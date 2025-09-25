@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width,initial-scale=1"/>
+    <title>RAG 뉴스 챗봇</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        :root { color-scheme: light dark; }
+        html, body { scroll-behavior: smooth; }
+        .bubble { max-width: 80%; }
+        .dot { animation: blink 1.4s infinite both }
+        .dot:nth-child(2){ animation-delay:.2s }
+        .dot:nth-child(3){ animation-delay:.4s }
+        @keyframes blink{ 0%,80%,100%{opacity:0} 40%{opacity:1} }
+        .scroll-thin::-webkit-scrollbar{ width:10px }
+        .scroll-thin::-webkit-scrollbar-thumb{ background:#cbd5e1; border-radius:8px }
+        @media (prefers-color-scheme: dark){
+            .scroll-thin::-webkit-scrollbar-thumb{ background:#475569 }
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-950 text-slate-900 dark:text-slate-100 min-h-screen">
+
+<header class="sticky top-0 z-10 backdrop-blur bg-white/60 dark:bg-slate-900/60 border-b border-slate-200/60 dark:border-slate-800">
+    <div class="mx-auto max-w-4xl px-4 py-3 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+            <div class="w-9 h-9 rounded-2xl bg-blue-600 flex items-center justify-center shadow text-white">AI</div>
+            <div>
+                <h1 class="text-lg font-semibold">RAG 뉴스 챗봇</h1>
+                <p class="text-xs text-slate-500 dark:text-slate-400">GPT-5 · 문서 기반 + 서버 수집 데이터</p>
+            </div>
+        </div>
+        <button id="resetBtn" class="px-3 py-2 rounded-xl text-sm bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 transition">
+            대화 초기화
+        </button>
+    </div>
+</header>
+
+<main class="mx-auto max-w-4xl px-4 py-6">
+    <section class="mb-4">
+        <div class="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/60 p-4 shadow-sm">
+            <p class="text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+                ⓘ 이 챗봇은 <b>RAG기술을 사용하여</b> 실시간 정보를 수집하여 답변합니다. 실시간/Top N 뉴스는 서버에서 수집·요약 후 안내합니다.
+                <br> 질의예) "이 사이트에서 제공하는 기능은 뭐야?", "오늘 가장 조회수 많은 뉴스 Top5 알려줘" </br>
+            </p>
+        </div>
+    </section>
+
+    <section class="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/60 shadow-sm">
+        <div id="chat" class="h-[60vh] p-4 overflow-y-auto scroll-thin">
+            <div class="flex items-start gap-3 mb-4">
+                <div class="shrink-0 w-9 h-9 rounded-2xl bg-blue-600 text-white flex items-center justify-center">AI</div>
+                <div class="bubble rounded-2xl px-4 py-3 bg-slate-100 dark:bg-slate-800">
+                    <p class="text-sm leading-relaxed">
+                        안녕하세요! 인공지능 상담사입니다. 무엇이 궁금하신가요?
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <div class="p-3 border-t border-slate-200 dark:border-slate-800">
+            <form id="chatForm" class="flex items-end gap-2">
+        <textarea id="messageInput" rows="1" placeholder="메시지를 입력하고 Enter…"
+                  class="flex-1 resize-none rounded-2xl px-4 py-3 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"></textarea>
+                <button id="sendBtn" type="submit"
+                        class="px-4 py-3 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium shadow transition disabled:opacity-60 disabled:cursor-not-allowed">
+                    보내기
+                </button>
+            </form>
+        </div>
+    </section>
+</main>
+
+<script>
+    const CHAT_URL = "/api/chat";
+    const RESET_URL = "/api/reset";
+    const TIMEOUT_MS = 120000; // 2분로 증가
+
+    const chatEl = document.getElementById("chat");
+    const formEl = document.getElementById("chatForm");
+    const inputEl = document.getElementById("messageInput");
+    const sendBtn = document.getElementById("sendBtn");
+    const resetBtn = document.getElementById("resetBtn");
+
+    const escapeHtml = (s)=>s.replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
+    const autoGrow = (ta)=>{ ta.style.height='auto'; ta.style.height=ta.scrollHeight+'px'; };
+    const scrollToBottom = ()=>{ chatEl.scrollTop = chatEl.scrollHeight; };
+
+    function bubbleUser(text){
+        chatEl.insertAdjacentHTML("beforeend",
+            `<div class="flex items-start gap-3 mb-4 justify-end">
+         <div class="bubble rounded-2xl px-4 py-3 bg-blue-600 text-white shadow">${escapeHtml(text)}</div>
+         <div class="shrink-0 w-9 h-9 rounded-2xl bg-blue-100 dark:bg-slate-800 flex items-center justify-center text-blue-700 dark:text-slate-200">나</div>
+       </div>`);
+        scrollToBottom();
+    }
+
+    function bubbleAI(html){
+        chatEl.insertAdjacentHTML("beforeend",
+            `<div class="flex items-start gap-3 mb-4">
+         <div class="shrink-0 w-9 h-9 rounded-2xl bg-blue-600 text-white flex items-center justify-center">AI</div>
+         <div class="bubble rounded-2xl px-4 py-3 bg-slate-100 dark:bg-slate-800 shadow">
+           <div class="prose prose-slate dark:prose-invert max-w-none text-sm">${html}</div>
+         </div>
+       </div>`);
+        scrollToBottom();
+    }
+
+    function bubbleTyping(){
+        const id = "typing-" + (crypto?.randomUUID?.() || Math.random().toString(36).slice(2));
+        chatEl.insertAdjacentHTML("beforeend",
+            `<div id="${id}" class="flex items-start gap-3 mb-4">
+         <div class="shrink-0 w-9 h-9 rounded-2xl bg-blue-600 text-white flex items-center justify-center">AI</div>
+         <div class="bubble rounded-2xl px-4 py-3 bg-slate-100 dark:bg-slate-800">
+           <span class="inline-flex items-center gap-1 text-slate-500">
+             <span class="dot">●</span><span class="dot">●</span><span class="dot">●</span>
+           </span>
+         </div>
+       </div>`);
+        scrollToBottom();
+        return id;
+    }
+
+    function removeEl(id){ const el=document.getElementById(id); if(el) el.remove(); }
+    function mdSafe(text){ return escapeHtml(text).replace(/^-\s/gm,"• ").replace(/\n/g,"<br>"); }
+
+    inputEl.addEventListener("input", ()=>autoGrow(inputEl));
+    inputEl.addEventListener("keydown", (e)=>{ if(e.key==="Enter"&&!e.shiftKey){ e.preventDefault(); formEl.requestSubmit(); }});
+
+    formEl.addEventListener("submit", async (e)=>{
+        e.preventDefault();
+        const q = inputEl.value.trim();
+        if(!q) return;
+
+        bubbleUser(q);
+        inputEl.value=""; autoGrow(inputEl);
+        sendBtn.disabled = true;
+        const typingId = bubbleTyping();
+
+        try{
+            const ctrl = new AbortController();
+            const to = setTimeout(()=>ctrl.abort('timeout'), TIMEOUT_MS);
+
+            const res = await fetch(CHAT_URL, {
+                method: "POST",
+                headers: {"Content-Type":"application/json"},
+                body: JSON.stringify({message: q}),
+                signal: ctrl.signal
+            });
+            clearTimeout(to);
+
+            if(!res.ok){ removeEl(typingId); return bubbleAI(`서버 오류(${res.status})`); }
+            const data = await res.json();
+            removeEl(typingId);
+            bubbleAI(mdSafe(data.answer || "응답이 비었습니다."));
+
+        }catch(err){
+            removeEl(typingId);
+            const msg = (err?.name === 'AbortError' || err === 'timeout' ||
+                (typeof err?.message === 'string' && err.message.toLowerCase().includes('abort')))
+                ? `요청이 ${Math.floor(TIMEOUT_MS/1000)}초를 초과해 중단됐어요. 잠시 후 다시 시도하거나 질문을 더 구체적으로 해보세요.`
+                : ("요청 실패: " + (err?.message || err));
+            bubbleAI(msg);
+        }finally{
+            sendBtn.disabled = false;
+        }
+    });
+
+    resetBtn.addEventListener("click", async ()=>{
+        resetBtn.disabled = true;
+        try{
+            const res = await fetch(RESET_URL, { method:"POST" });
+            if(res.ok) bubbleAI("대화 기록을 초기화했습니다."); else bubbleAI("초기화 실패.");
+        }catch{ bubbleAI("초기화 요청 실패."); }
+        finally{ resetBtn.disabled = false; }
+    });
+</script>
+</body>
+</html>

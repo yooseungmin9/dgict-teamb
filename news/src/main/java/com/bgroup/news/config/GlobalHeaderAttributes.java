@@ -1,4 +1,4 @@
-package com.example.news.config;
+package com.bgroup.news.config;
 
 import org.springframework.stereotype.Component;
 import org.springframework.web.bind.annotation.ControllerAdvice;
