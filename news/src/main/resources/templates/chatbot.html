@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8">
+  <title>챗봇</title>
+  <link rel="stylesheet" th:href="@{/css/style.css}" />
+  <script th:src="@{/js/app.js}"></script>
+</head>
+<body>
+<div th:replace="fragments/header :: siteHeader"></div>
+
+<main class="main">
+  <div class="container">
+    <div id="chatbot.html" class="page">
+      <h2 class="page-title">AI 경제 상담봇</h2>
+      <div class="chatbot-container">
+        <div class="chat-messages" id="chat-messages">
+          <div class="message bot-message">
+            <div class="message-content">
+              안녕하세요! AI 경제 상담봇입니다. 경제 뉴스나 경제 용어에 대해 궁금한 것이 있으시면 언제든 물어보세요.
+            </div>
+          </div>
+        </div>
+        <div class="chat-input-container">
+          <input type="text" id="chat-input" placeholder="경제 관련 질문을 입력하세요..." class="form-control">
+          <button id="send-btn" class="btn btn--primary">전송</button>
+        </div>
+      </div>
+      <div class="faq-section">
+        <h3>자주 묻는 질문</h3>
+        <div class="faq-items">
+          <button class="faq-item" data-question="기준금리가 오르면 어떤 영향이 있나요?">
+            기준금리가 오르면 어떤 영향이 있나요?
+          </button>
+          <button class="faq-item" data-question="인플레이션이란 무엇인가요?">
+            인플레이션이란 무엇인가요?
+          </button>
+          <button class="faq-item" data-question="환율이 경제에 미치는 영향은?">
+            환율이 경제에 미치는 영향은?
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+</body>
+</html>

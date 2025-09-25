@@ -1,0 +1,60 @@
+<!-- src/main/resources/templates/fragments/header.html -->
+<!-- [입문자용 설명]
+     - 재사용 가능한 헤더 조각(fragment)입니다.
+     - 버튼/카드 유지 요구에 맞춰 data-url + 공용 JS로 이동 처리 -->
+<header class="header" th:fragment="siteHeader" xmlns:th="http://www.w3.org/1999/xhtml">
+  <div class="container">
+    <div class="flex items-center justify-between">
+      <div class="logo">
+        <h1 th:text="${pageTitle}">EcoNews AI</h1>
+        <span th:text="${subTitle}">AI 기반 경제 뉴스 분석</span>
+      </div>
+      <nav class="nav">
+        <!-- button 유지 + 접근성 -->
+        <button class="nav-btn" th:text="${nav1}" data-url="/"></button>
+        <button class="nav-btn" th:text="${nav2}" data-url="/news"></button>
+        <button class="nav-btn" th:text="${nav3}" data-url="/sentiment"></button>
+        <button class="nav-btn" th:text="${nav4}" data-url="/global"></button>
+        <button class="nav-btn" th:text="${nav5}" data-url="/trends"></button>
+        <button class="nav-btn" th:text="${nav6}" data-url="/chatbot"></button>
+        <button class="nav-btn" th:text="${nav7}" data-url="/recommendations"></button>
+
+        <button class="login-btn" data-url="/login">
+          <img src="/img/login.png" alt="로그인" class="login-icon" />
+        </button>
+      </nav>
+    </div>
+  </div>
+
+  <!-- 공용 라우팅 스크립트: 모든 페이지에서 동작 -->
+  <script th:inline="javascript">
+    (function () {
+    function go(el) {
+      var url = el.dataset.url;
+      if (url) window.location.href = url; // 지정 URL로 이동
+    }
+    function onClick(e) {
+      var t = e.currentTarget;
+      go(t);
+    }
+    function onKey(e) {
+      // Enter(13) 또는 Space(32)로도 이동
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        go(e.currentTarget);
+      }
+    }
+    // 버튼, 카드 모두에 리스너 장착
+    var links = document.querySelectorAll('[data-url]');
+    links.forEach(function (el) {
+      el.addEventListener('click', onClick);
+      el.addEventListener('keydown', onKey);
+      // 시각적으로 링크처럼 보이게
+      el.style.cursor = 'pointer';
+    });
+  })();
+  </script>
+</header>
+
+<!-- [간단 테스트]
+     - 이 파일만 수정하면 모든 페이지의 헤더가 함께 반영됩니다. -->

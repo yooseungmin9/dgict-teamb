@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8">
+  <title>트랜드 예측</title>
+  <link rel="stylesheet" th:href="@{/css/style.css}" />
+  <script th:src="@{/js/app.js}"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+<div th:replace="fragments/header :: siteHeader"></div>
+
+<main class="main">
+  <div class="container">
+    <div id="trends.html" class="page">
+      <h2 class="page-title">소비 트렌드 예측</h2>
+      <div class="trends-grid">
+        <div class="chart-section">
+          <h3>향후 3개월 소비 전망</h3>
+          <div class="chart-container" style="position: relative; height: 300px;">
+            <canvas id="trendsChart"></canvas>
+          </div>
+        </div>
+        <div class="correlation-section">
+          <h3>경제지표 상관관계</h3>
+          <div class="correlation-grid">
+            <div class="correlation-item high">
+              <span class="label">금리 ↔ 부동산</span>
+              <span class="value">-0.87</span>
+            </div>
+            <div class="correlation-item medium">
+              <span class="label">환율 ↔ 수출</span>
+              <span class="value">0.64</span>
+            </div>
+            <div class="correlation-item low">
+              <span class="label">물가 ↔ 소비</span>
+              <span class="value">-0.32</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="forecast-section">
+        <h3>업종별 전망</h3>
+        <div class="forecast-cards">
+          <div class="forecast-card positive">
+            <h4>IT/반도체</h4>
+            <div class="forecast-trend">📈 상승</div>
+            <p>AI 수요 증가와 메모리 가격 회복세</p>
+          </div>
+          <div class="forecast-card neutral">
+            <h4>부동산</h4>
+            <div class="forecast-trend">→ 보합</div>
+            <p>금리 정책과 규제 완화 기대감 상충</p>
+          </div>
+          <div class="forecast-card negative">
+            <h4>내수소비</h4>
+            <div class="forecast-trend">📉 둔화</div>
+            <p>고금리와 물가 부담 지속</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+</body>
+</html>

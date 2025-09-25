@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8">
+  <title>글로벌 모니터링</title>
+  <link rel="stylesheet" th:href="@{/css/style.css}" />
+  <script th:src="@{/js/app.js}"></script>
+</head>
+<body>
+<div th:replace="fragments/header :: siteHeader"></div>
+
+<main class="main">
+  <div class="container">
+    <div id="global.html" class="page">
+      <h2 class="page-title">글로벌 경제 모니터링</h2>
+      <div class="global-section">
+        <h3>해외 경제 헤드라인</h3>
+        <div class="headlines-scroll">
+          <div id="headlines-ticker" class="ticker">
+            <!-- Headlines will be dynamically generated -->
+          </div>
+        </div>
+      </div>
+      <div class="indicators-section">
+        <h3>주요국 경제 지표</h3>
+        <div class="indicators-table">
+          <table id="indicators-table">
+            <thead>
+            <tr>
+              <th>국가</th>
+              <th>GDP 성장률</th>
+              <th>인플레이션</th>
+              <th>실업률</th>
+            </tr>
+            </thead>
+            <tbody>
+  </div>
+</main>
+</body>
+</html>

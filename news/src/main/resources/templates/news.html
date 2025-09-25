@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>오늘의 뉴스</title>
+    <link rel="stylesheet" th:href="@{/css/style.css}" />
+    <script th:src="@{/js/app.js}" ></script>
+</head>
+<body>
+<div th:replace="fragments/header :: siteHeader"></div>
+
+<main class="main">
+  <div class="container">
+    <div id="news.html" class="page">
+      <h2 class="page-title">오늘의 경제 뉴스</h2>
+      <div class="news-section">
+        <h3>금일 주요 뉴스</h3>
+        <div id="news-list" class="news-list">
+          <!-- News items will be dynamically generated -->
+        </div>
+      </div>
+      <div class="news-section">
+        <h3>전일 브리핑 요약</h3>
+        <div class="briefing-card">
+          <p>어제 주요 경제 이슈: 한국은행 기준금리 결정 회의, 주요 기업 실적 발표, 부동산 시장 동향 등이 주목받았습니다.</p>
+          <div class="briefing-highlights">
+            <span class="highlight">금리정책</span>
+            <span class="highlight">기업실적</span>
+            <span class="highlight">부동산</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+</body>
+</html>
