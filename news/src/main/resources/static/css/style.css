@@ -1249,10 +1249,21 @@ select.form-control {
   max-width: 80%;
 }
 
-.chat-input-container {
-  display: flex;
-  padding: var(--space-16);
-  gap: var(--space-8);
+.chat-form.flex-row {
+    display: flex;
+    align-items: flex-end;
+    gap: 10px;
+}
+
+.chat-input-auto {
+    flex: 1;
+    resize: none;
+    min-height: 44px;
+    max-height: 160px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    border: 1px solid #ccc;
+    font-size: 14px;
 }
 
 .chat-input-container .form-control {
