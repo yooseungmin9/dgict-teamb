@@ -1,4 +1,3 @@
 package com.bgroup.news.service;
 
-public class NewsService {
-}
+public class NewsService {}

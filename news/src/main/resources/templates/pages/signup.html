@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>회원가입</title>
+</head>
+<body>
+<h1>회원가입</h1>
+<form th:action="@{/pages/signup}" th:object="${member}" method="post">
+  <label>ID: <input type="text" th:field="*{id}" required /></label><br/>
+  <label>Password: <input type="password" th:field="*{password}" required /></label><br/>
+  <label>이름: <input type="text" th:field="*{name}" required /></label><br/>
+  <label>출생년도: <input type="number" th:field="*{birthYear}" /></label><br/>
+  <label>전화번호: <input type="text" th:field="*{phone}" /></label><br/>
+  <label>지역:
+    <select th:field="*{region}">
+      <option value="">-- 지역 선택 --</option>
+      <option value="서울">서울</option>
+      <option value="부산">부산</option>
+      <option value="대구">대구</option>
+      <option value="인천">인천</option>
+      <option value="광주">광주</option>
+      <option value="대전">대전</option>
+      <option value="울산">울산</option>
+      <option value="경기">경기</option>
+      <option value="강원">강원</option>
+      <option value="충북">충북</option>
+      <option value="충남">충남</option>
+      <option value="전북">전북</option>
+      <option value="전남">전남</option>
+      <option value="경북">경북</option>
+      <option value="경남">경남</option>
+      <option value="제주">제주</option>
+    </select>
+  </label><br/>
+  <label>성별:
+    <select th:field="*{gender}">
+      <option value="남">남</option>
+      <option value="여">여</option>
+    </select>
+  </label><br/>
+  <button type="submit">가입하기</button>
+</form>
+<p><a href="/pages/members">회원목록 보기</a></p>
+<button type="button" onclick="location.href='/pages/dashboard'">메인화면</button>
+</body>
+</html>
