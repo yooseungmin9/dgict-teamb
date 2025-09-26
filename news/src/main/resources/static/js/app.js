@@ -1,4 +1,5 @@
 // Application data
+
 const appData = {
   news_summary: [
     {
@@ -292,7 +293,7 @@ function updateActiveNav(activeBtn) {
   }
 }
 
-// Render news data
+// renderNewsData() — "제목 바로 오른쪽"에 칩이 붙도록 교체
 function renderNewsData() {
   const newsList = document.getElementById('news-list');
   if (!newsList) return;
@@ -300,30 +301,79 @@ function renderNewsData() {
   newsList.innerHTML = '';
 
   appData.news_summary.forEach((news, index) => {
-    const newsItem = document.createElement('div');
-    newsItem.className = 'news-item';
-    newsItem.setAttribute('data-news-id', index);
+    const label = toSentimentLabel(news);     // 'pos' | 'neg' | 'neu'
+    const arrow = sentimentArrow(label);      // ▲ / ▼ / —
+    const score = sentimentScoreText(news);   // " 0.42" 등 (없으면 빈문자)
 
     const stars = '★'.repeat(news.importance) + '☆'.repeat(5 - news.importance);
 
-    newsItem.innerHTML = `
+    const item = document.createElement('div');
+    item.className = 'news-item';
+    item.setAttribute('data-news-id', index);
+
+    item.innerHTML = `
       <div class="news-header">
-        <h4 class="news-title">${news.title}</h4>
+        <h4 class="news-title">
+          <span class="title-text">${escapeHtml(news.title)}</span>
+          <!-- 🔽 제목 바로 오른쪽에 배치되는 칩 -->
+          <span class="sentiment-chip ${label}" title="감성: ${label}${score}">
+            ${arrow}
+          </span>
+        </h4>
         <div class="news-meta">
-          <span class="news-category">${news.category}</span>
-          <span class="news-time">${news.time}</span>
+          <span class="news-category">${escapeHtml(news.category)}</span>
+          <span class="news-time">${escapeHtml(news.time)}</span>
         </div>
       </div>
-      <p class="news-summary">${news.summary}</p>
+      <p class="news-summary">${escapeHtml(news.summary)}</p>
       <div class="news-importance">
         <span>중요도:</span>
-        <span class="stars">${stars}</span>
+        <span class="stars" aria-label="중요도 ${news.importance}/5">${stars}</span>
       </div>
     `;
 
-    newsItem.addEventListener('click', () => openNewsModal(news));
-    newsList.appendChild(newsItem);
+    item.addEventListener('click', () => openNewsModal(news));
+    newsList.appendChild(item);
   });
+
+  function escapeHtml(s){
+    return String(s||'').replace(/[&<>"']/g, m => ({
+      '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+    }[m]));
+  }
+}
+
+function toSentimentLabel(news){
+  // 1) 명시적 라벨 우선
+  if (typeof news.sentiment === 'string') {
+    const s = news.sentiment.toLowerCase();
+    if (s.startsWith('pos')) return 'pos';
+    if (s.startsWith('neg')) return 'neg';
+    return 'neu';
+  }
+  // 2) 점수(-1~1) 기준
+  if (typeof news.score === 'number') {
+    if (news.score >= 0.15) return 'pos';
+    if (news.score <= -0.15) return 'neg';
+    return 'neu';
+  }
+  // 3) 아주 간단한 키워드 휴리스틱 (없으면 중립)
+  const t = (news.title||'') + ' ' + (news.summary||'');
+  const posK = /(호조|호재|증가|상승|회복|상회|개선|선전|확대|급등|강세)/;
+  const negK = /(부진|악화|감소|하락|둔화|우려|급락|약세|경고|참사|적자)/;
+  if (posK.test(t) && !negK.test(t)) return 'pos';
+  if (negK.test(t) && !posK.test(t)) return 'neg';
+  return 'neu';
+}
+
+/** 라벨 → 표시 문자 */
+function sentimentArrow(label){
+  return label === 'pos' ? '▲' : label === 'neg' ? '▼' : '—';
+}
+
+/** 화살표 옆에 점수(있을 때만) */
+function sentimentScoreText(news){
+  return typeof news.score === 'number' ? ` ${news.score.toFixed(2)}` : '';
 }
 
 // Render global data
