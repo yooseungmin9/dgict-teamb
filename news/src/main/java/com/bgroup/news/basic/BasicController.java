@@ -54,4 +54,11 @@ public class BasicController {
 
         return "login";
     }
+
+    @GetMapping("/chart")
+    public String chartPage() {
+
+        return "chart";  // templates/chart.html 반환
+    }
 }
+

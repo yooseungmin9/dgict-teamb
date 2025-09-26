@@ -1483,4 +1483,34 @@ select.form-control {
   .page-title {
     font-size: var(--font-size-2xl);
   }
+
+  /* style.css 끝에 추가/수정 */
+  /* 제목 라인: 제목텍스트 + 감성칩을 같은 줄에 */
+.news-title{
+  margin:0;
+  font-size:16px;
+  line-height:1.45;
+  display:flex;
+  align-items:center;
+  gap:8px;            /* 제목과 칩 간격 */
 }
+.news-title .title-text{ flex:0 1 auto; }
+
+.sentiment-chip{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  width:20px;
+  height:20px;
+  border-radius:6px;
+  font-weight:700;
+  font-size:12px;
+  line-height:1;
+  user-select:none;
+  flex:0 0 20px;
+}
+
+/* 하드코딩 색상 버전 */
+.sentiment-chip.pos{ color:#c2172e; background:#ffe9ee; } /* 빨강 ▲ */
+.sentiment-chip.neg{ color:#0b66c3; background:#eaf4ff; } /* 파랑 ▼ */
+.sentiment-chip.neu{ color:#6b7280; background:#f3f4f6; } /* 회색 — */
