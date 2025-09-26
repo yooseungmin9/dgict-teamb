@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.ModelAttribute;
  */
 @ControllerAdvice
 @Component
-public class GlobalHeaderAttributes {
+public class HeaderAttributes {
 
     @ModelAttribute
     public void injectHeaderDefaults(Model model) {
