@@ -17,6 +17,7 @@ public class ApiController {
     private final ChatbotService chatbotService;
     private final KeywordService keywordService;
 
+    // ----------- Chatbot API -----------
     @PostMapping("/chat")
     public ResponseEntity<?> chat(@RequestBody Map<String, Object> body) {
         String result = chatbotService.sendChat(body);

@@ -13,50 +13,41 @@ public class PageController {
     public String index(Model model){
         model.addAttribute("mainPageTitle","경제 뉴스 분석 대시보드");
         model.addAttribute("todayNews","오늘의 뉴스");
-
         return "pages/dashboard";
     }
 
     @GetMapping("/news")
     public String news(Model model){
-
         return "pages/news";
     }
 
     @GetMapping("/sentiment")
     public String sentiment(Model model){
-
         return "pages/sentiment";
     }
 
     @GetMapping("/global")
     public String global(Model model){
-
         return "pages/global";
     }
 
     @GetMapping("/trends")
     public String trends(Model model){
-
         return "pages/trends";
     }
 
-
     @GetMapping("/recommendations")
     public String recommendations(Model model){
-
         return "pages/recommendations";
     }
 
     @GetMapping("/login")
     public String login(Model model){
-
         return "pages/login";
     }
 
     @GetMapping("/chart")
     public String chartPage() {
-
         return "pages/chart";  // templates/chart.html 반환
     }
 
