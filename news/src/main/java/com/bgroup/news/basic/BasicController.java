@@ -1,4 +1,4 @@
-package com.example.news.basic;
+package com.bgroup.news.basic;
 
 import java.time.LocalDate;
 import java.util.*;
@@ -42,11 +42,6 @@ public class BasicController {
         return "trends";
     }
 
-    @GetMapping("/chatbot")
-    public String chatbot(Model model){
-
-        return "chatbot";
-    }
 
     @GetMapping("/recommendations")
     public String recommendations(Model model){
@@ -59,4 +54,11 @@ public class BasicController {
 
         return "login";
     }
+
+    @GetMapping("/chart")
+    public String chartPage() {
+
+        return "chart";  // templates/chart.html 반환
+    }
 }
+

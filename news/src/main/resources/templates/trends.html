@@ -1,10 +1,13 @@
+<!-- templates/trends.html — "소비 트렌드 예측 + 키워드 추이" 통합본 -->
 <!DOCTYPE html>
 <html lang="ko" xmlns:th="http://www.thymeleaf.org">
 <head>
   <meta charset="UTF-8">
   <title>트랜드 예측</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="stylesheet" th:href="@{/css/style.css}" />
   <script th:src="@{/js/app.js}"></script>
+  <!-- Chart.js 한 번만 로드 -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
@@ -14,6 +17,8 @@
   <div class="container">
     <div id="trends.html" class="page">
       <h2 class="page-title">소비 트렌드 예측</h2>
+
+      <!-- 상단: 소비 전망 + 상관관계 -->
       <div class="trends-grid">
         <div class="chart-section">
           <h3>향후 3개월 소비 전망</h3>
@@ -21,6 +26,7 @@
             <canvas id="trendsChart"></canvas>
           </div>
         </div>
+
         <div class="correlation-section">
           <h3>경제지표 상관관계</h3>
           <div class="correlation-grid">
@@ -39,6 +45,8 @@
           </div>
         </div>
       </div>
+
+      <!-- 업종별 카드 -->
       <div class="forecast-section">
         <h3>업종별 전망</h3>
         <div class="forecast-cards">
@@ -59,8 +67,122 @@
           </div>
         </div>
       </div>
+
+      <!-- ▼ 새로 추가: 주요 키워드 추이 -->
+      <div class="keyword-section" style="margin-top: 28px;">
+        <h3>주요 키워드 추이</h3>
+        <div class="chart-container" style="position: relative; height: 360px;">
+          <canvas id="keywordChart"></canvas>
+        </div>
+      </div>
     </div>
   </div>
 </main>
+
+<!-- 스크립트: 두 차트 초기화 -->
+<script>
+  // -------------------------------------------
+  // 1) 소비 전망(데모용): 간단한 라인/영역 차트
+  //    실제 값이 있으면 여기로 바인딩만 바꾸세요.
+  // -------------------------------------------
+  (function initTrendsChart(){
+    const ctx = document.getElementById('trendsChart');
+    if(!ctx) return;
+
+    // 입문자용 더미 데이터
+    const labels = ["이번달", "다음달", "다다음달"];
+    const values = [100, 104, 108]; // 소비지수(=100 기준)
+
+    new Chart(ctx, {
+      type: "line",
+      data: {
+        labels,
+        datasets: [{
+          label: "소비지수(=100)",
+          data: values,
+          fill: true,
+          tension: 0.3,
+          borderWidth: 2
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: { legend: { display: false } },
+        scales: {
+          y: { beginAtZero: false }
+        }
+      }
+    });
+  })();
+
+  // -------------------------------------------
+  // 2) 키워드 추이: /keywords JSON → 라인차트
+  //    실패 시 더미 데이터로 폴백
+  //    기대 JSON 형식:
+  //    {
+  //      "dates": ["2025-09-20","2025-09-21",...],
+  //      "keywords": {
+  //         "금리":[3,5,4,...],
+  //         "환율":[2,4,5,...],
+  //         "부동산":[1,2,2,...]
+  //      }
+  //    }
+  // -------------------------------------------
+  async function fetchKeywords(){
+    try{
+      const res = await fetch("/keywords");
+      if(!res.ok) throw new Error(res.status);
+      return await res.json();
+    }catch(e){
+      // 🔁 폴백(더미)
+      return {
+        dates: ["2025-09-19","2025-09-20","2025-09-21","2025-09-22","2025-09-23","2025-09-24","2025-09-25"],
+        keywords: {
+          "금리":[3,4,5,4,6,7,8],
+          "환율":[2,2,3,3,4,5,4],
+          "부동산":[1,1,2,2,2,3,3]
+        }
+      };
+    }
+  }
+
+  (async function initKeywordChart(){
+    const el = document.getElementById("keywordChart");
+    if(!el) return;
+
+    const data = await fetchKeywords();
+    const labels = data.dates || [];
+
+    // 서로 다른 색상(HSL) 자동 생성
+    const datasets = Object.keys(data.keywords || {}).map((kw, i) => ({
+      label: kw,
+      data: data.keywords[kw],
+      borderColor: `hsl(${(i*70)%360} 70% 45%)`,
+      backgroundColor: `hsl(${(i*70)%360} 70% 45% / 0.15)`,
+      pointRadius: 2,
+      fill: false,
+      tension: 0.3,
+      borderWidth: 2
+    }));
+
+    new Chart(el, {
+      type: "line",
+      data: { labels, datasets },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { position: "top" },
+          tooltip: { mode: "index", intersect: false }
+        },
+        interaction: { mode: "nearest", axis: "x", intersect: false },
+        scales: {
+          x: { ticks: { maxRotation: 0, autoSkip: true } },
+          y: { beginAtZero: true, title: { display: true, text: "언급량(건)" } }
+        }
+      }
+    });
+  })();
+</script>
 </body>
 </html>
