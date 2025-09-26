@@ -73,8 +73,8 @@ def save_to_mongo_or_json(docs: list):
     try:
         client = MongoClient("mongodb://localhost:27017/", serverSelectionTimeoutMS=2000)
         client.server_info()  # 연결 확인
-        db = client["newsdb"]
-        col = db["articles"]
+        db = client["test123"]
+        col = db["seongjin_articles"]
 
         for doc in docs:
             result = col.update_one({"link": doc["link"]}, {"$set": doc}, upsert=True)

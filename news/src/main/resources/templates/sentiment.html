@@ -2,10 +2,63 @@
 <html lang="ko" xmlns:th="http://www.thymeleaf.org">
 <head>
   <meta charset="UTF-8">
-  <title>감성 분석</title>
+  <title>EcoNews AI - 감성 분석</title>
   <link rel="stylesheet" th:href="@{/css/style.css}" />
-  <script th:src="@{/js/app.js}"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    .analysis-grid {
+      display: flex;
+      gap: 32px;
+    }
+    .chart-container {
+      flex: 2;
+    }
+    .sentiment-summary {
+      flex: 1;
+      padding: 16px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+    }
+    .sentiment-item {
+      margin: 8px 0;
+      font-size: 16px;
+    }
+    .positive { color: #36a2eb; }
+    .neutral { color: #999; }
+    .negative { color: #ff6384; }
+
+    /* 카드 스타일 */
+    .category-cards {
+  display: flex;          /* 가로로 나열 */
+  gap: 16px;
+  margin-top: 32px;
+  overflow-x: auto;       /* 넘치면 가로 스크롤 */
+  padding-bottom: 8px;
+}
+.category-card {
+  min-width: 200px;       /* 카드 최소 너비 */
+  flex: 0 0 auto;         /* 줄바꿈 방지 */
+  border: 1px solid #eee;
+  border-radius: 12px;
+  padding: 16px;
+  background: #fff;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+  text-align: center;
+}
+.category-card h4 {
+  margin-bottom: 8px;
+  font-size: 18px;
+  font-weight: 600;
+  color: #2c3e50;
+}
+.category-card .status {
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+.status.positive { color: #36a2eb; }
+.status.neutral { color: #666; }
+.status.negative { color: #ff6384; }
+  </style>
 </head>
 <body>
 <div th:replace="fragments/header :: siteHeader"></div>
@@ -15,38 +68,127 @@
     <div id="sentiment" class="page">
       <h2 class="page-title">경제 뉴스 감성 분석</h2>
       <div class="analysis-grid">
-        <div class="chart-container" style="position: relative; height: 300px;">
-          <canvas id="sentimentChart"></canvas>
+        <div class="chart-container">
+          <canvas id="pyramidChart" width="400" height="250"></canvas>
         </div>
         <div class="sentiment-summary">
           <h3>오늘의 시장 감성</h3>
           <div class="sentiment-item positive">
             <span class="sentiment-label">긍정</span>
-            <span class="sentiment-value">35%</span>
+            <span id="positiveValue">0%</span>
           </div>
           <div class="sentiment-item neutral">
             <span class="sentiment-label">중립</span>
-            <span class="sentiment-value">45%</span>
+            <span id="neutralValue">0%</span>
           </div>
           <div class="sentiment-item negative">
             <span class="sentiment-label">부정</span>
-            <span class="sentiment-value">20%</span>
+            <span id="negativeValue">0%</span>
           </div>
         </div>
       </div>
-      <div class="keywords-section">
-        <h3>주요 키워드</h3>
-        <div class="keywords-cloud">
-          <span class="keyword large">금리</span>
-          <span class="keyword medium">인플레이션</span>
-          <span class="keyword small">부동산</span>
-          <span class="keyword large">반도체</span>
-          <span class="keyword medium">환율</span>
-          <span class="keyword small">소비자물가</span>
-        </div>
-      </div>
+
+      <!-- ✅ 새로 추가된 카테고리 카드 섹션 -->
+      <section style="margin-top:40px;">
+        <h3>업종별 감성 요약</h3>
+        <div class="category-cards" id="categoryCards"></div>
+      </section>
     </div>
   </div>
 </main>
+
+<script>
+  async function loadData() {
+    const res = await fetch("http://127.0.0.1:8000/sentiment?days=7");
+    const json = await res.json();
+    const data = json.data;
+
+    const categories = Object.keys(data);
+    const pos = categories.map(c => data[c]["긍정"] || 0);
+    const neu = categories.map(c => data[c]["중립"] || 0);
+    const neg = categories.map(c => -(data[c]["부정"] || 0)); // 음수
+
+    // 합계 → 요약
+    const totalPos = pos.reduce((a,b)=>a+b,0);
+    const totalNeu = neu.reduce((a,b)=>a+b,0);
+    const totalNeg = -neg.reduce((a,b)=>a+b,0);
+    const total = totalPos + totalNeu + totalNeg;
+
+    document.getElementById("positiveValue").textContent = ((totalPos/total)*100).toFixed(1)+"%";
+    document.getElementById("neutralValue").textContent = ((totalNeu/total)*100).toFixed(1)+"%";
+    document.getElementById("negativeValue").textContent = ((totalNeg/total)*100).toFixed(1)+"%";
+
+    // x축 범위: 양쪽 대칭
+    const maxVal = Math.max(...pos, ...neg.map(v=>-v));
+    const ctx = document.getElementById("pyramidChart").getContext("2d");
+    new Chart(ctx, {
+      type: "bar",
+      data: {
+        labels: categories,
+        datasets: [
+          { label: "부정", data: neg, backgroundColor: "rgba(255,99,132,0.7)" },
+          { label: "긍정", data: pos, backgroundColor: "rgba(54,162,235,0.7)" }
+        ]
+      },
+      options: {
+        indexAxis: "y",
+        responsive: true,
+        scales: {
+          x: {
+            stacked: true,
+            suggestedMin: -maxVal,
+            suggestedMax: maxVal,
+            ticks: { callback: v => Math.abs(v) }
+          },
+          y: { stacked: true }
+        },
+        plugins: {
+          tooltip: {
+            callbacks: {
+              label: ctx => `${ctx.dataset.label}: ${Math.abs(ctx.raw)}`
+            }
+          },
+          legend: { position: "top" }
+        }
+      }
+    });
+
+    // ✅ 카테고리 카드 렌더링
+    renderCategoryCards(data);
+  }
+
+  function renderCategoryCards(data) {
+  const container = document.getElementById("categoryCards");
+  container.innerHTML = "";
+
+  Object.entries(data).forEach(([category, values]) => {
+    const pos = values["긍정"] || 0;
+    const neu = values["중립"] || 0;
+    const neg = values["부정"] || 0;
+
+    let status = "보합 ➡";
+    let statusClass = "neutral";
+
+    if (pos > neg && pos > neu) {
+      status = "상승 ⬆";
+      statusClass = "positive";
+    } else if (neg > pos && neg > neu) {
+      status = "둔화 ⬇";
+      statusClass = "negative";
+    }
+
+    const card = `
+      <div class="category-card">
+        <h4>${category}</h4>
+        <div class="status ${statusClass}">${status}</div>
+        <p>긍정 ${pos}, 중립 ${neu}, 부정 ${neg}</p>
+      </div>
+    `;
+    container.insertAdjacentHTML("beforeend", card);
+  });
+}
+
+  loadData();
+</script>
 </body>
 </html>
