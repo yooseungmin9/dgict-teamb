@@ -114,7 +114,7 @@ def analyze_sentiment(text: str) -> str:
 # -------------------
 # 크롤러 본체
 # -------------------
-def crawl_and_save(days: int = 5, limit_per_day: int = 50) -> None:
+def crawl_and_save(days: int = 30, limit_per_day: int = 50) -> None:
     col = get_collection()
     headers = {"User-Agent": USER_AGENT}
 
@@ -173,4 +173,4 @@ def crawl_and_save(days: int = 5, limit_per_day: int = 50) -> None:
 # 실행부
 # -------------------
 if __name__ == "__main__":
-    crawl_and_save(days=5, limit_per_day=50)
+    crawl_and_save(days=30, limit_per_day=50)

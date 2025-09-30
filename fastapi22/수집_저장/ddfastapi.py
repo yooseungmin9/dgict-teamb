@@ -10,9 +10,9 @@ app = FastAPI()
 @app.get("/keywords")
 def keywords():
     # MongoDB 연결
-    client = MongoClient("mongodb+srv://Dgict_TeamB:team1234@cluster0.5d0uual.mongodb.net/")
+    client = MongoClient("mongodb+srv://Dgict_TeamB:team1234@cluster0.5d0uual.mongodb.net/?retryWrites=true&w=majority")
     db = client["test123"]
-    col = db["seongjin_articles"]
+    col = db["sungjin_articles"]
 
     today = datetime.now()
     week_ago = today - timedelta(days=7)

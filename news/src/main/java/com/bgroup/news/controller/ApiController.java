@@ -1,7 +1,6 @@
 package com.bgroup.news.controller;
 
 import com.bgroup.news.mongo.document.MemberDoc;
-import com.bgroup.news.service.ChatbotService;
 import com.bgroup.news.service.KeywordService;
 import com.bgroup.news.service.MemberService;
 import org.springframework.data.domain.Page;
@@ -17,29 +16,26 @@ import java.util.Map;
 @RequestMapping("/api")
 public class ApiController {
 
-    private final ChatbotService chatbotService;
     private final KeywordService keywordService;
     private final MemberService memberService;
 
-    public ApiController(ChatbotService chatbotService,
-                         KeywordService keywordService,
+    public ApiController(KeywordService keywordService,
                          MemberService memberService) {
-        this.chatbotService = chatbotService;
         this.keywordService = keywordService;
         this.memberService = memberService;
     }
 
-    @PostMapping("/chat")
-    public ResponseEntity<?> chat(@RequestBody Map<String, Object> body) {
-        String result = chatbotService.sendChat(body);
-        return ResponseEntity.ok(result);
-    }
+//    @PostMapping("/chat")
+//    public ResponseEntity<?> chat(@RequestBody Map<String, Object> body) {
+//        String result = chatbotService.sendChat(body);
+//        return ResponseEntity.ok(result);
+//    }
 
-    @PostMapping("/reset")
-    public ResponseEntity<?> reset() {
-        String result = chatbotService.reset();
-        return ResponseEntity.ok(result);
-    }
+//    @PostMapping("/reset")
+//    public ResponseEntity<?> reset() {
+//        String result = chatbotService.reset();
+//        return ResponseEntity.ok(result);
+//    }
 
     @GetMapping("/keywords")
     public Mono<String> getKeywords() {

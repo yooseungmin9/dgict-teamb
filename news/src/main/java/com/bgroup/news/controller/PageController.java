@@ -29,24 +29,15 @@ public class PageController {
         return "pages/news";
     }
 
-    @GetMapping("/sentiment")
-    public String sentiment(Model model) {
-        return "pages/sentiment";
-    }
-
     @GetMapping("/global")
     public String global(Model model) {
         return "pages/global";
     }
 
     @GetMapping("/trends")
-    public String trends(Model model) {
+    public String showTrendsPage() {
+        // 그냥 templates/trends.html 반환
         return "pages/trends";
-    }
-
-    @GetMapping("/recommendations")
-    public String recommendations(Model model) {
-        return "pages/recommendations";
     }
 
     @GetMapping("/login")
@@ -81,11 +72,6 @@ public class PageController {
     @GetMapping("/chart")
     public String chartPage() {
         return "pages/chart";
-    }
-
-    @GetMapping("/chat")
-    public String chatPage() {
-        return "pages/chat";
     }
 
     @GetMapping("/members")

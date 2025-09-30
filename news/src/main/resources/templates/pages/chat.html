@@ -1,62 +1,81 @@
-<!-- templates/chat.html (기존 레이아웃 유지, 필요한 id만 추가) -->
+<!-- templates/chat.html -->
 <!DOCTYPE html>
 <html lang="ko" xmlns:th="http://www.thymeleaf.org">
 <head>
-    <meta charset="UTF-8" />
-    <title>AI 경제 상담봇</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <link rel="stylesheet" th:href="@{/css/style.css}" />
-    <script th:src="@{/js/app.js}"></script>
+  <meta charset="UTF-8" />
+  <title>AI 경제 상담봇</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" th:href="@{/css/style.css}" />
+  <style>
+    .chatbot-container { position: relative; }
 
-    <!-- (선택) Tailwind를 추가해 버튼/배경만 빠르게 꾸미고 싶다면 이 한 줄 -->
-    <!-- <script src="https://cdn.tailwindcss.com"></script> -->
+    /* 상단 우측에 대화초기화 + 언어 선택 배치 */
+    .top-controls {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      align-items: flex-end;
+    }
+
+    .top-controls select {
+      padding: 4px;
+      font-size: 14px;
+    }
+  </style>
 </head>
 <body>
-<div th:replace="fragments/header :: siteHeader"></div>
+  <div th:replace="fragments/header :: siteHeader"></div>
 
-<main class="main">
+  <main class="main">
     <div class="container">
-        <h2 class="page-title">AI 경제 상담봇</h2>
+      <h2 class="page-title">기자와의 대화 챗봇</h2>
 
-        <!-- ▼▼▼ 필수: 대화창 id="chat" ▼▼▼ -->
-        <div class="chatbot-container">
-            <div id="chat" class="chat-messages">
-                <div class="message bot-message">
-                    <div class="message-content">
-                        안녕하세요! AI 경제 상담봇입니다. 경제 뉴스나 경제 용어에 대해 궁금한 것이 있으시면 언제든 물어보세요.
-                    </div>
-                </div>
-            </div>
 
-            <!-- ▼▼▼ 필수: form, textarea, 버튼의 id 3개 ▼▼▼ -->
-            <div class="chat-input-container">
-                <form id="chatForm" class="chat-form flex-row">
-    <textarea id="messageInput" rows="1" placeholder="경제 관련 질문을 입력하세요..."
-              class="chat-input-auto"></textarea>
+        <div class="global-controls">
+            <select id="langSelect" aria-label="음성 인식 언어">
+                <option value="ko-KR">한국어</option>
+                <option value="en-US">English</option>
+            </select>
+            <button id="resetBtn" type="button" class="btn btn--secondary">대화 초기화</button>
+        </div>
+      <div class="chatbot-container">
 
-                    <!-- 버튼 그룹 -->
-                    <div class="btn-group">
-                        <button id="sendBtn" type="submit" class="btn btn--primary">전송</button>
-                        <button id="resetBtn" type="button" class="btn btn--secondary">대화 초기화</button>
-                    </div>
-                </form>
-            </div>
-
+        <!-- 채팅 메시지 영역 -->
+        <div id="chat" class="chat-messages">
+          <div class="message bot-message"><div class="message-content">
+            안녕하세요 알파경제 <b>김기자</b>입니다. 오늘은 어떤것이 궁금하신가요?
+          </div></div>
+          <!-- 상태 표시 말풍선 -->
+          <div id="statusBubble" class="message bot-message"><div class="message-content">상태: 대기</div></div>
         </div>
 
-        <!-- 기존 FAQ 버튼은 그대로 두고, 클릭 시 입력창에 넣고 전송하도록 JS에서 바인딩하면 됨 -->
-        <div class="faq-section">
-            <h3>자주 묻는 질문</h3>
-            <div class="faq-items">
-                <button class="faq-item" data-question="기준금리가 오르면 어떤 영향이 있나요?">기준금리가 오르면 어떤 영향이 있나요?</button>
-                <button class="faq-item" data-question="인플레이션이란 무엇인가요?">인플레이션이란 무엇인가요?</button>
-                <button class="faq-item" data-question="환율이 경제에 미치는 영향은?">환율이 경제에 미치는 영향은?</button>
-            </div>
-        </div>
+        <!-- 입력폼 -->
+        <form id="chatForm" class="chat-form flex-row">
+          <textarea id="messageInput" rows="1" placeholder="질문을 말하거나 입력하세요..." class="chat-input-auto"></textarea>
+
+          <div class="btn-group">
+            <button id="sttStartBtn" type="button" class="btn btn--secondary">🎙️</button>
+            <button id="sttStopBtn"  type="button" class="btn btn--secondary" disabled>⏹</button>
+            <button id="sendBtn"  type="submit" class="btn btn--primary">전송</button>
+            <button id="ttsBtn"   type="button" class="btn btn--secondary">🔈 답변 듣기</button>
+          </div>
+        </form>
+
+        <audio id="ttsAudio" controls class="hidden"></audio>
+      </div>
+      <div class="faq-row" aria-label="예시 질문">
+        <button type="button" class="btn btn--ghost faq-item" data-question="오늘의 경제 뉴스 Top5 알려줘">오늘의 경제 뉴스 Top5 알려줘</button>
+        <button type="button" class="btn btn--ghost faq-item" data-question="최근 금리 인상 요약">최근 금리 인상 요약</button>
+        <button type="button" class="btn btn--ghost faq-item" data-question="원/달러 환율 전망">원/달러 환율 전망</button>
+        <button type="button" class="btn btn--ghost faq-item" data-question="이번 주 글로벌 증시 동향">이번 주 글로벌 증시 동향</button>
+        <button type="button" class="btn btn--ghost faq-item" data-question="AI 관련 주요 기업 소식">AI 관련 주요 기업 소식</button>
+      </div>
     </div>
-</main>
+  </main>
 
-<!-- ▼▼▼ 필수: 동작 JS 등록 ▼▼▼ -->
-<script th:src="@{/js/chat.js}"></script>
+  <script th:src="@{/js/chat.js}"></script>
 </body>
 </html>

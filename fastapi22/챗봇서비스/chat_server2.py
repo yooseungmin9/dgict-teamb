@@ -1,21 +1,25 @@
-# chat_server2.py
-from fastapi import FastAPI
+# chat_server2.py — (합본) 챗봇 + CLOVA STT/TTS + 안전한 /chat
+# 실행: uvicorn chat_server2:app --reload --port 8000
+from fastapi import FastAPI, UploadFile, File, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse, StreamingResponse, FileResponse
 from pathlib import Path
 from openai import OpenAI
-import os, sys, json, logging
-import oracledb
 from datetime import datetime
+import os, sys, json, logging, subprocess, io, requests, tempfile
+import oracledb
+# import pyttsx3
+from google.cloud import texttospeech
+from google.oauth2 import service_account
+# chat_server2.py (상단 몇 줄만 추가/수정)
+# 1) .env 로드 + 부팅 시 환경 체크 로그 + 디버그 엔드포인트
 
 # ====== 로깅 설정 ======
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s",
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 log = logging.getLogger("chat_server")
 
-# ==== OpenAI ====
-API_KEY= "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"
+# ===== OpenAI =====
+API_KEY= "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"
 client = OpenAI(api_key=API_KEY)
 
 # ==== 벡터스토어 ID ====
@@ -26,17 +30,21 @@ if not VS_ID_PATH.exists():
 VS_ID = VS_ID_PATH.read_text().strip()
 log.info(f"VectorStore ID: {VS_ID}")
 
-# ==== Oracle 연결 설정 ====
+
+# ===== Oracle =====
 ORACLE_USER = "hr"
 ORACLE_PASSWORD = "hr"
 ORACLE_DSN = "localhost:1521/XEPDB1"
-
 def get_oracle_conn():
-    # cx_Oracle.connect 대신 oracledb.connect 사용
+    """
+    Thin 모드는 Oracle Client 미필요.
+    DSN 형식: "host:port/service_name"
+    예: "localhost:1521/XEPDB1"
+    """
     return oracledb.connect(
         user=ORACLE_USER,
         password=ORACLE_PASSWORD,
-        dsn=ORACLE_DSN
+        dsn=ORACLE_DSN,     # "localhost:1521/XEPDB1"
     )
 
 def fetch_today_topn_from_oracle(n: int = 5):
@@ -65,7 +73,6 @@ def fetch_today_topn_from_oracle(n: int = 5):
                 })
     return rows
 
-# ==== 시스템 프롬프트 ====
 SYSTEM_INSTRUCTIONS = """
 너는 'AI 기반 경제 뉴스 분석 웹서비스'의 안내 챗봇이다.
 
@@ -87,15 +94,15 @@ SYSTEM_INSTRUCTIONS = """
 - 링크(url), 조회수, 발행일을 간단히 보여준다.
 """
 
-app = FastAPI()
+app = FastAPI(title="Chat+STT+TTS")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"],
+    allow_origins=["*"], allow_credentials=True,
+    allow_methods=["*"], allow_headers=["*"],
 )
 
 history = []
 
-# ====== 디버그: Responses 덤프 ======
 def dump_response_debug(tag: str, resp):
     try:
         safe = {
@@ -119,7 +126,6 @@ def dump_response_debug(tag: str, resp):
         log.info(f"[{tag}] resp deep-dump: {json.dumps(safe, ensure_ascii=False, default=str)}")
     except Exception as e:
         log.warning(f"[{tag}] dump_response_debug 실패: {e}")
-
 
 # ====== 도구 호출 탐지 (tool_call + function_call 지원) ======
 def find_first_tool_call(resp):
@@ -161,17 +167,13 @@ def find_first_tool_call(resp):
     log.info("[tool_call/function_call] 없음")
     return None, None, None
 
-
 def format_topn_md(rows):
-    if not rows:
-        return "오늘 수집된 인기 뉴스 Top N 데이터가 없습니다."
-    lines = ["**오늘의 경제 뉴스 Top N**"]
+    if not rows: return "오늘 수집된 인기 뉴스 Top N 데이터가 없습니다."
+    lines = ["오늘의 경제 뉴스 Top N"]
     for r in rows:
-        lines.append(
-            f"{r['ranking']}. [{r['title']}]({r['url']})\n"
-            f"   - 요약: {r.get('summary') or ''}\n"
-            f"   - 조회수: {r.get('view_count','-')} · 발행일: {r.get('published_at','')}"
-        )
+        lines.append(f"{r['ranking']}. [{r['title']}]({r['url']})\n"
+                     f"   - 요약: {r.get('summary') or ''}\n"
+                     f"   - 조회수: {r.get('view_count','-')} · 발행일: {r.get('published_at','')}")
     return "\n".join(lines)
 
 @app.post("/chat")
@@ -232,9 +234,156 @@ async def chat(payload: dict):
     history.append({"role": "assistant", "content": [{"type": "output_text", "text": answer}]})
     return {"answer": answer}
 
+# ===== CLOVA STT =====
+CLOVA_KEY_ID = "qiivats8e3"
+CLOVA_KEY    = "QCKIyNgJc3dZURDK9yQdSqd7qknZiwPvDVdI9yHL"
+CSR_URL = "https://naveropenapi.apigw.ntruss.com/recog/v1/stt"
+
+def _ffmpeg_to_wav16k(in_path: str) -> str:
+    out_path = in_path + ".wav"
+    subprocess.run(["ffmpeg","-y","-i",in_path,"-ac","1","-ar","16000",out_path],
+                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
+    return out_path
+
+LANG_MAP = {"ko":"Kor","en":"Eng","ja":"Jpn"}
+def normalize_lang(l: str) -> str:
+    if not l: return "Kor"
+    if l.lower() in ("kor","eng","jpn"): return l.title()
+    return LANG_MAP.get(l.split("-")[0].lower(), "Kor")
+
+@app.post("/api/stt")
+async def stt_clova(audio_file: UploadFile = File(...),
+                    lang: str = Query("Kor")):
+    lang = normalize_lang(lang)
+    with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(audio_file.filename or "")[1]) as tmp:
+        raw = await audio_file.read(); tmp.write(raw); src_path = tmp.name
+    wav_path = None
+    try:
+        wav_path = _ffmpeg_to_wav16k(src_path)
+        headers = {"X-NCP-APIGW-API-KEY-ID": CLOVA_KEY_ID,
+                   "X-NCP-APIGW-API-KEY": CLOVA_KEY,
+                   "Content-Type": "application/octet-stream"}
+        url = f"{CSR_URL}?lang={lang}"
+        with open(wav_path, "rb") as f:
+            res = requests.post(url, headers=headers, data=f.read(), timeout=60)
+        if res.status_code != 200:
+            return JSONResponse({"error": f"CSR 실패: {res.status_code} {res.text}"}, status_code=500)
+        return {"text": res.text.strip(), "lang": lang}
+    except Exception as e:
+        log.exception("STT 처리 오류"); return JSONResponse({"error": str(e)}, status_code=500)
+    finally:
+        for p in (src_path, wav_path):
+            try:
+                if p and os.path.exists(p): os.remove(p)
+            except: pass
+
+# ===== Google Cloud TTS =====
+# 선택안하면 언어별 기본 음성 (원하면 표 늘리면 됨)
+DEFAULT_VOICE = {
+    "ko-KR": "ko-KR-Standard-B",   # 깔끔한 남성
+    "en-US": "en-US-Neural2-C",
+    "ja-JP": "ja-JP-Neural2-B",
+}
+
+def _pick_voice(lang: str, voice: str | None) -> str:
+    if voice:
+        return voice
+    base = (lang or "ko-KR").split(",")[0]
+    return DEFAULT_VOICE.get(base, "ko-KR-Neural2-B")
+
+@app.get("/api/tts")
+def tts_google(
+    text: str = Query(..., min_length=1),
+    lang: str = Query("ko-KR"),
+    voice: str | None = Query(None),
+    rate: float = Query(1.0, ge=0.25, le=4.0),
+    pitch: float = Query(0.0, ge=-20.0, le=20.0),
+    fmt: str = Query("MP3", regex="^(MP3|OGG_OPUS|LINEAR16)$"),
+):
+    """
+    Google Cloud Text-to-Speech
+    - 기본: MP3 / ko-KR / Neural2-B
+    - rate, pitch 조절 가능
+    """
+
+    # 서비스 계정 키 JSON 경로를 상수로 지정
+    GCP_KEY_PATH = "/Users/yoo/key/absolute-text-473306-c1-b75ae69ab526.json"
+
+    # credentials 객체 직접 생성
+    gcp_credentials = service_account.Credentials.from_service_account_file(GCP_KEY_PATH)
+
+    # 클라이언트 초기화 시 credentials 지정
+    tts_client = texttospeech.TextToSpeechClient(credentials=gcp_credentials)
+
+    try:
+        client = tts_client
+
+        # 입력
+        synthesis_input = texttospeech.SynthesisInput(text=text)
+
+        # 음성 선택
+        voice_name = _pick_voice(lang, voice)
+        voice_params = texttospeech.VoiceSelectionParams(
+            language_code=lang,
+            name=voice_name,
+        )
+
+        # 오디오 포맷
+        if fmt == "MP3":
+            audio_cfg = texttospeech.AudioConfig(
+                audio_encoding=texttospeech.AudioEncoding.MP3,
+                speaking_rate=rate,
+                pitch=pitch,
+            )
+            media_type = "audio/mpeg"
+            ext = "mp3"
+        elif fmt == "OGG_OPUS":
+            audio_cfg = texttospeech.AudioConfig(
+                audio_encoding=texttospeech.AudioEncoding.OGG_OPUS,
+                speaking_rate=rate,
+                pitch=pitch,
+            )
+            media_type = "audio/ogg"
+            ext = "ogg"
+        else:  # LINEAR16 (WAV PCM)
+            audio_cfg = texttospeech.AudioConfig(
+                audio_encoding=texttospeech.AudioEncoding.LINEAR16,
+                speaking_rate=rate,
+                pitch=pitch,
+            )
+            media_type = "audio/wav"
+            ext = "wav"
+
+        # 합성
+        resp = client.synthesize_speech(
+            input=synthesis_input,
+            voice=voice_params,
+            audio_config=audio_cfg,
+        )
+
+        # 스트리밍 응답
+        headers = {
+            "Content-Type": media_type,
+            "Cache-Control": "no-cache",
+            "Content-Disposition": f'inline; filename="speech.{ext}"',
+        }
+        return StreamingResponse(io.BytesIO(resp.audio_content), headers=headers)
+    except Exception as e:
+        log.exception("Google TTS 실패")
+        return JSONResponse({"error": f"TTS 실패: {e}"}, status_code=500)
 
 @app.post("/reset")
 async def reset():
     global history
     history = []
     return {"status": "ok", "message": "대화 기록 초기화 완료"}
+
+@app.get("/health")
+def health(): return {"status":"ok"}
+
+"""
+[간단 테스트]
+- STT: curl -F "audio_file=@/PATH/sample.wav" "http://127.0.0.1:8000/stt/clova?lang=Kor"
+- TTS: curl --get -L --data-urlencode "text=안녕하세요" "http://127.0.0.1:8000/tts/clova" -o out.mp3
+- Chat: curl -H "Content-Type: application/json" -d '{"message":"오늘의 경제 뉴스 Top5"}' http://127.0.0.1:8000/chat
+"""
