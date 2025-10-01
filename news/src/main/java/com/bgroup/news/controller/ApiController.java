@@ -25,18 +25,6 @@ public class ApiController {
         this.memberService = memberService;
     }
 
-//    @PostMapping("/chat")
-//    public ResponseEntity<?> chat(@RequestBody Map<String, Object> body) {
-//        String result = chatbotService.sendChat(body);
-//        return ResponseEntity.ok(result);
-//    }
-
-//    @PostMapping("/reset")
-//    public ResponseEntity<?> reset() {
-//        String result = chatbotService.reset();
-//        return ResponseEntity.ok(result);
-//    }
-
     @GetMapping("/keywords")
     public Mono<String> getKeywords() {
         return keywordService.fetchKeywords();

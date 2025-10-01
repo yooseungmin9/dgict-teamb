@@ -1,4 +1,3 @@
-// DiscoverController.java
 package com.bgroup.news.controller;
 
 import com.bgroup.news.dto.BooksResponse;
