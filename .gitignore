@@ -236,7 +236,9 @@ ipython_config.py
 .LSOverride
 
 # Icon must end with two \r
-Icon
+Icon
+
+
 
 # Thumbnails
 ._*
@@ -619,5 +621,8 @@ $RECYCLE.BIN/
 
 # Windows shortcuts
 *.lnk
+
+__pycache__/
+*.pyc
 
 # End of https://www.toptal.com/developers/gitignore/api/windows,macos,pycharm,intellij,python,java,jetbrains,webstorm,react,jupyternotebooks
