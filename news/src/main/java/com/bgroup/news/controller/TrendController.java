@@ -1,119 +1,146 @@
+// TrendController.java — 람다 캡처 오류 해결 + 오타 교정 + 주석/테스트 예시 포함
 package com.bgroup.news.controller;
 
 import com.bgroup.news.dto.KeywordRankingResponse;
 import org.bson.Document;
-
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.aggregation.*;
 import org.springframework.data.mongodb.core.query.Criteria;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.util.StringUtils;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.util.*;
 
+/**
+ * /api/trends 컨트롤러
+ * - FastAPI 프록시: GET /api/trends/category-trends
+ * - Mongo 집계:   GET /api/trends/keyword-ranking
+ */
 @RestController
 @RequestMapping("/api/trends")
 public class TrendController {
 
-    private final WebClient trendClient; // FastAPI(네이버 DataLab)
-    private final MongoTemplate mongoTemplate; // MongoDB(키워드)
+    private final WebClient trendClient;   // FastAPI 베이스 URL로 구성된 WebClient (예: http://localhost:8000/api/trends)
+    private final MongoTemplate mongoTemplate;
 
     public TrendController(WebClient trendClient, MongoTemplate mongoTemplate) {
         this.trendClient = trendClient;
         this.mongoTemplate = mongoTemplate;
     }
 
-    // 1) 네이버 DataLab 언급량
+    // ============ 1) 네이버 DataLab 언급량 (FastAPI 프록시) ============
     @GetMapping("/category-trends")
-    public Mono<String> categoryTrends(
+    public Mono<ResponseEntity<String>> categoryTrends(
             @RequestParam(defaultValue = "30") int days,
-            @RequestParam(defaultValue = "date") String time_unit
+            @RequestParam(name = "time_unit", defaultValue = "date") String timeUnit
     ) {
+        // [입문자 주석] 람다에서 캡처할 변수는 final 또는 effectively final 이어야 함
+        // days를 재할당하지 말고, '보정값'을 새 변수에 담아서 사용
+        final int normalizedDays = Math.min(365, Math.max(7, days));
+        final String normalizedTimeUnit = timeUnit; // 여기서는 재할당 안 하므로 effectively final
+
         return trendClient.get()
                 .uri(uri -> uri.path("/category-trends")
-                        .queryParam("days", days)
-                        .queryParam("time_unit", time_unit)
+                        .queryParam("days", normalizedDays)
+                        .queryParam("time_unit", normalizedTimeUnit)
                         .build())
                 .retrieve()
-                .bodyToMono(String.class);
+                .bodyToMono(String.class)
+                .map(ResponseEntity::ok)
+                .onErrorResume(ex ->
+                        Mono.just(ResponseEntity.status(HttpStatus.BAD_GATEWAY)
+                                .body("{\"error\":\"trends proxy failed\"}")));
     }
 
-    // 2) Mongo 키워드 랭킹
+    // ============ 2) Mongo 키워드 랭킹 (카테고리별 TopN) ============
     @GetMapping("/keyword-ranking")
     public List<KeywordRankingResponse> keywordRanking(
-            @RequestParam(defaultValue = "10") int topN,
+            @RequestParam(name = "topN", defaultValue = "10") int topN,
             @RequestParam(required = false) String category,
             @RequestParam(defaultValue = "30") int days
     ) {
-        var fmt = java.time.format.DateTimeFormatter.BASIC_ISO_DATE;
-        String to = java.time.LocalDate.now().format(fmt);
-        String from = java.time.LocalDate.now().minusDays(days).format(fmt);
+        // [입문자 주석] 파라미터 가드는 별도 변수에 담아 effectively final 유지
+        final int nTopN = Math.min(1000, Math.max(1, topN));
+        final int nDays = Math.min(365, Math.max(7, days));
 
-        // 필요한 필드만
-        AggregationOperation projectNeeded = ctx -> new org.bson.Document("$project",
-                new org.bson.Document("category", 1)
+        final DateTimeFormatter fmt = DateTimeFormatter.BASIC_ISO_DATE; // YYYYMMDD
+        final String to = LocalDate.now().format(fmt);
+        final String from = LocalDate.now().minusDays(nDays).format(fmt);
+
+        // 1) 필요한 필드만 남기기
+        AggregationOperation projectNeeded = context -> new Document("$project",
+                new Document("category", 1)
                         .append("keywords", 1)
-                        .append("news_date", 1)
-        );
-        AggregationOperation matchDate = ctx -> new org.bson.Document("$match",
-                new org.bson.Document("news_date", new org.bson.Document("$gte", from).append("$lte", to))
-        );
+                        .append("news_date", 1));
+
+        // 2) 날짜 필터
+        Criteria dateCri = Criteria.where("news_date").gte(from).lte(to);
+        AggregationOperation matchDate = Aggregation.match(dateCri);
+
+        // 3) 카테고리 필터(옵션)
         AggregationOperation matchCat = null;
-        if (category != null && !category.isBlank()) {
-            matchCat = ctx -> new org.bson.Document("$match", new org.bson.Document("category", category));
+        if (StringUtils.hasText(category)) {
+            matchCat = Aggregation.match(Criteria.where("category").is(category));
         }
 
-        AggregationOperation unwind = ctx -> new org.bson.Document("$unwind", "$keywords");
+        // 4) keywords 펼치기
+        AggregationOperation unwindKeywords = context -> new Document("$unwind", "$keywords");
 
-        // (cat, keyword)로 count
-        AggregationOperation groupCounts = ctx -> new org.bson.Document("$group",
-                new org.bson.Document("_id",
-                        new org.bson.Document("category", "$category").append("keyword", "$keywords"))
-                        .append("count", new org.bson.Document("$sum", 1))
-        );
+        // 5) (category, keyword) 단위로 count
+        AggregationOperation groupCatKw = context -> new Document("$group",
+                new Document("_id", new Document("category", "$category").append("keyword", "$keywords"))
+                        .append("count", new Document("$sum", 1)));
 
-        // 카테고리 그룹에서 topN (전역 sort 없이)
-        AggregationOperation groupTopN = ctx -> new org.bson.Document("$group",
-                new org.bson.Document("_id", "$_id.category")
-                        .append("keywords",
-                                new org.bson.Document("$topN",
-                                        new org.bson.Document("n", topN)
-                                                .append("sortBy", new org.bson.Document("count", -1))
-                                                .append("output",
-                                                        new org.bson.Document("keyword", "$_id.keyword")
-                                                                .append("count", "$count")
-                                                )
-                                )
-                        )
-        );
+        // 6) 카테고리별 정렬을 위해 우선 정렬(카테고리↑, count↓)
+        AggregationOperation sortForGroup = Aggregation.sort(Sort.by(
+                Sort.Order.asc("_id.category"),
+                Sort.Order.desc("count")
+        ));
 
-        AggregationOperation projectOut = ctx -> new org.bson.Document("$project",
-                new org.bson.Document("_id", 0)
+        // 7) 카테고리 단위로 모으면서 정렬된 상태의 배열을 push
+        //    [중요] "$._id.keyword" → 오타. 정식 경로는 "$_id.keyword"
+        AggregationOperation groupByCategory = context -> new Document("$group",
+                new Document("_id", "$_id.category")
+                        .append("keywords", new Document("$push",
+                                new Document("keyword", "$_id.keyword")
+                                        .append("count", "$count")
+                        )));
+
+        // 8) TopN만 자르기 ($slice 사용 → Mongo 4.x 이상 호환)
+        AggregationOperation projectSliceTopN = context -> new Document("$project",
+                new Document("_id", 0)
                         .append("category", "$_id")
-                        .append("keywords", 1)
-        );
+                        .append("keywords", new Document("$slice", Arrays.asList("$keywords", nTopN))));
 
-        List<AggregationOperation> ops = new ArrayList<>(List.of(projectNeeded, matchDate));
+        // 파이프라인 구성
+        List<AggregationOperation> ops = new ArrayList<>();
+        ops.add(projectNeeded);
+        ops.add(matchDate);
         if (matchCat != null) ops.add(matchCat);
-        ops.addAll(List.of(unwind, groupCounts, groupTopN, projectOut));
+        ops.add(unwindKeywords);
+        ops.add(groupCatKw);
+        ops.add(sortForGroup);
+        ops.add(groupByCategory);
+        ops.add(projectSliceTopN);
 
         Aggregation agg = Aggregation.newAggregation(ops);
-        var results = mongoTemplate.aggregate(agg, "shared_articles", org.bson.Document.class);
+        var results = mongoTemplate.aggregate(agg, "shared_articles", Document.class);
 
+        // 평탄화하여 응답 DTO 만들기
         List<KeywordRankingResponse> flat = new ArrayList<>();
-        for (org.bson.Document d : results) {
+        for (Document d : results) {
             String cat = d.getString("category");
             @SuppressWarnings("unchecked")
             List<Map<String, Object>> arr = (List<Map<String, Object>>) d.get("keywords", List.class);
+            if (arr == null) continue;
+
             for (int i = 0; i < arr.size(); i++) {
                 Map<String, Object> m = arr.get(i);
                 String kw = Objects.toString(m.get("keyword"), "");
@@ -121,9 +148,28 @@ public class TrendController {
                 flat.add(new KeywordRankingResponse(i + 1, kw, cat, cnt));
             }
         }
-        flat.sort(Comparator.comparing(KeywordRankingResponse::getCategory, Comparator.nullsLast(String::compareTo))
+
+        // 보기 좋게 카테고리/랭크 순 정렬(선택)
+        flat.sort(Comparator
+                .comparing(KeywordRankingResponse::getCategory, Comparator.nullsLast(String::compareTo))
                 .thenComparingInt(KeywordRankingResponse::getRank));
+
         return flat;
     }
 }
 
+/* =========================
+   간단 사용 예시(테스트)
+   — 터미널에서 호출
+=========================
+
+# 1) FastAPI 프록시 (네이버 DataLab 라인 차트용)
+curl "http://localhost:8080/api/trends/category-trends?days=30&time_unit=date"
+
+# 2) 키워드 랭킹 (카테고리별 TopN)
+curl "http://localhost:8080/api/trends/keyword-ranking?days=30&topN=10"
+
+# 3) 특정 카테고리만 (예: 증권)
+curl "http://localhost:8080/api/trends/keyword-ranking?days=30&topN=15&category=증권"
+
+*/

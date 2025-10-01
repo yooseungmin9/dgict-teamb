@@ -1,57 +1,139 @@
-<!-- src/main/resources/templates/fragments/header.html -->
-<!-- [입문자용 설명]
-     - 재사용 가능한 헤더 조각(fragment)입니다.
-     - 버튼/카드 유지 요구에 맞춰 data-url + 공용 JS로 이동 처리 -->
 <header class="header" th:fragment="siteHeader" xmlns:th="http://www.w3.org/1999/xhtml">
-  <div class="container">
-    <div class="flex items-center justify-between">
-      <div class="logo">
-        <h1 th:text="${pageTitle}">EcoNews AI</h1>
-        <span th:text="${subTitle}">AI 기반 경제 뉴스 분석</span>
+  <div class="container header__bar">
+    <!-- 1) 좌측: 로고/브랜드 -->
+    <a class="brand" data-url="/pages/" aria-label="대시보드로 이동">
+      <svg viewBox="0 0 24 24" class="brand__logo">
+        <path d="M3 12h3l3 7 4-14 3 7h5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <div class="brand__text">
+        <h1 class="brand__name">써머릭스 SUMMARIX</h1>
+        <span class="brand__tag">경제뉴스 요약/분석 웹서비스</span>
       </div>
-      <nav class="nav">
-        <!-- button 유지 + 접근성 -->
-        <button class="nav-btn" th:text="${nav1}" data-url="/pages/"></button>
-        <button class="nav-btn" th:text="${nav2}" data-url="/pages/news"></button>
-        <button class="nav-btn" th:text="${nav3}" data-url="/pages/sentiment"></button>
-        <button class="nav-btn" th:text="${nav4}" data-url="/pages/global"></button>
-        <button class="nav-btn" th:text="${nav5}" data-url="/pages/trends"></button>
-        <button class="nav-btn" th:text="${nav6}" data-url="/pages/chat"></button>
-        <button class="nav-btn" th:text="${nav7}" data-url="/pages/recommendations"></button>
+    </a>
+    <nav id="siteNav" class="nav nav--pills" aria-label="주 메뉴">
+      <!-- button 유지 + 접근성 -->
+      <button class="nav-btn" data-url="/pages/">
+        <svg viewBox="0 0 24 24" class="icon">
+          <path d="M3 3h7v7H3zM14 3h7v4h-7zM14 9h7v12h-7zM3 12h7v9H3z" fill="currentColor"/>
+        </svg> 대시보드</button>
+      <button class="nav-btn" data-url="/pages/news">
+        <svg viewBox="0 0 24 24" class="icon">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" fill="none" stroke="currentColor" stroke-width="2"/>
+          <path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" fill="none" stroke="currentColor" stroke-width="2"/>
+        </svg> 오늘의 뉴스</button>
+      <button class="nav-btn" data-url="/pages/sentiment">
+        <svg viewBox="0 0 24 24" class="icon">
+          <path d="M3 3v18h18" stroke="currentColor" stroke-width="2" fill="none"/>
+          <rect x="7" y="10" width="3" height="7" fill="currentColor"/><rect x="12" y="6" width="3" height="11" fill="currentColor"/>
+          <rect x="17" y="13" width="3" height="4" fill="currentColor"/>
+        </svg> 감성 분석</button>
+      <button class="nav-btn" data-url="/pages/global">
+        <svg viewBox="0 0 24 24" width="24" height="24" aria-label="지구"  fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"></circle>
+          <path d="M2 12h20"></path>
+          <path d="M12 2c3 3.5 3 16.5 0 20"></path>
+          <path d="M12 2c-3 3.5-3 16.5 0 20"></path>
+          <path d="M3 8c3 2 15 2 18 0"></path>
+          <path d="M3 16c3 -2 15 -2 18 0"></path>
+        </svg> 글로벌 모니터링</button>
+      <button class="nav-btn" data-url="/pages/trends">
+        <svg viewBox="0 0 24 24" width="24" height="24"
+             fill="none" stroke="currentColor" stroke-width="2"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <polyline points="3 17, 9 11, 13 15, 21 7"></polyline>
+          <polyline points="17 7, 21 7, 21 11"></polyline>
+        </svg> 트렌드 예측</button>
+      <button class="nav-btn" data-url="/pages/chat">
+        <svg viewBox="0 0 24 24" width="24" height="24" class="icon icon--stroke" aria-hidden="true">
+          <g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 11.5c0 4.7-4.25 8.5-9.5 8.5-1.3 0-2.55-.22-3.66-.62L3 21l1.45-3.63C3.56 16 3 13.8 3 11.5 3 6.8 7.25 3 12.5 3S21 6.8 21 11.5Z"/>
+          </g>
+        </svg> 챗봇</button>
+      <button class="nav-btn" data-url="/pages/recommendations">
+        <svg viewBox="0 0 24 24" width="24" height="24"
+             fill="none" stroke="currentColor" stroke-width="2"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M12 5v13"/>
+          <path d="M12 5
+             C10.8 4.2 9.2 4 7.5 4
+             C5.6 4 4 5.3 4 7.2
+             V19.5
+             C4 17.8 5.6 17 7.5 17
+             H12"/>
+          <path d="M12 5
+             C13.2 4.2 14.8 4 16.5 4
+             C18.4 4 20 5.3 20 7.2
+             V19.5
+             C20 17.8 18.4 17 16.5 17
+             H12"/>
+        </svg> 추천</button>
 
-<!--        <button class="login-btn" data-url="/pages/login">-->
-<!--          <img src="/img/login.png" alt="로그인" class="login-icon" />-->
-<!--        </button>-->
-      </nav>
+        <!-- 로그인 상태 -->
+        <div th:if="${session.loginUser != null}">
+          <button id="accountBtn" class="account-btn" type="button" title="계정정보">
+            <svg viewBox="0 0 24 24" class="account-icon" aria-hidden="true">
+              <path d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5Zm0 2c-4.42 0-8 2.24-8 5v1h16v-1c0-2.76-3.58-5-8-5Z"/>
+            </svg>
+          </button>
+        </div>
+
+        <div th:if="${session.loginUser != null}">
+          <form th:action="@{/pages/logout}" method="post">
+            <button id="logoutBtn" class="logout-btn" type="submit" title="로그아웃">
+              Logout
+            </button>
+          </form>
+        </div>
+
+        <!-- 비로그인 상태 -->
+        <div th:if="${session.loginUser == null}">
+          <button id="loginBtn" class="login-btn" title="로그인" data-url="/pages/login">
+            Login
+          </button>
+        </div>
+    </nav>
+  </div>
+  <div class="container topnav__info">
+    <span class="info-text">AI 기반 실시간 경제 분석 및 인사이트 제공</span>
+    <div class="info-right">
+      <span class="info-updated">마지막 업데이트: <span id="last-updated">오늘 15:30</span></span>
+      <span class="info-live">
+        <!-- Wifi + pulse dot -->
+        <svg viewBox="0 0 24 24" class="icon icon--xs"><path d="M5 12.55a11 11 0 0 1 14.08 0M1.42 9a16 16 0 0 1 21.16 0M8.53 16.11a6 6 0 0 1 6.95 0" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+        <span class="dot"></span>
+        <span class="live-text">실시간 연결</span>
+      </span>
     </div>
   </div>
+
 
   <!-- 공용 라우팅 스크립트: 모든 페이지에서 동작 -->
   <script th:inline="javascript">
     (function () {
     function go(el) {
       var url = el.dataset.url;
-      if (url) window.location.href = url; // 지정 URL로 이동
+      if (url) window.location.href = url;
     }
-    function onClick(e) {
-      var t = e.currentTarget;
-      go(t);
-    }
+    function onClick(e) { go(e.currentTarget); }
     function onKey(e) {
-      // Enter(13) 또는 Space(32)로도 이동
-      if (e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault();
-        go(e.currentTarget);
-      }
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(e.currentTarget); }
     }
-    // 버튼, 카드 모두에 리스너 장착
     var links = document.querySelectorAll('[data-url]');
     links.forEach(function (el) {
       el.addEventListener('click', onClick);
       el.addEventListener('keydown', onKey);
-      // 시각적으로 링크처럼 보이게
       el.style.cursor = 'pointer';
     });
+  })();
+
+// "마지막 업데이트" 시간 갱신을 간단히
+  (function(){
+    const el = document.getElementById('last-updated');
+    if(!el) return;
+    const now = new Date();
+    const hh = String(now.getHours()).padStart(2,'0');
+    const mm = String(now.getMinutes()).padStart(2,'0');
+    el.textContent = `오늘 ${hh}:${mm}`;
   })();
   </script>
 </header>

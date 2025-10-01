@@ -21,7 +21,7 @@
   const $mContent = document.getElementById("modal-content");
   const $mToggle  = document.getElementById("modal-toggle");
   const $mLink    = document.getElementById("modal-link");
-  const $mSource  = document.getElementById("modal-source");
+  const $mPress  = document.getElementById("modal-press");
 
   // ----- 2) 유틸 -----
   const PLACEHOLDER =
@@ -186,7 +186,7 @@
       if (data.url) { $mLink.href = data.url; $mLink.style.display = "inline-block"; }
       else { $mLink.removeAttribute("href"); $mLink.style.display = "none"; }
 
-      $mSource.textContent = data.source ? `출처: ${data.source}` : "";
+      $mPress.textContent = data.press ? `출처: ${data.press}` : "";
       showModal();
     } catch (e) {
       console.error("[modal] load detail error:", e);

@@ -31,7 +31,7 @@ def run_blog(q: str = Query("경제"), display: int = Query(30, ge=1, le=100)):
     n = crawler_blog.run(q=q, display=display)
     return {"upserted": n}
 
-@app.get("/trends")
+@app.get("/services")
 def trends(days: int = Query(7, ge=1, le=90), topk: int = Query(50, ge=5, le=200)):
     top = analyzer.top_keywords(days=days, topk=topk)
     img_path = str(PUBLIC / "wordcloud.png")

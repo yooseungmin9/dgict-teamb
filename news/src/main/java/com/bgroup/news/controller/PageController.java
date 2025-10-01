@@ -91,4 +91,10 @@ public class PageController {
         memberService.saveMember(member);
         return "redirect:/pages/members";
     }
+
+    @GetMapping("/account")
+    public String account(Model model) {
+
+        return "pages/account";
+    }
 }

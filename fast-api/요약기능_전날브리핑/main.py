@@ -1,7 +1,7 @@
 # main.py — 통합본: /news, /news/{id}, /briefing/yesterday, /health
 # 실행: uvicorn main:app --reload --port 8000
 # 필요 패키지:
-#   pip install "fastapi>=0.110" uvicorn "pydantic<3" "pymongo==4.10.1" "openai>=1.46.0" "bson>=0.5.10"
+#   pip install "fast-api>=0.110" uvicorn "pydantic<3" "pymongo==4.10.1" "openai>=1.46.0" "bson>=0.5.10"
 
 from typing import List, Any, Dict
 from datetime import datetime, timedelta, timezone
@@ -18,9 +18,9 @@ from openai import OpenAI  # 전일 브리핑용
 # =========================
 MONGO_URI = "mongodb+srv://Dgict_TeamB:team1234@cluster0.5d0uual.mongodb.net/"
 DB_NAME   = "test123"
-COLL_NAME = "news"
+COLL_NAME = "shared_articles"
 
-OPENAI_API_KEY = "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"
+OPENAI_API_KEY = ""
 OPENAI_MODEL   = "gpt-4o-mini"        # 가벼운 모델 예시(원하면 다른 모델로 교체)
 
 # =========================
@@ -111,7 +111,7 @@ def list_news(limit: int = Query(10, ge=1, le=50)) -> List[Dict[str, Any]]:
 def get_news_detail(news_id: str) -> Dict[str, Any]:
     """
     MongoDB에서 단일 뉴스 상세 조회
-    반환: {id,title,updated_at,image,content,url,source}
+    반환: {id,title,updated_at,image,content,url,press}
     """
     try:
         _id = ObjectId(news_id)
@@ -126,7 +126,7 @@ def get_news_detail(news_id: str) -> Dict[str, Any]:
     url     = doc.get("url", "")
     content = doc.get("content", "")  # 기사 본문(이미 저장했다고 가정)
     image   = pick_image(doc)         # ✅ 목록과 동일 로직
-    source  = doc.get("source", "")
+    press  = doc.get("press", "")
     # updated_at 우선 → 없으면 published_at → 없으면 ObjectId 시각
     updated_at = doc.get("updated_at") or doc.get("published_at")
     if not updated_at and isinstance(doc.get("_id"), ObjectId):
@@ -139,7 +139,7 @@ def get_news_detail(news_id: str) -> Dict[str, Any]:
         "image": image,
         "content": content,
         "url": url,
-        "source": source,
+        "press": press,
     }
 
 # =========================

@@ -1,22 +1,14 @@
-# app_trends.py
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-from datetime import date, timedelta
+# api/services/category_trends.py
+# [입문자용] 네이버 데이터랩 카테고리 관심도 추이 로직만 담당
+
 import requests
-from common.config import NAVER_CLIENT_ID, NAVER_CLIENT_SECRET, CATEGORIES, CATEGORY_KEYWORDS, chunked
-
-app = FastAPI(title="Trend API (Naver Datalab)", version="1.0.0")
-
-# ====== CORS ======
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+from datetime import date, timedelta
+from api.common.config import NAVER_CLIENT_ID, NAVER_CLIENT_SECRET, CATEGORIES, CATEGORY_KEYWORDS, chunked
 
 def call_naver_datalab_groups(start_date: str, end_date: str, time_unit: str, groups_dict: dict):
+    """
+    네이버 데이터랩 API 호출 (키워드 그룹 5개씩 제한 → chunked로 분할)
+    """
     url = "https://openapi.naver.com/v1/datalab/search"
     headers = {
         "X-Naver-Client-Id": NAVER_CLIENT_ID,
@@ -38,32 +30,34 @@ def call_naver_datalab_groups(start_date: str, end_date: str, time_unit: str, gr
         all_results.extend(j.get("results", []))
     return {"results": all_results}
 
-@app.get("/category-trends")
-def category_trends(days: int = 30, time_unit: str = "date"):
+def get_category_trends(days: int = 30, time_unit: str = "date"):
+    """
+    최근 N일 기준 카테고리 관심도 추이 계산
+    반환: {"source":"naver","dates":[...],"categories":{"증권":[..],...}}
+    """
     end = date.today()
     start = end - timedelta(days=days)
     start_date = start.strftime("%Y-%m-%d")
-    end_date = end.strftime("%Y-%m-%d")
+    end_date   = end.strftime("%Y-%m-%d")
 
     raw = call_naver_datalab_groups(start_date, end_date, time_unit, CATEGORY_KEYWORDS)
 
+    # 전체 라벨(기간) 수집
     all_dates = set()
     for result in raw.get("results", []):
         for item in result.get("data", []):
             all_dates.add(item["period"])
     labels = sorted(all_dates)
 
+    # 카테고리별 시계열 매핑
     categories = {}
     for result in raw.get("results", []):
         cat = result.get("title")
         series_map = {d["period"]: d["ratio"] for d in result.get("data", [])}
         categories[cat] = [int(round(series_map.get(dt, 0))) for dt in labels]
 
+    # 누락 카테고리는 0으로 채움
     for cat in CATEGORIES:
         categories.setdefault(cat, [0] * len(labels))
 
     return {"source": "naver", "dates": labels, "categories": categories}
-
-@app.get("/health")
-def health():
-    return {"ok": True, "service": "trends"}

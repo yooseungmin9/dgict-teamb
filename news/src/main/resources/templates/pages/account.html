@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>account</title>
+  <style>
+    /* ====== 디자인 토큰 ====== */
+    :root{
+      --bg:#fafafa;           /* 배경 */
+      --panel:#ffffff;        /* 카드/폼 배경 */
+      --ink:#111827;          /* 본문 텍스트 */
+      --muted:#6b7280;        /* 보조 텍스트 */
+      --line:#e5e7eb;         /* 구분선 */
+      --primary:#2563eb;      /* 링크/강조 */
+      --btn:#111827;          /* 버튼 텍스트 */
+      --btn-bg:#f3f4f6;       /* 버튼 배경 */
+      --btn-bg-hover:#e5e7eb; /* 버튼 호버 */
+      --radius:10px;
+      --field-h:40px;         /* 입력 컨트롤 높이 */
+      --gap:16px;
+    }
+
+    /* ====== 리셋(간단) ====== */
+    *,*::before,*::after{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0;
+      background:var(--bg);
+      color:var(--ink);
+      font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Apple SD Gothic Neo,Noto Sans KR,Malgun Gothic,sans-serif;
+    }
+    a{color:var(--primary);text-decoration:none}
+    a:hover{text-decoration:underline}
+
+    /* ====== 컨테이너 ====== */
+    .wrap{
+      margin:24px auto 48px;
+      padding:0 16px;
+    }
+    .panel{
+      background:var(--panel);
+      border:1px solid var(--line);
+      border-radius:var(--radius);
+      padding:20px 16px 16px;
+    }
+
+    /* ====== 제목 ====== */
+    .title{
+      font-size:18px;
+      font-weight:700;
+      margin:0 0 12px 0;
+    }
+
+    /* ====== 폼 레이아웃 ====== */
+    .form{
+      display:flex;
+      flex-direction:column;
+      gap:0; /* 행 사이 구분선으로 간격 대체 */
+    }
+    .row{
+      display:grid;
+      grid-template-columns: 220px 1fr; /* 좌측 라벨, 우측 입력 */
+      align-items:center;
+      column-gap:16px;
+      padding:14px 8px;
+      border-top:1px solid var(--line);
+    }
+    .row:first-of-type{border-top:0}
+
+    /* 레이블 왼쪽 작은 원형 아이콘 */
+    .label{
+      display:flex;
+      align-items:center;
+      gap:8px;
+      color:var(--ink);
+      white-space:nowrap;
+    }
+    .label::before{
+      content:"";
+      width:12px;height:12px;
+      border:1px solid var(--muted);
+      border-radius:50%;
+      display:inline-block;
+    }
+
+    /* 입력 컨트롤 공통 */
+    .control{width:100%}
+    input[type="text"],
+    input[type="email"],
+    input[type="tel"],
+    input[type="password"],
+    select{
+      width:100%;
+      height:var(--field-h);
+      border:1px solid var(--line);
+      border-radius:6px;
+      padding:0 12px;
+      background:#fff;
+      outline:none;
+    }
+    input::placeholder{color:#a1a1aa}
+
+    /* 비밀번호 행: 텍스트 대신 링크 */
+    .inline-link{
+      height:var(--field-h);
+      display:flex;
+      align-items:center;
+    }
+
+    /* 프로필 이미지 업로드 링크 */
+    .upload-link{
+      display:inline-flex;
+      align-items:center;
+      height:var(--field-h);
+    }
+    .visually-hidden{
+      position:absolute !important;
+      width:1px;height:1px;
+      padding:0;margin:-1px;
+      overflow:hidden;clip:rect(0,0,0,0);
+      white-space:nowrap;border:0;
+    }
+
+    /* 버튼 영역 */
+    .actions{
+      display:flex;
+      gap:12px;
+      justify-content:flex-start;
+      margin-top:20px;
+    }
+    .btn{
+      min-width:92px;
+      height:36px;
+      padding:0 14px;
+      border:1px solid var(--line);
+      border-radius:8px;
+      background:var(--btn-bg);
+      color:var(--btn);
+      cursor:pointer;
+    }
+    .btn:hover{background:var(--btn-bg-hover)}
+    .btn.primary{
+      background:#2563eb;
+      color:#fff;
+      border-color:#1d4ed8;
+    }
+    .btn.primary:hover{background:#1d4ed8}
+
+    /* 반응형 보정: 좁은 화면에서 1열 */
+    @media (max-width:720px){
+      .row{grid-template-columns:1fr}
+      .label{margin-bottom:6px}
+    }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <section class="panel">
+    <form class="form" id="profileForm" onsubmit="return false">
+      <!-- ID -->
+      <div class="row">
+        <div class="label">ID</div>
+        <div class="control">
+          <span id="userId"></span>
+        </div>
+      </div>
+
+      <!-- 비밀번호 -->
+      <div class="row">
+        <div class="label">비밀번호</div>
+        <div class="control inline-link">
+          <a href="/pwchange" id="pwChangeLink" aria-label="비밀번호 변경">변경</a>
+        </div>
+      </div>
+
+      <!-- 이름 -->
+      <div class="row">
+        <div class="label">이름</div>
+        <div class="control">
+          <input type="text" id="name" th:value="${session.loginUser.name}" aria-label="이름" />
+        </div>
+      </div>
+
+      <!-- 성별 -->
+      <div class="row">
+        <div class="label">성별</div>
+        <div class="control">
+          <input type="text" id="gender" aria-label="성별" />
+        </div>
+      </div>
+
+      <!-- 출생년도 -->
+      <div class="row">
+        <div class="label">출생년도</div>
+        <div class="control">
+          <input type="email" id="year" aria-label="출생년도" />
+        </div>
+      </div>
+
+      <!-- 전화 -->
+      <div class="row">
+        <div class="label">전화번호</div>
+        <div class="control">
+          <input type="tel" id="phone" aria-label="전화" />
+        </div>
+      </div>
+
+      <!-- 주소 -->
+      <div class="row">
+        <div class="label">거주지역</div>
+        <div class="control">
+          <input type="text" id="region"  aria-label="거주지역" />
+        </div>
+      </div>
+
+      <!-- 버튼 -->
+      <div class="actions">
+        <button type="button" class="btn primary" id="saveBtn">저장(F8)</button>
+        <span th:if="${session.admin != null and session.admin > 0}">
+          <button type="button" class="btn" th:href="@{/pages/admin}">관리자 페이지</button>
+        </span>
+      </div>
+    </form>
+  </section>
+</div>
+
+<script>
+
+
+</script>
+
+</body>
+</html>
