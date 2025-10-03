@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="UTF-8">
+    <title>Opinion Mining Dashboard</title>
+    <link rel="stylesheet" href="/css/style.css"/>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/wordcloud2.js"></script>
+    <script defer src="/js/app.js"></script>
+    <style>
+        body {
+          margin:0;
+/*        font-family:Arial, sans-serif; */
+          display:flex;
+          flex-direction:column;
+          min-height:100vh;
+        }
+
+        .page{
+          display:flex;
+          align-items:stretch;                 /* 자식(사이드바/구분선/메인) 높이 맞춤 */
+          gap:20px;                            /* 기존 간격 유지 */
+          min-height: calc(100vh - var(--header-h, 0px));  /* 화면 끝까지 */
+        }
+
+        .sidebar{ width:300px; padding:20px; box-sizing:border-box; overflow-y:auto; }
+        .main{
+          flex:1 1 auto;          /* 남은 공간 채움 */
+          min-width:0;            /* 플렉스 오버플로우 방지 */
+          padding:20px;
+          box-sizing:border-box;
+        }
+
+        /* ✅ 세로 구분선 요소 */
+        .v-sep{
+          flex:0 0 1px;                        /* 폭 1px 고정 */
+          align-self:stretch;                  /* 부모 높이에 맞춰 늘어남 */
+          background: var(--line, #ddd);       /* 디자인 토큰 없으면 #ddd 사용 */
+        }
+
+        /* 좌측 사이드바 */
+        .sidebar {
+          width: 300px;
+          padding: 20px;
+          box-sizing: border-box;
+          overflow-y: auto;
+        }
+        .sidebar h2 {
+          font-size: 18px;
+          margin-bottom: 20px;
+        }
+        .thumbnail-box {
+          margin-bottom: 15px;
+          cursor: pointer;
+        }
+        .thumbnail-box img {
+          width: 100%;
+          border-radius: 6px;
+        }
+        .thumbnail-title {
+          font-size: 14px;
+          margin-top: 5px;
+          display: -webkit-box;
+          -webkit-line-clamp: 2;
+          -webkit-box-orient: vertical;
+          overflow: hidden;
+        }
+
+        /* 메인 영역 */
+        .main{
+          flex:1 1 auto;
+          min-width:0;
+          padding:20px;
+          box-sizing:border-box;
+        }
+
+        /* 영상 정보 */
+        .video-info {
+          text-align: center;
+          margin-bottom: 20px;
+        }
+        .video-info img {
+          width: 320px;
+          height: 180px;
+          border-radius: 6px;
+          margin-bottom: 15px;
+        }
+        .video-meta h3 {
+          margin: 0 0 10px 0;
+          font-size: 22px;
+        }
+        .video-meta p {
+          margin: 4px 0;
+          color: #555;
+          font-size: 14px;
+        }
+
+        /* 영상 플레이어 */
+        .video-player {
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          width: 640px;
+          height: 360px;
+          margin: 0 auto 40px auto;
+          background: #000;
+          color: #fff;
+          border-radius: 8px;
+        }
+
+        /* 분석 시각화 */
+        .charts {
+          display: flex;
+          justify-content: space-between;
+          margin-bottom: 30px;
+        }
+        .chart-box {
+          width: 48%;
+          background: #fafafa;
+          padding: 15px;
+          border-radius: 8px;
+          box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+          text-align: center;
+        }
+        #pieChart {
+          max-width: 240px;
+          max-height: 240px;
+          margin: auto;
+        }
+        #wordCloud {
+          width: 100%;
+          height: 300px;
+          border: 1px solid #ddd;
+        }
+
+        /* 분석 요약 */
+        .analysis {
+          background: #fff;
+          padding: 20px;
+          border-radius: 8px;
+          box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .comments {
+          margin-top: 15px;
+        }
+        .comment {
+          margin-bottom: 10px;
+          font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+<div th:replace="fragments/header :: siteHeader"></div>
+<main>
+    <div class="page">
+        <!-- 좌측 사이드바 -->
+        <div class="sidebar">
+            <h2>카테고리 추천 유튜브</h2>
+            <div class="thumbnail-box">
+                <img src="https://via.placeholder.com/280x160" alt="썸네일">
+                <div class="thumbnail-title">경제 이슈 분석</div>
+            </div>
+            <div class="thumbnail-box">
+                <img src="https://via.placeholder.com/280x160" alt="썸네일">
+                <div class="thumbnail-title">주식 시장 반응</div>
+            </div>
+            <div class="thumbnail-box">
+                <img src="https://via.placeholder.com/280x160" alt="썸네일">
+                <div class="thumbnail-title">글로벌 경제 뉴스</div>
+            </div>
+            <div class="thumbnail-box">
+                <img src="https://via.placeholder.com/280x160" alt="썸네일">
+                <div class="thumbnail-title">환율 전망</div>
+            </div>
+            <div class="thumbnail-box">
+                <img src="https://via.placeholder.com/280x160" alt="썸네일">
+                <div class="thumbnail-title">산업 트렌드</div>
+            </div>
+        </div>
+
+        <!-- 추가: 세로 구분선. 화면 높이에 맞춰 늘어납니다. -->
+        <div class="v-sep" aria-hidden="true"></div>
+
+        <div class="container">
+            <!-- 메인 영역 -->
+            <div class="main">
+                <!-- 영상 정보 (가운데 정렬) -->
+                <div class="video-info">
+                    <img src="https://via.placeholder.com/320x180" alt="선택 썸네일">
+                    <div class="video-meta">
+                        <h3>경제 이슈 분석</h3>
+                        <p>업로드 날짜: 2025-10-01</p>
+                        <p>조회수: 12,345</p>
+                        <p>댓글 수: 567</p>
+                    </div>
+                </div>
+
+                <!-- 영상 플레이어 -->
+                <div class="video-player">
+                    <iframe id="videoFrame"
+                            width="640"
+                            height="360"
+                            src="https://www.youtube.com/embed/dQw4w9WgXcQ"
+                            title="YouTube video player"
+                            frameborder="0"
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                            allowfullscreen>
+                    </iframe>
+                </div>
+
+                <!-- 분석 시각화 -->
+                <div class="charts">
+                    <div class="chart-box">
+                        <h4>감정 분포</h4>
+                        <canvas id="pieChart"></canvas>
+                    </div>
+                    <div class="chart-box">
+                        <h4>댓글 워드클라우드</h4>
+                        <canvas id="wordCloud"></canvas>
+                    </div>
+                </div>
+
+                <!-- 분석 요약 -->
+                <div class="analysis">
+                    <h4>분석 요약</h4>
+                    <p>이 영상 댓글 중 <b>기쁨이 45%</b>로 가장 많음</p>
+                    <div class="comments">
+                        <div class="comment">😊 정말 좋은 정보네요!</div>
+                        <div class="comment">😡 이건 동의하기 어렵습니다.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+
+        <script>
+            // 파이차트 (감정 분포)
+            new Chart(document.getElementById("pieChart"), {
+              type: "pie",
+              data: {
+                labels: ["기쁨", "슬픔", "분노", "놀람"],
+                datasets: [{
+                  data: [45, 25, 20, 10],
+                  backgroundColor: ["#4caf50","#2196f3","#f44336","#ff9800"]
+                }]
+              },
+              options: {
+                responsive: false
+              }
+            });
+
+            // 워드클라우드 (댓글 키워드 예시)
+            WordCloud(document.getElementById('wordCloud'), {
+              list: [
+                ["좋다", 30], ["최고", 25], ["분노", 20],
+                ["경제", 18], ["주식", 15], ["위기", 12],
+                ["대박", 10], ["위험", 8], ["호재", 22], ["악재", 16]
+              ],
+              weightFactor: 3,
+              minSize: 12,
+              maxRotation: 0,
+              backgroundColor: "#fafafa",
+              color: function() {
+                return ['#4caf50', '#2196f3', '#f44336', '#ff9800'][Math.floor(Math.random()*4)];
+              }
+            });
+
+            (function setHeaderHeightVar(){
+              const header = document.querySelector('header.header'); // 헤더 프래그먼트의 루트
+              function apply(){
+                const h = header ? header.offsetHeight : 0;
+                document.documentElement.style.setProperty('--header-h', h + 'px');
+              }
+              apply();
+              window.addEventListener('resize', apply); // 창 크기 변화 시 갱신
+            })();
+        </script>
+    </div>
+</main>
+</body>
+</html>

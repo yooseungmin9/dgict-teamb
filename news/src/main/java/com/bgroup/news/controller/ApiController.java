@@ -1,7 +1,6 @@
 package com.bgroup.news.controller;
 
-import com.bgroup.news.mongo.document.MemberDoc;
-import com.bgroup.news.service.KeywordService;
+import com.bgroup.news.dto.MemberDoc;
 import com.bgroup.news.service.MemberService;
 import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
@@ -16,18 +15,10 @@ import java.util.Map;
 @RequestMapping("/api")
 public class ApiController {
 
-    private final KeywordService keywordService;
     private final MemberService memberService;
 
-    public ApiController(KeywordService keywordService,
-                         MemberService memberService) {
-        this.keywordService = keywordService;
+    public ApiController(MemberService memberService) {
         this.memberService = memberService;
-    }
-
-    @GetMapping("/keywords")
-    public Mono<String> getKeywords() {
-        return keywordService.fetchKeywords();
     }
 
     @GetMapping("/members/{id}")

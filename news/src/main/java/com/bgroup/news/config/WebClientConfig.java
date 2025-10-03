@@ -28,14 +28,6 @@ public class WebClientConfig {
                 .build();
     }
 
-    @Bean("sentimentClient") // 8001
-    public WebClient sentimentClient(@Value("${fastapi.sentiment}") String baseUrl) {
-        return WebClient.builder()
-                .baseUrl(baseUrl.trim())
-                .exchangeStrategies(strategies())
-                .build();
-    }
-
     @Bean("chatClient") // 8002
     public WebClient chatClient(@Value("${fastapi.chat}") String baseUrl) {
         return WebClient.builder()
@@ -44,16 +36,8 @@ public class WebClientConfig {
                 .build();
     }
 
-    @Bean("booksClient") // 8003
-    public WebClient booksClient(@Value("${fastapi.book}") String baseUrl) {
-        return WebClient.builder()
-                .baseUrl(baseUrl.trim())
-                .exchangeStrategies(strategies())
-                .build();
-    }
-
     @Bean("youtubeClient")
-    public WebClient youtubeClient(@Value("${fastapi.youtube}") String baseUrl) {
+    public WebClient youtuberClient(@Value("${fastapi.youtube}") String baseUrl) {
         return WebClient.builder()
                 .baseUrl(baseUrl.trim())
                 .exchangeStrategies(strategies())
@@ -62,6 +46,22 @@ public class WebClientConfig {
 
     @Bean("trendClient")
     public WebClient trendClient(@Value("${fastapi.trend}") String baseUrl) {
+        return WebClient.builder()
+                .baseUrl(baseUrl.trim())
+                .exchangeStrategies(strategies())
+                .build();
+    }
+
+    @Bean("sentiClient")
+    public WebClient sentiClient(@Value("${fastapi.senti}") String baseUrl) {
+        return WebClient.builder()
+                .baseUrl(baseUrl.trim())
+                .exchangeStrategies(strategies())
+                .build();
+    }
+
+    @Bean("analysisClient")
+    public WebClient analysisClient(@Value("${fastapi.analysis}") String baseUrl) {
         return WebClient.builder()
                 .baseUrl(baseUrl.trim())
                 .exchangeStrategies(strategies())

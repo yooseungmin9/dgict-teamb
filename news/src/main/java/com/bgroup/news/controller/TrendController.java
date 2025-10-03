@@ -2,11 +2,11 @@ package com.bgroup.news.controller;
 
 import com.bgroup.news.dto.KeywordRankingResponse;
 import org.bson.Document;
-
-import org.springframework.data.domain.Sort;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.mongodb.core.MongoTemplate;
-import org.springframework.data.mongodb.core.aggregation.*;
-import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.aggregation.Aggregation;
+import org.springframework.data.mongodb.core.aggregation.AggregationOperation;
+import org.springframework.data.mongodb.core.aggregation.AggregationResults;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -14,18 +14,16 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 
 @RestController
 @RequestMapping("/api/trends")
 public class TrendController {
+    @Value("${app.mongo.collection:shared_articles}")
+    private String articleCollection;
 
     private final WebClient trendClient; // FastAPI(네이버 DataLab)
-    private final MongoTemplate mongoTemplate; // MongoDB(키워드)
+    private final MongoTemplate mongoTemplate; // MongoDB(뉴스/키워드)
 
     public TrendController(WebClient trendClient, MongoTemplate mongoTemplate) {
         this.trendClient = trendClient;
@@ -54,76 +52,101 @@ public class TrendController {
             @RequestParam(required = false) String category,
             @RequestParam(defaultValue = "30") int days
     ) {
-        var fmt = java.time.format.DateTimeFormatter.BASIC_ISO_DATE;
-        String to = java.time.LocalDate.now().format(fmt);
-        String from = java.time.LocalDate.now().minusDays(days).format(fmt);
+        // 1) 문자열 경계값 (DB에 저장된 포맷과 맞춤: yyyy-MM-dd'T'HH:mm:ss)
+        var fmt = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss");
+        String to = java.time.LocalDateTime.now().format(fmt);
+        String from = java.time.LocalDateTime.now().minusDays(days).format(fmt);
 
-        // 필요한 필드만
-        AggregationOperation projectNeeded = ctx -> new org.bson.Document("$project",
-                new org.bson.Document("category", 1)
+        // 2) 필요한 필드만
+        AggregationOperation projectNeeded = ctx -> new Document("$project",
+                new Document("category", 1)
                         .append("keywords", 1)
-                        .append("news_date", 1)
+                        .append("published_at", 1)
         );
-        AggregationOperation matchDate = ctx -> new org.bson.Document("$match",
-                new org.bson.Document("news_date", new org.bson.Document("$gte", from).append("$lte", to))
+
+        // 3) 문자열 비교 (ISO-8601은 사전순 == 시간순)
+        //    published_at 저장값: "2025-10-01T15:47:31.810573" (마이크로초 존재 OK)
+        //    경계값: "....:ss" (짧아도 사전순 비교 상 범위 필터 정상 동작)
+        AggregationOperation matchDate = ctx -> new Document("$match",
+                new Document("$expr",
+                        new Document("$and", List.of(
+                                new Document("$gte", List.of("$published_at", from)),
+                                new Document("$lte", List.of("$published_at", to))
+                        ))
+                )
         );
+
         AggregationOperation matchCat = null;
         if (category != null && !category.isBlank()) {
-            matchCat = ctx -> new org.bson.Document("$match", new org.bson.Document("category", category));
+            matchCat = ctx -> new Document("$match", new Document("category", category));
         }
 
-        AggregationOperation unwind = ctx -> new org.bson.Document("$unwind", "$keywords");
-
-        // (cat, keyword)로 count
-        AggregationOperation groupCounts = ctx -> new org.bson.Document("$group",
-                new org.bson.Document("_id",
-                        new org.bson.Document("category", "$category").append("keyword", "$keywords"))
-                        .append("count", new org.bson.Document("$sum", 1))
+        AggregationOperation notEmptyKeywords = ctx -> new Document("$match",
+                new Document("keywords", new Document("$exists", true).append("$ne", Collections.emptyList()))
         );
 
-        // 카테고리 그룹에서 topN (전역 sort 없이)
-        AggregationOperation groupTopN = ctx -> new org.bson.Document("$group",
-                new org.bson.Document("_id", "$_id.category")
+        AggregationOperation unwind = ctx -> new Document("$unwind", "$keywords");
+
+        AggregationOperation groupCounts = ctx -> new Document("$group",
+                new Document("_id",
+                        new Document("category", "$category").append("keyword", "$keywords"))
+                        .append("count", new Document("$sum", 1))
+        );
+
+        AggregationOperation groupTopN = ctx -> new Document("$group",
+                new Document("_id", "$_id.category")
                         .append("keywords",
-                                new org.bson.Document("$topN",
-                                        new org.bson.Document("n", topN)
-                                                .append("sortBy", new org.bson.Document("count", -1))
+                                new Document("$topN",
+                                        new Document("n", topN)
+                                                .append("sortBy", new Document("count", -1))
                                                 .append("output",
-                                                        new org.bson.Document("keyword", "$_id.keyword")
+                                                        new Document("keyword", "$_id.keyword")
                                                                 .append("count", "$count")
                                                 )
                                 )
                         )
         );
 
-        AggregationOperation projectOut = ctx -> new org.bson.Document("$project",
-                new org.bson.Document("_id", 0)
+        AggregationOperation projectOut = ctx -> new Document("$project",
+                new Document("_id", 0)
                         .append("category", "$_id")
                         .append("keywords", 1)
         );
 
-        List<AggregationOperation> ops = new ArrayList<>(List.of(projectNeeded, matchDate));
+        var ops = new ArrayList<AggregationOperation>();
+        ops.add(projectNeeded);
+        ops.add(matchDate);
         if (matchCat != null) ops.add(matchCat);
-        ops.addAll(List.of(unwind, groupCounts, groupTopN, projectOut));
+        ops.add(notEmptyKeywords);
+        ops.add(unwind);
+        ops.add(groupCounts);
+        ops.add(groupTopN);
+        ops.add(projectOut);
 
-        Aggregation agg = Aggregation.newAggregation(ops);
-        var results = mongoTemplate.aggregate(agg, "shared_articles", org.bson.Document.class);
+        var agg = Aggregation.newAggregation(ops);
+        AggregationResults<Document> results =
+                mongoTemplate.aggregate(agg, articleCollection, Document.class);
 
-        List<KeywordRankingResponse> flat = new ArrayList<>();
-        for (org.bson.Document d : results) {
-            String cat = d.getString("category");
+        var out = new ArrayList<KeywordRankingResponse>();
+        for (Document d : results) {
+            String cat = Objects.toString(d.get("category"), "");
             @SuppressWarnings("unchecked")
-            List<Map<String, Object>> arr = (List<Map<String, Object>>) d.get("keywords", List.class);
+            List<Map<String, Object>> arr =
+                    (List<Map<String, Object>>) d.get("keywords", List.class);
+            if (arr == null) continue;
             for (int i = 0; i < arr.size(); i++) {
-                Map<String, Object> m = arr.get(i);
+                var m = arr.get(i);
                 String kw = Objects.toString(m.get("keyword"), "");
                 int cnt = ((Number) m.getOrDefault("count", 0)).intValue();
-                flat.add(new KeywordRankingResponse(i + 1, kw, cat, cnt));
+                out.add(new KeywordRankingResponse(i + 1, kw, cat, cnt));
             }
         }
-        flat.sort(Comparator.comparing(KeywordRankingResponse::getCategory, Comparator.nullsLast(String::compareTo))
+
+        // 보기 좋게 정렬
+        out.sort(Comparator
+                .comparing(KeywordRankingResponse::getCategory, Comparator.nullsLast(String::compareTo))
                 .thenComparingInt(KeywordRankingResponse::getRank));
-        return flat;
+
+        return out;
     }
 }
-

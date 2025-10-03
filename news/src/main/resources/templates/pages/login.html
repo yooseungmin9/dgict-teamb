@@ -7,46 +7,164 @@
   <style>
     * { box-sizing: border-box; }
     body {
-      margin: 0; min-height: 100dvh; background: #e8f2fb;
+      margin: 0;
+      min-height: 100dvh;
+      background: transparent;
       font-family: system-ui, -apple-system, Segoe UI, Roboto, Noto Sans KR, Arial, sans-serif;
-      display: grid; place-items: center;
+      display: grid;
+      place-items: center;
     }
-    .login { position: relative; width: min(92vw, 380px); margin: auto; background: transparent; padding: 60px 20px 28px; }
-    .avatar { width: 96px; height: 96px; border: 3px solid #2f76c2; border-radius: 50%; margin: 0 auto 20px; display: grid; place-items: center; }
-    .avatar svg { width: 54px; height: 54px; fill: #2f76c2; }
-    .field { position: relative; margin: 10px 0; }
+
+    /* ===== 컨테이너 ===== */
+    .login {
+      position: relative;               /* 버튼 위치 기준 */
+      width: min(92vw, 380px);
+      margin: auto;                     /* 화면 중앙 배치 */
+      background: transparent;            /* 원본 디자인: 카드 배경 없음 */
+      padding: 60px 20px 28px;
+    }
+
+    /* ===== 아바타 아이콘 원 ===== */
+    .avatar {
+      width: 96px;
+      height: 96px;
+      border: 3px solid #000000;
+      border-radius: 50%;
+      margin: 0 auto 20px;
+      display: grid;
+      place-items: center;
+    }
+    .avatar svg { width: 54px; height: 54px; fill: #000000; }
+
+    /* ===== 입력 그룹 ===== */
+    .field {
+      position: relative;
+      margin: 10px 0;
+    }
     .field input {
-      width: 100%; height: 48px; padding: 0 56px 0 44px;
-      border: 2px solid #2f76c2; border-radius: 10px; background: white;
-      font-size: 16px; color: #0d3f70; outline: none;
+      width: 100%;
+      height: 48px;
+      padding: 0 56px 0 44px;             /* 왼쪽 아이콘/오른쪽 토글 공간 */
+      border: 2px solid #000000;
+      border-radius: 10px;
+      background: white;
+      font-size: 16px;
+      color: #000000;
+      outline: none;
+      box-sizing: border-box;
     }
-    .field input::placeholder { color: #7aa8d9; }
+    .field input::placeholder { color: rgba(0,0,0,0.35); }
     .field input:focus { box-shadow: 0 0 0 3px rgba(47,118,194,0.15); }
-    .left-icon, .right-icon {
-      position: absolute; top: 50%; transform: translateY(-50%); display: grid; place-items: center; color: #2f76c2;
+
+    /* 좌측 아이콘 */
+    .field .left-icon {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      left: 8px;    /* 기존 12px → 살짝 안쪽 */
+      width: 32px;
+      height: 32px;
+      display: grid;
+      place-items: center;
+      color: #000000;
     }
-    .left-icon { left: 8px; width: 32px; height: 32px; }
-    .right-icon { right: 6px; width: 25px; height: 25px; cursor: pointer; background: transparent; border: none; border-radius: 6px; }
-    .right-icon svg { width: 20px; height: 20px; }
-    .right-icon:hover { background: rgba(47,118,194,0.1); border: 1px solid #2f76c2; }
-    .row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 8px 2px 18px; font-size: 14px; color: #0d3f70; }
-    .row a { color: #7aa8d9; text-decoration: none; }
+    /* 기존 .field .right-icon 수정 */
+    .field .right-icon {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      right: 6px;   /* 기존 12px → 살짝 안쪽 */
+      width: 25px;      /* 크기 키움 */
+      height: 25px;     /* 크기 키움 */
+      display: grid;
+      place-items: center;
+      justify-content: center; /* 가로 중앙 */
+      color: #000000;
+      cursor: pointer;
+      background: transparent;
+      border: none;
+      border-radius: 6px; /* 살짝 둥글림 */
+    }
+
+    /* 안의 SVG도 크기 확대 */
+    .field .right-icon svg {
+      width: 20px;
+      height: 20px;
+    }
+
+    .field .right-icon:hover {
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid #000000;
+    }
+
+    .field .right-icon { right: 12px; cursor: pointer; }
+
+    /* ===== 보조 행(Remember/비밀번호 찾기) ===== */
+    .row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin: 8px 2px 18px;
+      font-size: 14px;
+      color: #0d3f70;
+    }
+    .row a {
+      color: #000000;
+      text-decoration: none;
+    }
     .row a:hover { text-decoration: underline; }
-    .btn { width: 100%; height: 52px; border: 0; border-radius: 10px; background: #1e73be; color: #fff; font-size: 18px; letter-spacing: .5px; cursor: pointer; }
-    .btn:hover { background: #185e9c; }
-    .error { margin: 6px 2px 0; color: #d64545; font-size: 13px; min-height: 18px; }
-    .back-btn { position: absolute; top: 8px; left: 0; width: 32px; height: 32px; padding: 0; border: none; background: none; cursor: pointer; }
-    .back-btn img { width: 100%; height: 100%; object-fit: contain; }
-    .back-btn:hover img { opacity: .8; }
+
+    /* ===== 로그인 버튼 ===== */
+    .btn {
+      width: 100%;
+      height: 52px;
+      border: 0;
+      border-radius: 10px;
+      background: rgba(0,0,0,0.5);
+      color: #fff;
+      font-size: 18px;
+      letter-spacing: 0.5px;
+      cursor: pointer;
+    }
+    .btn:hover { background: rgba(0,0,0,0.7); }
+
+    /* ===== 오류 메시지 ===== */
+    .error {
+      margin: 6px 2px 0;
+      color: #d64545;
+      font-size: 13px;
+      min-height: 18px; /* 레이아웃 흔들림 방지 */
+    }
+
+    .back-btn {
+      position: absolute;
+      top: 8px;    /* 로그인 박스의 상단 여백 기준 */
+      left: 0;     /* 로그인 박스의 왼쪽에 붙임 */
+      width: 32px;
+      height: 32px;
+      padding: 0;
+      border: none;
+      background: none;
+      cursor: pointer;
+    }
+    .back-btn img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+    .back-btn:hover img {
+      opacity: 0.8;
+    }
   </style>
 </head>
 <body>
 
-<!-- 서버로 전송: POST /pages/login -->
+<!-- 서버로 전송: POST /login -->
 <form class="login" id="loginForm" th:action="@{/pages/login}" method="post" novalidate>
-  <!-- (Spring Security 사용 시 CSRF 필요)
-  <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
-  -->
+  <!-- (Spring Security 사용 시 CSRF 필요)-->
+<!--  <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />-->
+
 
   <!-- 뒤로가기 -->
   <button type="button" class="back-btn" onclick="history.back()">
@@ -66,7 +184,7 @@
       <svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5Zm0 2c-4.42 0-8 2.24-8 5v1h16v-1c0-2.76-3.58-5-8-5Z"/></svg>
     </span>
     <!-- ★ name="id" 로 맞춤 (서비스가 id 기반 인증) -->
-    <input id="id" name="id" type="text" placeholder="ID" autocomplete="username" aria-label="ID" required />
+    <input id="id" name="id" type="text" placeholder="회원 ID" autocomplete="username" aria-label="ID" required />
   </div>
 
   <!-- Password -->
@@ -74,7 +192,7 @@
     <span class="left-icon" aria-hidden="true">
       <svg viewBox="0 0 24 24"><path fill="currentColor" d="M17 8V7a5 5 0 0 0-10 0v1H5v12h14V8Zm-8 0V7a3 3 0 0 1 6 0v1Z"/></svg>
     </span>
-    <input id="password" name="password" type="password" placeholder="Password"
+    <input id="password" name="password" type="password" placeholder="비밀번호"
            autocomplete="current-password" aria-label="Password" required minlength="4" />
     <button type="button" class="right-icon" id="togglePw" aria-label="비밀번호 보이기 전환" title="비밀번호 보기/숨기기">
       <svg id="eyeOff" viewBox="0 0 24 24">
@@ -88,8 +206,8 @@
 
   <!-- Remember / Forgot -->
   <div class="row">
-    <label><input id="remember" type="checkbox" /> Remember me</label>
-    <a href="#" id="forgot">Forgot password?</a>
+    <label><input id="remember" type="checkbox" /> ID 기억하기</label>
+    <a href="/pages/signup" id="forgot">회원가입</a>
   </div>
 
   <!-- 로그인 버튼 -->
@@ -129,7 +247,7 @@
       else localStorage.removeItem('demo_login_id');
       // ★ 여기서는 e.preventDefault() 안 씀 → 서버로 정상 POST 전송
     });
-  })();
+  })()
 </script>
 </body>
 </html>

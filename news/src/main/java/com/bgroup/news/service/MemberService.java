@@ -1,7 +1,7 @@
 package com.bgroup.news.service;
 
-import com.bgroup.news.mongo.document.MemberDoc;
-import com.bgroup.news.mongo.repository.MemberRepository;
+import com.bgroup.news.dto.MemberDoc;
+import com.bgroup.news.repository.MemberRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;

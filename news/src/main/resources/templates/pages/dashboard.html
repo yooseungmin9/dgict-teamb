@@ -1,93 +1,174 @@
 <!DOCTYPE html>
 <html lang="ko" xmlns:th="http://www.thymeleaf.org">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title th:text="${pageTitle}">경제 뉴스 분석 대시보드</title>
-  <link rel="stylesheet" th:href="@{/css/style.css}" />
-  <script th:src="@{/js/app.js}"></script>
+  <meta charset="utf-8"/>
+  <title>써머릭스 SUMMARIX</title>
+  <link rel="stylesheet" href="/css/style.css"/>
+  <link rel="stylesheet" href="/css/dashboard-grid.css"/>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script defer src="/js/sentiment.js"></script>
+  <script defer src="/js/trands.js"></script>
+  <script defer src="/js/app.js"></script>
 </head>
-<body>
-<div th:replace="~{fragments/header :: siteHeader}"></div>
+<body data-page="dashboard">
+<!-- 헤더는 프래그먼트 호출만 -->
+<div th:replace="fragments/header :: siteHeader"></div>
 
-<main class="main">
+<main class="dash">
   <div class="container">
+    <!-- 헤드라인 영역 -->
+    <div class="dash__headline">
+      <h2>~ 글로벌 뉴스 속보 모니터링 ~</h2>
+    </div>
+    <div>
+      <button class="report-btn" type="button" id="aiReportBtn">AI 리포트 생성</button>
+    </div>
 
-    <!-- 로그인 상태 안내 블록 -->
-    <section style="margin: 12px 0 20px;">
-      <!-- 로그인 상태 -->
-      <div th:if="${session.loginUser != null}">
-        안녕하세요, <b th:text="${session.loginUser.name}">사용자</b> 님!
-        <span th:if="${session.admin != null and session.admin > 0}">
-          &nbsp;|&nbsp;<a th:href="@{/pages/admin}">관리자 페이지</a>
-        </span>
-        <form th:action="@{/pages/logout}" method="post" style="display:inline; margin-left: 12px;">
-          <!-- Spring Security 사용 시 CSRF 토큰 -->
-          <!-- <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" /> -->
-          <button type="submit">로그아웃</button>
-        </form>
+    <!-- 3열 그리드 -->
+    <section class="dash__grid">
+      <!-- 좌열 -->
+      <!-- dashboard.html : #panel-sentiment-series 블록만 교체 -->
+      <div class="stack">
+        <div class="card" id="panel-sentiment-series">
+          <!-- [설명] 기존 제목/placeholder 제거, 제공 카드 삽입 -->
+          <article class="metric-card">
+              <div class="feature-card" id="sentiment-card" data-api="/api/sentiment/line">
+              <div class="card__header">
+                <strong>긍·부정추이</strong>
+                <div style="display:flex; gap:8px; align-items:center; margin-left:auto;">
+                  <button id="btn-mode-count" class="btn btn--sm">건수</button>
+                  <button id="btn-mode-ratio" class="btn btn--sm">비율</button>
+                  <button id="btn-g-day"   class="btn btn--sm">일별</button>
+                  <button id="btn-g-week"  class="btn btn--sm">주별</button>
+                  <button id="btn-g-month" class="btn btn--sm">월별</button>
+                </div>
+              </div>
+              <div class="card__body">
+                <div id="sentiment-status" style="font-size:12px;color:#666;margin:4px 0;">준비됨</div>
+                <div style="height:280px;">
+                  <canvas id="sentiment-chart"><!-- Chart.js가 이 캔버스에 그립니다 --></canvas>
+                </div>
+              </div>
+            </div>
+          </article>
+        </div>
+
+          <div class="card" id="panel-hot-datalab">
+
+              <div class="card__body">
+                  <strong>키워드 핫토픽 그래프 (데이터랩)</strong>
+                  <div class="controls" style="margin-bottom:8px;">
+                      <label class="muted">표시 기간(일)
+                          <select id="DB_trendDays">
+                              <option value="30" selected>30</option>
+                              <option value="60">60</option>
+                              <option value="90">90</option>
+                          </select>
+                      </label>
+                  </div>
+                  <div class="chart-container">
+                      <canvas id="DB_categoryTrendChart"></canvas>
+                  </div>
+              </div>
+          </div>
       </div>
 
-      <!-- 비로그인 상태 -->
-      <div th:if="${session.loginUser == null}">
-        <a th:href="@{/pages/login}">로그인</a>
-        &nbsp;|&nbsp;
-        <a th:href="@{/pages/signup}">회원가입</a>
+
+
+
+
+
+
+      <!-- 중앙열 -->
+      <div class="stack">
+        <div class="card" id="panel-hot-topic-yesterday">
+          <div class="card__title">키워드 핫토픽 (어제 대비)</div>
+          <div class="card__body placeholder">핫토픽 리스트/차트</div>
+        </div>
+
+        <div class="card" id="panel-news-count">
+          <div class="card__title">분석된 뉴스 개수</div>
+          <div class="card__body placeholder">카운트/스파크라인</div>
+        </div>
+
+        <div class="card" id="panel-today-sentiment">
+          <div class="card__title">오늘의 감성점수 수집된것 (백분율)</div>
+          <div class="card__body placeholder">파이/도넛</div>
+        </div>
+
+        <div class="card" id="panel-tbd">
+          <div class="card__title">미정</div>
+          <div class="card__body placeholder">추후 위젯</div>
+        </div>
+      </div>
+
+      <!-- 우열 -->
+      <div class="stack">
+          <div class="card" id="panel-keyword-rank">
+              <div class="card__title">키워드 랭킹</div>
+              <div class="card__body">
+                  <!-- ▼ trends.html의 .ranking-section 본문 이식 (제목 h3 제거) -->
+                  <div class="controls" style="margin-bottom:6px;">
+                      <!-- 보기 모드 -->
+                      <label><input type="radio" name="DB_kwMode" value="category" checked /> 카테고리별</label>
+                      <label><input type="radio" name="DB_kwMode" value="global" /> 통합</label>
+
+                      <!-- 카테고리 선택 -->
+                      <select id="DB_kwCategorySelect" style="min-width:140px; display:none;"></select>
+
+                      <!-- TopN -->
+                      <label class="muted">Top
+                          <select id="DB_kwTopN">
+                              <option value="10" selected>10</option>
+                              <option value="20">20</option>
+                              <option value="30">30</option>
+                          </select>
+                      </label>
+                      <!-- 기간(일) -->
+                      <label class="muted">기간(일)
+                          <select id="DB_kwDays">
+                              <option value="30" selected>30</option>
+                              <option value="60">60</option>
+                              <option value="90">90</option>
+                          </select>
+                      </label>
+                  </div>
+
+                  <!-- 탭 버튼 -->
+                  <div id="DB_kwTabs" style="margin:6px 0; display:flex; gap:6px; flex-wrap:wrap;"></div>
+
+                  <table id="DB_kwTable" class="ranking-table">
+                      <thead>
+                      <tr>
+                          <th style="width:64px;">순위</th>
+                          <th>키워드</th>
+                          <th id="DB_kwHeaderCategory" class="col-category" style="width:140px;">카테고리</th>
+                          <th class="right" style="width:100px;">언급량</th>
+                      </tr>
+                      </thead>
+                      <tbody id="DB_keywordRankingBody"></tbody>
+                  </table>
+              </div>
+          </div>
+
+        <div class="row-2">
+          <div class="card" id="panel-opinion">
+            <div class="card__title">오피니언 마이닝 요약</div>
+            <div class="card__body placeholder">요약 텍스트</div>
+          </div>
+        </div>
       </div>
     </section>
 
-    <!-- Dashboard Page -->
-    <div id="dashboard.html" class="page">
-      <h2 class="page-title" th:text="${mainPageTitle}">경제 뉴스 분석 대시보드</h2>
-
-      <div class="dashboard-grid">
-
-        <div class="dashboard-card" th:attr="data-url=@{/pages/news}">
-          <div class="card-icon">📰</div>
-          <h3 th:text="${todayNews}">오늘의 뉴스</h3>
-          <p>금일 주요 경제 뉴스 요약과 전일 브리핑을 확인하세요</p>
-          <div class="card-stats">5개 주요 뉴스</div>
-        </div>
-
-        <div class="dashboard-card" th:attr="data-url=@{/pages/sentiment}">
-          <div class="card-icon">📊</div>
-          <h3>감성 분석</h3>
-          <p>경제 뉴스에 대한 시장 반응을 시각적으로 분석</p>
-          <div class="card-stats">긍정 35% | 중립 45%</div>
-        </div>
-
-        <div class="dashboard-card" th:attr="data-url=@{/pages/global}">
-          <div class="card-icon">🌐</div>
-          <h3>글로벌 모니터링</h3>
-          <p>실시간 해외 경제뉴스 헤드라인과 주요 지표</p>
-          <div class="card-stats">실시간 업데이트</div>
-        </div>
-
-        <div class="dashboard-card" th:attr="data-url=@{/pages/trends}">
-          <div class="card-icon">📈</div>
-          <h3>트렌드 예측</h3>
-          <p>소비트렌드 예측과 경제지표 상관관계 분석</p>
-          <div class="card-stats">3개월 전망</div>
-        </div>
-
-        <div class="dashboard-card" th:attr="data-url=@{/pages/chat}">
-          <div class="card-icon">🤖</div>
-          <h3>AI 챗봇</h3>
-          <p>경제뉴스와 경제용어에 대한 질문답변 서비스</p>
-          <div class="card-stats">24시간 지원</div>
-        </div>
-
-        <div class="dashboard-card" th:attr="data-url=@{/pages/recommendations}">
-          <div class="card-icon">📚</div>
-          <h3>맞춤 추천</h3>
-          <p>개인화된 경제 서적과 교육 영상 추천</p>
-          <div class="card-stats">AI 큐레이션</div>
-        </div>
-
+    <!-- 하단 대형 푸터영역 -->
+    <section class="dash__footer">
+      <div class="card card--footer">
+        <div class="card__body placeholder">푸터 등등</div>
       </div>
-    </div>
+    </section>
   </div>
 </main>
+</body>
 
 <script th:inline="javascript">
   (function () {
@@ -107,5 +188,4 @@
     });
   })();
 </script>
-</body>
 </html>

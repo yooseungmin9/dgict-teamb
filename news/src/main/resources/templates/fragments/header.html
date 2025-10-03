@@ -1,60 +1,84 @@
-<!-- src/main/resources/templates/fragments/header.html -->
-<!-- [입문자용 설명]
-     - 재사용 가능한 헤더 조각(fragment)입니다.
-     - 버튼/카드 유지 요구에 맞춰 data-url + 공용 JS로 이동 처리 -->
 <header class="header" th:fragment="siteHeader" xmlns:th="http://www.w3.org/1999/xhtml">
-  <div class="container">
-    <div class="flex items-center justify-between">
-      <div class="logo">
-        <h1 th:text="${pageTitle}">EcoNews AI</h1>
-        <span th:text="${subTitle}">AI 기반 경제 뉴스 분석</span>
-      </div>
-      <nav class="nav">
-        <!-- button 유지 + 접근성 -->
-        <button class="nav-btn" th:text="${nav1}" data-url="/pages/"></button>
-        <button class="nav-btn" th:text="${nav2}" data-url="/pages/news"></button>
-        <button class="nav-btn" th:text="${nav3}" data-url="/pages/sentiment"></button>
-        <button class="nav-btn" th:text="${nav4}" data-url="/pages/global"></button>
-        <button class="nav-btn" th:text="${nav5}" data-url="/pages/trends"></button>
-        <button class="nav-btn" th:text="${nav6}" data-url="/pages/chat"></button>
-        <button class="nav-btn" th:text="${nav7}" data-url="/pages/recommendations"></button>
+  <!-- [1] 상단 바: 로고 · 타이틀 · 서브타이틀 -->
+  <div class="container header__top">
+    <!-- 좌: 원형 로고 (이미지 없는 상태의 더미) -->
+    <a class="logo" data-url="/pages/" aria-label="대시보드로 이동">
+      <svg viewBox="0 0 24 24" class="brand__logo">
+        <path d="M3 12h3l3 7 4-14 3 7h5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </a>
 
-<!--        <button class="login-btn" data-url="/pages/login">-->
-<!--          <img src="/img/login.png" alt="로그인" class="login-icon" />-->
-<!--        </button>-->
-      </nav>
+    <!-- 중앙: 서비스 타이틀 -->
+    <div class="title" data-url="/pages/" aria-label="대시보드로 이동">
+      <h1 class="title__main">써머릭스 SUMMARIX</h1>
+      <p class="title__sub">경제뉴스 분석 대시보드</p>
+    </div>
+
+    <!-- 우: 비워서 중앙 정렬 균형 유지 -->
+    <div aria-hidden="true"></div>
+  </div>
+
+  <hr class="header__divider"/>
+
+  <!-- [2] 하단 바: 좌(네비) · 우(검색/로그인) -->
+  <div class="container header__bottom">
+    <!-- 좌측 네비 -->
+    <nav class="nav nav--pills" aria-label="주 메뉴">
+      <button class="nav-btn" data-url="/pages/news">뉴스 요약</button>
+      <button class="nav-btn" data-url="/pages/youtube_opinion">분석</button>
+      <button class="nav-btn" data-url="/pages/chat">챗봇</button>
+      <button class="nav-btn" data-url="/pages/recommend">추천</button>
+    </nav>
+
+    <!-- 우측 검색/로그인 영역 -->
+    <div class="actions">
+      <!-- 검색창: 디자인 목적의 버튼형 인풋 -->
+      <div class="searchbox" role="search">
+        <input type="text" id="q" placeholder="검색창" aria-label="검색어 입력"/>
+      </div>
+      <button class="icon-btn" type="button" title="검색 실행" id="searchBtn" aria-label="검색">
+        <!-- 돋보기 아이콘 (stroke) -->
+        <svg viewBox="0 0 24 24" class="icon" aria-hidden="true">
+          <circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2"/>
+          <path d="M16.5 16.5L21 21" fill="none" stroke="currentColor" stroke-width="2"/>
+        </svg>
+      </button>
+
+      <!-- 로그인 상태 -->
+      <div th:if="${session.loginUser != null}">
+        <button id="accountBtn" class="account-btn" type="button" title="계정정보">
+          <svg viewBox="0 0 24 24" class="account-icon" aria-hidden="true">
+            <path d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5Zm0 2c-4.42 0-8 2.24-8 5v1h16v-1c0-2.76-3.58-5-8-5Z"/>
+          </svg>
+        </button>
+      </div>
+
+      <div th:if="${session.loginUser != null}">
+        <form th:action="@{/pages/logout}" method="post">
+          <button id="logoutBtn" class="logout-btn" type="submit" title="로그아웃">Logout</button>
+        </form>
+      </div>
+
+
+      <!-- 비로그인 상태 -->
+      <div th:if="${session.loginUser == null}">
+        <button id="loginBtn" class="login-btn" title="로그인" data-url="/pages/login">Login</button>
+      </div>
     </div>
   </div>
 
-  <!-- 공용 라우팅 스크립트: 모든 페이지에서 동작 -->
-  <script th:inline="javascript">
+  <hr class="header__divider"/>
+  <!-- 공용 라우팅 + 간단 테스트 스크립트 -->
+  <script>
     (function () {
-    function go(el) {
-      var url = el.dataset.url;
-      if (url) window.location.href = url; // 지정 URL로 이동
-    }
-    function onClick(e) {
-      var t = e.currentTarget;
-      go(t);
-    }
-    function onKey(e) {
-      // Enter(13) 또는 Space(32)로도 이동
-      if (e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault();
-        go(e.currentTarget);
-      }
-    }
-    // 버튼, 카드 모두에 리스너 장착
-    var links = document.querySelectorAll('[data-url]');
-    links.forEach(function (el) {
-      el.addEventListener('click', onClick);
-      el.addEventListener('keydown', onKey);
-      // 시각적으로 링크처럼 보이게
-      el.style.cursor = 'pointer';
-    });
-  })();
+      function go(el){ var u=el.dataset.url; if(u) window.location.href=u; }
+      function onClick(e){ go(e.currentTarget); }
+      function onKey(e){ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); go(e.currentTarget);} }
+      document.querySelectorAll('[data-url]').forEach(function(el){
+        el.addEventListener('click', onClick);
+        el.addEventListener('keydown', onKey);
+        el.style.cursor='pointer';
+      });
+    })();
   </script>
 </header>
-
-<!-- [간단 테스트]
-     - 이 파일만 수정하면 모든 페이지의 헤더가 함께 반영됩니다. -->

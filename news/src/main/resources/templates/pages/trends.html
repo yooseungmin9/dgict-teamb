@@ -14,10 +14,14 @@
     .chart-container { position: relative; height: 360px; }
     .controls { display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
     .chip { padding:6px 10px; border:1px solid #ddd; border-radius:12px; background:#f8f9fb; cursor:pointer; }
-    .ranking-table { width:100%; border-collapse: collapse; }
+    .chip.active { background:#e8eefc; border-color:#b6c6ff; }
+    .ranking-table { width:100%; border-collapse: collapse; table-layout: fixed; }
     .ranking-table th, .ranking-table td { padding:10px 8px; border-bottom:1px solid #eee; text-align:left; }
+    .ranking-table .right { text-align:right; }
     .muted { color:#888; }
-    .right { text-align:right; }
+    /* 모드에 따라 카테고리 열을 숨길 때 사용할 클래스 */
+    .hide-category th.col-category,
+    .hide-category td.col-category { display: none; }
   </style>
 </head>
 <body>
@@ -65,7 +69,7 @@
               <option value="30">30</option>
             </select>
           </label>
-          <!-- 기간(일) — 백엔드 days 쿼리와 연계하려면 컨트롤러에서 지원 -->
+          <!-- 기간(일) — 컨트롤러 days 쿼리 지원 시 사용 -->
           <label class="muted">기간(일)
             <select id="kwDays">
               <option value="30" selected>30</option>
@@ -78,12 +82,12 @@
         <!-- 탭 버튼 (선택 카테고리 빠르게 전환) -->
         <div id="kwTabs" style="margin:6px 0; display:flex; gap:6px; flex-wrap:wrap;"></div>
 
-        <table class="ranking-table">
+        <table id="kwTable" class="ranking-table">
           <thead>
           <tr>
             <th style="width:64px;">순위</th>
             <th>키워드</th>
-            <th id="kwHeaderCategory" style="width:140px;">카테고리</th>
+            <th id="kwHeaderCategory" class="col-category" style="width:140px;">카테고리</th>
             <th class="right" style="width:100px;">언급량</th>
           </tr>
           </thead>
@@ -134,7 +138,7 @@
       "산업": "#d62728",
       "글로벌경제": "#9467bd",
       "기타": "#8c564b",
-      "일반": "#8c564b" // 서버가 '일반'로 올 때 매핑
+      "일반": "#8c564b"
     };
 
     const labels = data.dates;
@@ -190,7 +194,6 @@
   let KW_CURRENT_CAT = "";   // 현재 표시 카테고리
 
   async function loadKeywordRanking() {
-    // days 파라미터는 컨트롤러가 지원할 때만 의미 있음
     const days = document.getElementById("kwDays").value;
     try {
       const url = "/api/trends/keyword-ranking";
@@ -216,12 +219,11 @@
     KW_CATEGORIES.forEach(cat => {
       const btn = document.createElement("button");
       btn.textContent = cat;
-      btn.className = "chip";
-      btn.style.cssText = "padding:6px 10px;border:1px solid #ddd;border-radius:12px;background:#f8f9fb;cursor:pointer;";
+      btn.className = "chip" + (cat === KW_CURRENT_CAT ? " active" : "");
       btn.addEventListener("click", () => {
         KW_CURRENT_CAT = cat;
-        const sel = document.getElementById("kwCategorySelect");
-        sel.value = cat;
+        document.getElementById("kwCategorySelect").value = cat;
+        buildKwTabs(); // 활성 표시 갱신
         renderKwTable();
       });
       wrap.appendChild(btn);
@@ -241,15 +243,22 @@
     sel.value = KW_CURRENT_CAT || KW_CATEGORIES[0] || "";
   }
 
+  function toggleCategoryColumn(show) {
+    const table = document.getElementById("kwTable");
+    if (show) {
+      table.classList.remove("hide-category");
+    } else {
+      table.classList.add("hide-category");
+    }
+  }
+
   function setKwMode(mode) {
     KW_MODE = mode;
-    const headerCat = document.getElementById("kwHeaderCategory");
-    if (mode === "category") {
-      headerCat.style.display = "none";
-      if (!KW_CURRENT_CAT) KW_CURRENT_CAT = KW_CATEGORIES[0] || "";
-    } else {
-      headerCat.style.display = "";
-    }
+    const showCategoryCol = (mode === "global"); // 통합 모드에서만 카테고리 열 표시
+    toggleCategoryColumn(showCategoryCol);
+    document.getElementById("kwCategorySelect").style.display = (mode === "category") ? "inline-block" : "none";
+    document.getElementById("kwTabs").style.display = (mode === "category") ? "flex" : "none";
+    if (!KW_CURRENT_CAT && KW_CATEGORIES.length) KW_CURRENT_CAT = KW_CATEGORIES[0];
     buildKwTabs();
     buildKwSelect();
     renderKwTable();
@@ -260,14 +269,18 @@
     tbody.innerHTML = "";
 
     const topN = parseInt(document.getElementById("kwTopN").value || "10", 10);
-
     let rows = [];
+
     if (KW_MODE === "category") {
-      // 선택 카테고리만 표시 (이미 rank 있음)
-      rows = (KW_BY_CAT[KW_CURRENT_CAT] || []).slice(0, topN)
-        .map((r, idx) => ({ rank: idx + 1, keyword: r.keyword, category: "", count: r.count }));
+      const src = (KW_BY_CAT[KW_CURRENT_CAT] || []).slice(0, topN);
+      rows = src.map((r, idx) => ({
+        rank: idx + 1,
+        keyword: r.keyword,
+        category: r.category || "",   // 셀은 유지(숨김은 CSS로 처리)
+        count: r.count || 0
+      }));
     } else {
-      // 통합 모드: 카테고리 무시하고 keyword별 count 합산 후 TopN
+      // 통합 모드: keyword별 count 합산 후 TopN
       const byWord = new Map();
       for (const r of KW_RAW) {
         const k = r.keyword;
@@ -281,19 +294,18 @@
       rows = merged.map((r, idx) => ({
         rank: idx + 1,
         keyword: r.keyword,
-        category: "-", // 통합이라 비움
+        category: "-", // 통합 모드에서는 구분 없음
         count: r.count
       }));
     }
 
     for (const r of rows) {
       const tr = document.createElement("tr");
-      const catCell = (KW_MODE === "category") ? "" : `<td>${r.category}</td>`;
       tr.innerHTML = `
         <td>${r.rank}</td>
         <td>${r.keyword}</td>
-        ${catCell}
-        <td class="right">${r.count.toLocaleString()}</td>
+        <td class="col-category">${r.category}</td>
+        <td class="right">${(r.count ?? 0).toLocaleString()}</td>
       `;
       tbody.appendChild(tr);
     }
@@ -303,6 +315,11 @@
   document.getElementById("trendDays").addEventListener("change", initCategoryTrends);
   document.getElementById("kwTopN").addEventListener("change", renderKwTable);
   document.getElementById("kwDays").addEventListener("change", loadKeywordRanking);
+  document.getElementById("kwCategorySelect").addEventListener("change", (e) => {
+    KW_CURRENT_CAT = e.target.value;
+    buildKwTabs(); // 탭 활성 표시 동기화
+    renderKwTable();
+  });
   document.querySelectorAll('input[name="kwMode"]').forEach(r =>
     r.addEventListener("change", (e) => setKwMode(e.target.value))
   );
@@ -310,8 +327,7 @@
   (async function bootstrap() {
     await initCategoryTrends();
     await loadKeywordRanking();
-    // 초기 모드는 category
-    setKwMode("category");
+    setKwMode("category"); // 초기 모드
   })();
 </script>
 </body>

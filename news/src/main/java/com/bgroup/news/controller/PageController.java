@@ -1,6 +1,6 @@
 package com.bgroup.news.controller;
 
-import com.bgroup.news.mongo.document.MemberDoc;
+import com.bgroup.news.dto.MemberDoc;
 import com.bgroup.news.service.MemberService;
 import jakarta.servlet.http.HttpSession;
 import org.springframework.stereotype.Controller;
@@ -90,5 +90,17 @@ public class PageController {
     public String signupSubmit(@ModelAttribute MemberDoc member) {
         memberService.saveMember(member);
         return "redirect:/pages/members";
+    }
+
+    @GetMapping("/account")
+    public String account(Model model) {
+
+        return "pages/account";
+    }
+
+    @GetMapping("/youtube_opinion")
+    public String youtube_opinion(Model model) {
+
+        return "pages/youtube_opinion";
     }
 }

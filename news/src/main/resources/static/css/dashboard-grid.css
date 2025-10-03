@@ -1,0 +1,75 @@
+/* 대시보드 틀 */
+.card{
+  border-radius:8px; background:#fff;
+  display:flex; flex-direction:column; min-height:120px;
+}
+.card__title{ padding:12px 16px; font-weight:700; border-bottom:1px solid #111; }
+.card__body{ padding:16px; }
+.placeholder{ color:#666; }
+
+/* AI 레포트 버튼 */
+.report-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 50px;
+  background: none;
+  border: 1px solid #000;
+  cursor: pointer;
+  font-size: 16px;
+  padding: 6px;
+  border-radius: 6px;        /* hover 배경을 둥글게 */
+  transition: background 0.3s;
+  margin-bottom : 7px;
+  margin-left:auto;
+}
+
+/* hover 시 배경 강조 */
+.report-btn:hover {
+  background:rgba(59,130,246,.12);
+}
+
+/* 헤드라인 */
+.dash__headline{
+  display:flex; align-items:center; justify-content:center; gap:16px;
+  padding:8px 0 12px;
+}
+.dash__headline h2{ font-size:24px; margin:0; }
+.btn-outline{
+  margin-left:auto; /* 우측 상단 배치 */
+  border:1px solid #111; background:#fff; border-radius:10px; height:40px; padding:0 14px; cursor:pointer;
+}
+
+/* 본문 그리드 (3열) */
+.dash__grid{
+  display:grid; grid-template-columns: 1fr 1fr 1fr; gap:20px;
+}
+
+/* 좌열 큰 카드 */
+.card--xl{ min-height:320px; }
+
+/* 중앙·우열 세로 스택 */
+.stack{ display:flex; flex-direction:column; gap:20px; }
+.row-2{ display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+
+/* 하단 푸터 */
+.dash__footer{ margin-top:24px; }
+.card--footer{ min-height:180px; }
+
+/* 반응형 */
+@media (max-width: 1200px){
+  .dash__grid{ grid-template-columns: 1fr; }
+  .btn-outline{ margin-left:0; }
+}
+
+.chart-container{ position:relative; height:240px; }
+.controls{ display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+.chip{ padding:6px 10px; border:1px solid #ddd; border-radius:12px; background:#f8f9fb; cursor:pointer; }
+.chip.active{ background:#e8eefc; border-color:#b6c6ff; }
+.ranking-table{ width:100%; border-collapse:collapse; table-layout:fixed; }
+.ranking-table th,.ranking-table td{ padding:10px 8px; border-bottom:1px solid #eee; text-align:left; }
+.ranking-table .right{ text-align:right; }
+.muted{ color:#888; }
+/* 통합 모드에서 카테고리 열 숨김 */
+.hide-category th.col-category,
+.hide-category td.col-category{ display:none; }

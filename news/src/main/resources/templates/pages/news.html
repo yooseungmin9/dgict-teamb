@@ -1,4 +1,3 @@
-<!-- templates/news.html — 좌측 썸네일 카드 + 모달 -->
 <!DOCTYPE html>
 <html lang="ko" xmlns:th="http://www.thymeleaf.org">
 <head>
@@ -6,6 +5,7 @@
   <title>오늘의 경제 뉴스</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="stylesheet" th:href="@{/css/style.css}" />
+  <script th:src="@{/js/app.js}" defer></script>
   <script th:src="@{/js/news.js}" defer></script>
 
   <style>
@@ -154,7 +154,7 @@
 
     <div class="modal-footer">
       <a id="modal-link" class="btn" href="#" target="_blank" rel="noopener noreferrer">원문 링크</a>
-      <span id="modal-source" class="meta-source"></span>
+      <span id="modal-press" class="meta-press"></span>
     </div>
   </div>
 </div>
