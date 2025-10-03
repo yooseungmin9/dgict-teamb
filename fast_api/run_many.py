@@ -4,14 +4,14 @@ import subprocess, sys, signal, os
 # ❗️여기에 서버 목록을 추가하세요.
 #   (작업폴더, "모듈:앱", 포트, [선택]가상환경 파이썬 경로)
 SERVERS = [
-    (r"C:\dgict-teamb\fast-api\chatbot", "chat_server2:app", 8002, None),
-    (r"C:\dgict-teamb\fast-api\recommend", "youtube_api:app", 8004, None),
-    (r"C:\dgict-teamb\fast-api\briff", "main:app", 8005, None),
-    (r"C:\dgict-teamb\fast-api\trend", "category_trends:app", 8006, None),
-    (r"C:\dgict-teamb\fast-api\senti_keyword", "main:app", 8007, None),
-    (r"C:\dgict-teamb\fast-api\analysis", "youtube_fastAPI:app", 8008, None),
+    (r"C:\dgict-teamb\fast_api\chatbot", "chat_server2:app", 8002, None),
+    (r"C:\dgict-teamb\fast_api\recommend", "youtube_api:app", 8004, None),
+    (r"C:\dgict-teamb\fast_api\briff", "main:app", 8005, None),
+    (r"C:\dgict-teamb\fast_api\trend", "category_trends:app", 8006, None),
+    (r"C:\dgict-teamb\fast_api\senti_keyword", "main:app", 8007, None),
+    (r"C:\dgict-teamb\fast_api\analysis", "youtube_fastAPI:app", 8008, None),
     # 예시) 다른 서비스 추가
-    # (r"C:\dgict-teamb\fast-api\FastAPI_다른서비스", "main:app", 8001, r"C:\Dgict_TeamB_Project\fastapi22\.venv\Scripts\python.exe"),
+    # (r"C:\dgict-teamb\fast_api\FastAPI_다른서비스", "main:app", 8001, r"C:\Dgict_TeamB_Project\fastapi22\.venv\Scripts\python.exe"),
 ]
 
 PROCS = []
