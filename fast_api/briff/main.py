@@ -20,7 +20,7 @@ MONGO_URI = "mongodb+srv://Dgict_TeamB:team1234@cluster0.5d0uual.mongodb.net/"
 DB_NAME   = "test123"
 COLL_NAME = "shared_articles"
 
-OPENAI_API_KEY = ""
+OPENAI_API_KEY = "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"
 OPENAI_MODEL   = "gpt-4o-mini"        # 가벼운 모델 예시(원하면 다른 모델로 교체)
 
 # =========================
@@ -78,31 +78,31 @@ def pick_image(doc: Dict[str, Any]) -> str:
 # (4) /news — 카드 목록 (title/url/summary/published_at/image)
 # =========================
 @app.get("/news")
-def list_news(limit: int = Query(10, ge=1, le=50)) -> List[Dict[str, Any]]:
-    """
-    요약은 이미 DB에 저장되어 있다고 가정.
-    title, url, summary, published_at, image 만 projection하여 최신순 반환
-    """
+def list_news(
+    limit: int = Query(10, ge=1, le=50),
+    skip: int = Query(0, ge=0)  # ← 페이지 시작 위치
+) -> List[Dict[str, Any]]:
     has_pub = coll.count_documents({"published_at": {"$exists": True}}) > 0
     sort_key = "published_at" if has_pub else "_id"
 
-    # ✅ 이미지 후보 필드를 projection에 포함(누락 방지)
-    cursor = coll.find(
-        {},
-        {"title":1,"url":1,"summary":1,"published_at":1, "image":1, "thumbnail":1, "img":1, "cover":1}
-    ).sort(sort_key, -1).limit(limit)
+    cursor = (coll.find({}, {"title":1,"url":1,"summary":1,"published_at":1,
+                             "image":1,"thumbnail":1,"img":1,"cover":1})
+                    .sort(sort_key, -1)
+                    .skip(skip)
+                    .limit(limit))
 
-    out: List[Dict[str, Any]] = []
-    for d in cursor:
-        out.append({
-            "_id": oid_str(d.get("_id")),
+    return [
+        {
+            "_id": str(d.get("_id")),
             "title": d.get("title",""),
             "url": d.get("url",""),
             "summary": d.get("summary",""),
-            "published_at": to_iso(d.get("published_at","")),
-            "image": pick_image(d),  # ✅ 좌측 썸네일로 사용할 값
-        })
-    return out
+            "published_at": str(d.get("published_at","")),
+            "image": d.get("image") or d.get("thumbnail") or "",
+        }
+        for d in cursor
+    ]
+
 
 # =========================
 # (5) /news/{id} — 상세(모달용)
@@ -143,79 +143,81 @@ def get_news_detail(news_id: str) -> Dict[str, Any]:
     }
 
 # =========================
-# (6) /briefing/yesterday — DB 미사용, GPT 직접 생성
+# (6) /briefing/yesterday — DB 기사 기반 전일 요약
 # =========================
+from openai import OpenAI
 _oai = OpenAI(api_key=OPENAI_API_KEY)
-
-def _extract_json(text: str) -> Dict[str, Any]:
-    """GPT 응답에서 JSON 블럭만 추출(앞뒤 설명 제거 대비)"""
-    try:
-        return json.loads(text)
-    except:
-        m = re.search(r"\{.*\}", text, re.S)
-        if m:
-            try:
-                return json.loads(m.group(0))
-            except:
-                pass
-    return {}
 
 @app.get("/briefing/yesterday")
 def briefing_yesterday() -> Dict[str, Any]:
-    """
-    반환: { "date": "YYYY-MM-DD", "summary": "...", "highlights": ["...","...","..."] }
-    (주의) 호출 실패 시 안내 문구 반환
-    """
-    # KST 기준 어제 날짜
+    """전날 기사 중 6개 카테고리별 요약 생성"""
     KST = timezone(timedelta(hours=9))
     today0 = datetime.now(KST).replace(hour=0, minute=0, second=0, microsecond=0)
-    y0 = today0 - timedelta(days=1)
+    y0, y1 = today0 - timedelta(days=1), today0
     y_date = y0.date().isoformat()
 
-    sys_msg = (
-        "너는 경제 뉴스 편집자다. "
-        "어제의 주요 경제 뉴스를 확인하고, 핵심 이슈를 1~2문장으로 요약하고, "
-        "핵심 토픽 3~5개를 한국어 단어로 뽑아라. 반드시 JSON만 반환해라."
-    )
-    user_msg = f"""
-어제({y_date}) 한국 및 글로벌 경제 뉴스의 주요 브리핑을 작성하라.
+    # 1️⃣ 카테고리 고정 리스트
+    categories = ["증권", "금융", "부동산", "산업", "글로벌경제", "일반"]
+    results = []
 
-반환 JSON 스키마:
+    # 2️⃣ 카테고리별 기사 조회 및 요약 생성
+    for cat in categories:
+        docs = list(coll.find(
+            {"category": cat, "published_at": {"$gte": y0.isoformat(), "$lt": y1.isoformat()}},
+            {"title": 1, "summary": 1, "content": 1}
+        ))
+
+        if not docs:
+            results.append({
+                "category": cat,
+                "summary": "해당 카테고리의 전일 기사가 없습니다.",
+                "highlights": []
+            })
+            continue
+
+        # 3️⃣ 입력 구성
+        items = [f"- {d.get('title', '')}: {(d.get('summary') or d.get('content') or '')[:200]}" for d in docs[:5]]
+        joined = "\n".join(items)
+
+        prompt = f"""
+너는 경제 뉴스 편집자다. 아래는 '{cat}' 분야의 전날 주요 기사다.
+핵심 내용을 2~3문장으로 요약하고 주요 키워드 3개를 추출하라.
+
+입력:
+{joined}
+
+JSON 스키마:
 {{
-  "date": "{y_date}",
-  "summary": "<한글 1~2문장 요약>",
-  "highlights": ["<토픽1>","<토픽2>","<토픽3>"]
+  "category": "{cat}",
+  "summary": "<요약>",
+  "highlights": ["<키워드1>", "<키워드2>", "<키워드3>"]
 }}
-JSON만 출력해라.
+JSON만 출력.
 """
 
-    try:
-        resp = _oai.chat.completions.create(
-            model=OPENAI_MODEL,
-            messages=[
-                {"role": "system", "content": sys_msg},
-                {"role": "user", "content": user_msg},
-            ],
-            temperature=0.5,
-            max_tokens=300,
-        )
-        text = resp.choices[0].message.content.strip()
-        data = _extract_json(text)
+        try:
+            resp = _oai.chat.completions.create(
+                model=OPENAI_MODEL,
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.4,
+                max_tokens=400,
+            )
+            text = resp.choices[0].message.content.strip()
+            match = re.search(r"\{.*\}", text, re.S)
+            data = json.loads(match.group(0)) if match else {}
+            results.append({
+                "category": cat,
+                "summary": data.get("summary", "요약 실패"),
+                "highlights": data.get("highlights", []),
+            })
+        except Exception as e:
+            results.append({
+                "category": cat,
+                "summary": "요약 생성 중 오류 발생",
+                "highlights": [str(e)[:50]],
+            })
 
-        summary = (data.get("summary") or "").strip()
-        highlights = [str(h).strip() for h in (data.get("highlights") or []) if str(h).strip()][:5]
-        if not summary:
-            raise ValueError("empty summary")
-        if not highlights:
-            highlights = ["경제동향"]
-
-        return {"date": y_date, "summary": summary, "highlights": highlights}
-    except Exception:
-        return {
-            "date": y_date,
-            "summary": "전일 브리핑 생성에 실패했습니다. 잠시 후 다시 시도하세요.",
-            "highlights": ["시스템오류"]
-        }
+    return {"date": y_date, "categories": results}
 
 # =========================
 # (7) /health — 연결 확인

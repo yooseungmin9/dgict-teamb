@@ -40,18 +40,21 @@ col_comments = db["youtube_comments"]
 # ------------------
 # 간단 토크나이저
 # ------------------
-_HANGUL = re.compile(r"[가-힣A-Za-z0-9]+")
-STOPWORDS = {"그리고", "하지만", "영상", "정말", "그냥", "진짜"}
+from konlpy.tag import Okt
 
+okt = Okt()
+
+# 불용어 확장 (필요에 따라 계속 추가 가능)
+STOPWORDS = {
+    "그리고", "하지만", "영상", "정말", "그냥", "진짜",
+    "하면", "해서", "하는", "에서", "으로", "이다",
+    "것", "거", "저", "나", "너", "우리", "너무", "이런"
+}
 
 def tokenize(text: str) -> list[str]:
-    """한글/영문/숫자 단위로 토큰화하고 불용어·1글자 제거."""
-    return [
-        w.lower()
-        for w in _HANGUL.findall(text or "")
-        if w not in STOPWORDS and len(w) > 1
-    ]
-
+    """Okt 명사 추출 기반 토큰화 + 불용어 제거"""
+    tokens = okt.nouns(text or "")
+    return [t for t in tokens if t not in STOPWORDS and len(t) > 1]
 
 # ------------------
 # API 라우트

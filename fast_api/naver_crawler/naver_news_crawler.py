@@ -23,7 +23,13 @@ COLL_NAME = "shared_articles"
 # -------------------
 # UA & 언론사 매핑
 # -------------------
-UA = {"User-Agent": "Mozilla/5.0", "Referer": "https://news.naver.com/"}
+UA = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+    "Referer": "https://news.naver.com/",
+    "Cache-Control": "no-cache",  # ★ 캐시 무효화
+    "Pragma": "no-cache",         # ★ HTTP 1.0 캐시 방지
+    "Expires": "0"                # ★ 캐시 만료 처리
+}
 BASE_LIST = "https://news.naver.com/main/list.naver"
 OIDS = {
   "056": "KBS",
@@ -229,7 +235,7 @@ def fetch_article(link: str) -> Dict[str, str]:
 # -------------------
 # 실행 본체
 # -------------------
-def crawl_and_save(days: int = 30, limit_per_day: int = 50):
+def crawl_and_save(days: int = 3, limit_per_day: int = 1):
     col = get_collection()
 
     for i in range(days):
@@ -287,4 +293,4 @@ def crawl_and_save(days: int = 30, limit_per_day: int = 50):
     logging.info("✅ 전체 수집 완료")
 
 if __name__ == "__main__":
-    crawl_and_save(days=30, limit_per_day=50)
+    crawl_and_save(days=3, limit_per_day=1)

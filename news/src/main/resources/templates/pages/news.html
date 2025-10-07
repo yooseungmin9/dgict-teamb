@@ -96,6 +96,31 @@
     @media (max-width:520px){
       .news-thumb{ width:96px; height:72px; flex-basis:96px; }
     }
+    /* ===== 페이지네이션 ===== */
+.pagination {
+  display: flex;
+  justify-content: center;  /* 가운데 정렬 */
+  align-items: center;
+  gap: 8px;                 /* 버튼 간격 */
+  margin: 20px 0;           /* 위아래 여백 */
+}
+
+.page-btn {
+  padding: 6px 12px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  background-color: white;
+  cursor: pointer;
+}
+
+.page-btn:hover {
+  background-color: #f5f5f5;
+}
+
+.page-info {
+  font-weight: 500;
+}
+
   </style>
 </head>
 <body>
@@ -111,16 +136,14 @@
           <p id="news-loading" class="muted">불러오는 중…</p>
           <p id="news-error" class="error" style="display:none;">뉴스를 불러오지 못했습니다.</p>
           <div id="news-list" class="news-list"></div>
+          <div id="pagination" class="pagination"></div>
         </div>
 
         <div class="news-section">
           <h3>전일 브리핑 요약</h3>
-          <div class="briefing-card">
-            <p>(예시) 어제 주요 경제 이슈 요약이 여기에 표시됩니다.</p>
-            <div class="briefing-highlights">
-              <span class="highlight">금리정책</span>
-              <span class="highlight">기업실적</span>
-              <span class="highlight">부동산</span>
+          <div class="briefing-card border rounded p-3 mt-4">
+            <div class="briefing-content">
+              <p>(예시) 어제 주요 경제 이슈 요약이 여기에 표시됩니다.</p>
             </div>
           </div>
         </div>

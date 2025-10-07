@@ -172,9 +172,13 @@ def collect_videos_with_emotions(query: str, category: str, target_count: int = 
             if not info:
                 continue
 
+            # 🔑 댓글 수 50개 이상인 영상만 수집
+            if info["comment_count"] < 50:
+                print(f"❌ 댓글 수 {info['comment_count']}개 → 스킵: {info['title']}")
+                continue
+
             comments = get_video_comments(video_id, max_total=1000)
             if not comments:
-                # 댓글 막히면 건너뜀
                 continue
 
             info["comments"] = comments
@@ -188,7 +192,6 @@ def collect_videos_with_emotions(query: str, category: str, target_count: int = 
             break
 
     print(f"📊 최종 저장된 영상 수: {saved_count}")
-
 
 # --------------------------
 # 7. 실행
