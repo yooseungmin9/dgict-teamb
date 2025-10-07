@@ -54,7 +54,7 @@
       </div>
 
       <div th:if="${session.loginUser != null}">
-        <form th:action="@{/pages/logout}" method="post">
+        <form th:action="@{/auth/logout}" method="post">
           <button id="logoutBtn" class="logout-btn" type="submit" title="로그아웃">Logout</button>
         </form>
       </div>
@@ -62,7 +62,7 @@
 
       <!-- 비로그인 상태 -->
       <div th:if="${session.loginUser == null}">
-        <button id="loginBtn" class="login-btn" title="로그인" data-url="/pages/login">Login</button>
+        <button id="loginBtn" class="login-btn" title="로그인" data-url="/auth/login">Login</button>
       </div>
     </div>
   </div>
