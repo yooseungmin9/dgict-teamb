@@ -39,19 +39,20 @@
     t = String(t).trim();
     return t.length > n ? t.slice(0, n) + "…" : t;
   }
-  async function fetchJson(url, ms = 8000) {
-    const ctrl = new AbortController();
-    const id = setTimeout(() => ctrl.abort(), ms);
+  // ----- 안정형 fetchJson (AbortSignal 제거 버전) -----
+  async function fetchJson(url) {
     try {
-      const r = await fetch(url, { signal: ctrl.signal });
-      clearTimeout(id);
-      if (!r.ok) throw new Error("HTTP " + r.status);
-      return await r.json();
-    } catch (e) {
-      clearTimeout(id);
-      throw e;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      const data = await res.json();
+      console.log("[DEBUG] fetchJson ok:", url, data);
+      return data;
+    } catch (err) {
+      console.error("[fetchJson] error:", err);
+      throw err;
     }
   }
+
   function formatDate(iso) {
     if (!iso) return "";
     const s = String(iso);
@@ -102,48 +103,112 @@
   }
 
   // ----- 4) 뉴스 목록 로드 -----
-  async function loadNews() {
-    $loading.style.display = "block";
-    $error.style.display   = "none";
-    $list.innerHTML = "";
+// ----- 4) 뉴스 목록 로드 (페이지네이션 포함) -----
+let currentPage = 1;    // 현재 페이지
+const limit = 10;       // 페이지당 기사 수
 
-    try {
-      const items = await fetchJson(NEWS_API, 8000);
-      $loading.style.display = "none";
-      if (!Array.isArray(items) || items.length === 0) {
-        $list.appendChild(el("p", "muted", "표시할 뉴스가 없습니다."));
-        return;
-      }
-      items.forEach(it => $list.appendChild(renderCard(it)));
-    } catch (e) {
-      console.error("[news] load error:", e);
-      $loading.style.display = "none";
-      $error.style.display = "block";
-      $error.textContent = "뉴스를 불러오지 못했습니다.";
+async function loadNews(page = 1) {
+  currentPage = page;
+  const skip = (page - 1) * limit;
+  const apiUrl = `${API_BASE}/news?limit=${limit}&skip=${skip}`;
+
+  $loading.style.display = "block";
+  $error.style.display   = "none";
+  $list.innerHTML = "";
+
+  try {
+    const items = await fetchJson(apiUrl, 8000);
+    $loading.style.display = "none";
+
+    if (!Array.isArray(items) || items.length === 0) {
+      $list.appendChild(el("p", "muted", "표시할 뉴스가 없습니다."));
+      return;
     }
+    items.forEach(it => $list.appendChild(renderCard(it)));
+
+    // 페이지 네비게이션 표시
+    renderPagination();
+  } catch (e) {
+    console.error("[news] load error:", e);
+    $loading.style.display = "none";
+    $error.style.display = "block";
+    $error.textContent = "뉴스를 불러오지 못했습니다.";
   }
+}
 
-  // ----- 5) 전일 브리핑 로드 -----
-  async function loadBriefing() {
-    const card  = document.querySelector(".briefing-card");
-    if (!card) return;
-    const p     = card.querySelector("p");
-    const chips = card.querySelector(".briefing-highlights");
+// ----- 페이지 버튼 렌더링 -----
+function renderPagination() {
+  const $pagination = document.getElementById("pagination");
+  if (!$pagination) return;
+  $pagination.innerHTML = "";
 
-    try {
-      const data = await fetchJson(BRIEFING_API, 8000);
-      if (p) {
-        const datePrefix = data.date ? `(${data.date}) ` : "";
-        p.textContent = datePrefix + (data.summary || "브리핑 데이터 없음");
-      }
-      if (chips) {
-        chips.innerHTML = "";
-        (data.highlights || []).forEach(t => chips.appendChild(el("span", "highlight", t)));
-      }
-    } catch (e) {
-      console.warn("[briefing] load error:", e);
+  const prevBtn = el("button", "page-btn", "이전");
+  const nextBtn = el("button", "page-btn", "다음");
+
+  prevBtn.disabled = currentPage === 1;
+  prevBtn.onclick = () => loadNews(currentPage - 1);
+  nextBtn.onclick = () => loadNews(currentPage + 1);
+
+  $pagination.appendChild(prevBtn);
+  $pagination.appendChild(el("span", "page-info", `${currentPage} 페이지`));
+  $pagination.appendChild(nextBtn);
+}
+// ----- 5) 전일 브리핑 로드 (카테고리별 표시) -----
+async function loadBriefing() {
+  const card = document.querySelector(".briefing-card");
+  if (!card) return;
+
+  const container = card.querySelector(".briefing-content");
+  if (!container) return;
+
+  try {
+    const data = await fetchJson(BRIEFING_API, 8000);
+    console.log("[DEBUG] briefing data:", data); // ✅ 실제 데이터 확인용
+
+    // 기존 내용 초기화
+    container.innerHTML = "";
+
+    // 날짜 표시
+    const datePrefix = data.date ? `(${data.date})` : "";
+    const dateEl = el("p", "briefing-date", `${datePrefix} 전일 카테고리별 요약`);
+    container.appendChild(dateEl);
+
+    // 카테고리 검증
+    if (!data.categories || !Array.isArray(data.categories) || data.categories.length === 0) {
+      container.appendChild(el("p", "muted", "전일 기사 요약이 없습니다."));
+      return;
     }
+
+    // ✅ 카테고리별 박스 렌더링
+    for (const cat of data.categories) {
+      const box = el("div", "briefing-box");
+
+      const title = el("h5", "briefing-title", `📌 ${cat.category || "분류 없음"}`);
+      box.appendChild(title);
+
+      const summary = el("p", "briefing-summary", cat.summary || "요약 없음");
+      box.appendChild(summary);
+
+      // 하이라이트(태그)
+      const tagWrap = el("div", "briefing-highlights");
+      if (Array.isArray(cat.highlights) && cat.highlights.length > 0) {
+        for (const tag of cat.highlights) {
+          const span = el("span", "highlight", tag);
+          tagWrap.appendChild(span);
+        }
+      }
+      box.appendChild(tagWrap);
+
+      // box → container
+      container.appendChild(box);
+    }
+
+  } catch (e) {
+    console.warn("[briefing] load error:", e);
+    container.innerHTML = `<p class="error">요약 데이터를 불러오지 못했습니다.</p>`;
   }
+}
+
 
   // ----- 6) 모달 동작 -----
   function showModal() {

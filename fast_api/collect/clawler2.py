@@ -294,7 +294,7 @@ def fetch_article(link: str) -> Dict[str, str]:
 # -------------------
 # 실행 본체
 # -------------------
-def crawl_and_save(days: int = 30, limit_per_day: int = 50):
+def crawl_and_save(days: int = 4, limit_per_day: int = 50):
     col = get_collection()
     counters = {}
 
@@ -355,4 +355,4 @@ def crawl_and_save(days: int = 30, limit_per_day: int = 50):
     logging.info("✅ 전체 수집 완료 (일별 카운트: %s)", counters)
 
 if __name__ == "__main__":
-    crawl_and_save(days=30, limit_per_day=50)
+    crawl_and_save(days=4, limit_per_day=50)
