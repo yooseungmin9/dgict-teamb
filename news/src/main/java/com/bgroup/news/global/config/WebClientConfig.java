@@ -8,8 +8,10 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.reactive.ReactorClientHttpConnector;
+import org.springframework.web.reactive.function.client.ExchangeFilterFunctions;
 import org.springframework.web.reactive.function.client.ExchangeStrategies;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.netty.http.client.HttpClient;
@@ -83,18 +85,35 @@ public class WebClientConfig {
 
     @Bean("trendClient")
     public WebClient trendClient(
-            WebClient.Builder baseWebClientBuilder,
+            WebClient.Builder builder,
             @Value("${fastapi.trend}") String baseUrl
     ) {
-        return baseWebClientBuilder.baseUrl(baseUrl.trim()).build();
+        return builder
+                .baseUrl(baseUrl.trim())
+                .clientConnector(new ReactorClientHttpConnector(
+                        HttpClient.create()
+                                .responseTimeout(Duration.ofSeconds(5))
+                                .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 2000)
+                ))
+                .filter(ExchangeFilterFunctions.statusError(HttpStatusCode::isError,
+                        r -> new IllegalStateException("FastAPI error: " + r.statusCode())))
+                .build();
     }
 
     @Bean("sentiClient")
-    public WebClient sentiClient(
-            WebClient.Builder baseWebClientBuilder,
-            @Value("${fastapi.senti}") String baseUrl
-    ) {
-        return baseWebClientBuilder.baseUrl(baseUrl.trim()).build();
+    public WebClient sentiClient(WebClient.Builder builder,
+                                 @Value("${fastapi.senti}") String baseUrl) {
+        HttpClient http = HttpClient.create()
+                .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 2000)
+                .responseTimeout(Duration.ofSeconds(4))
+                .doOnConnected(conn -> conn
+                        .addHandlerLast(new ReadTimeoutHandler(4))
+                        .addHandlerLast(new WriteTimeoutHandler(4)));
+
+        return builder
+                .baseUrl(baseUrl.trim())
+                .clientConnector(new ReactorClientHttpConnector(http))
+                .build();
     }
 
     @Bean("analysisClient")

@@ -15,13 +15,6 @@ public class PageController {
         this.memberService = memberService;
     }
 
-    @GetMapping({"/", "/dashboard"})
-    public String index(Model model) {
-        model.addAttribute("mainPageTitle", "경제 뉴스 분석 대시보드");
-        model.addAttribute("todayNews", "오늘의 뉴스");
-        return "pages/dashboard";
-    }
-
     @GetMapping("/news")
     public String news(Model model) {
         return "pages/news";

@@ -5,7 +5,7 @@
   const card = document.getElementById("sentiment-card");
   if(!card){ console.error("sentiment-card 없음"); return; }
 
-  const API = card.dataset.api || "/api/sentiment/line";
+  const API = "/api/dashboard/sentiment/line";
   const $status = document.getElementById("sentiment-status");
   const ctx = document.getElementById("sentiment-chart").getContext("2d");
 

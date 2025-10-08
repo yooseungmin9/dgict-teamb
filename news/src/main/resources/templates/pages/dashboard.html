@@ -6,32 +6,58 @@
     <link rel="stylesheet" href="/css/style.css"/>
     <link rel="stylesheet" href="/css/dashboard-grid.css"/>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- 기존 스크립트 -->
     <script defer src="/js/sentiment.js"></script>
     <script defer src="/js/trands.js"></script>
     <script defer src="/js/app.js"></script>
+
+    <!-- 추가 -->
+    <script defer src="/js/ticker.js"></script>
+    <script defer src="/js/emoa.js"></script>
+
+    <!-- trands.js가 전역에서 읽어갈 API 경로(없으면 상대경로 기본값 사용) -->
+    <script>
+        window.API_ENDPOINTS = {
+            sentimentLine: "/dashboard/sentiment/line",   // ← 실제 스프링 경로로 맞추기
+            keywordRanking: "/dashboard/keywords/ranking",
+            categoryTrend:  "/dashboard/trend/categories",
+            emoaScore:      "/emoa/score"                 // 필요시 "/dashboard/emoa/score" 로 변경
+        };
+    </script>
 </head>
-<body data-page="dashboard">
+
+<!-- emoa.js가 body data 속성으로도 경로를 읽을 수 있게 함 -->
+<body data-page="dashboard" data-emoa-api="/api/dashboard/emoa/score">
 <div th:replace="fragments/header :: siteHeader"></div>
 
 <main class="dash">
     <div class="container">
-
+        <!-- 상단 속보 바 -->
         <div class="dash__headline">
-            <h2 th:text="${mainPageTitle != null ? mainPageTitle : '~ 글로벌 뉴스 속보 모니터링 ~'}">~ 글로벌 뉴스 속보 모니터링 ~</h2>
+            <section id="news-ticker" class="ticker-wrap"
+                     data-api-base="http://127.0.0.1:8010"
+                     data-q="미국 경제"
+                     data-n="5"
+                     data-sort="date">
+                <div class="ticker-content" id="track-a" aria-label="뉴스 트랙 A"></div>
+                <div class="ticker-content" id="track-b" aria-label="뉴스 트랙 B"></div>
+            </section>
         </div>
 
         <div>
             <button class="report-btn" type="button" id="aiReportBtn">AI 리포트 생성</button>
         </div>
 
+        <!-- 3열 대시보드 -->
         <section class="dash__grid">
             <!-- 좌열 -->
             <div class="stack" id="col-left">
                 <div class="card" id="panel-sentiment-series">
                     <article class="card__body">
                         <div class="feature-card" id="sentiment-card"
-                             data-api="http://127.0.0.1:8000/sentiment/line">
-                            <strong>긍·부정추이</strong>
+                             data-api="/api/dashboard/sentiment/line"><!-- ★ 기존 8000 포트 → 스프링 경로로 교체 -->
+                            <strong class="strong">긍·부정추이</strong>
                             <div class="controls" style="display:flex; gap:8px; align-items:center; margin-left:auto;">
                                 <button id="btn-mode-count" class="btn btn--sm">건수</button>
                                 <button id="btn-mode-ratio" class="btn btn--sm">비율</button>
@@ -60,9 +86,12 @@
                     <div class="card__body placeholder">카운트/스파크라인</div>
                 </div>
 
+                <!-- 감성 요약 + 도넛(분포가 오면) -->
                 <div class="card" id="panel-today-sentiment">
-                    <div class="card__title">오늘의 감성점수 수집된것 (백분율)</div>
-                    <div class="card__body placeholder">파이/도넛</div>
+                    <div class="card__title">오늘의 감성 요약</div>
+                    <div class="card__body" id="emoa-summary">
+                        <p>데이터 수집 중...</p>
+                    </div>
                 </div>
 
                 <div class="card" id="panel-tbd">
@@ -75,24 +104,19 @@
             <div class="stack" id="col-right">
                 <div class="card" id="panel-keyword-rank">
                     <div class="card__body">
-                        <strong>키워드 랭킹</strong>
-
+                        <strong class="strong">키워드 랭킹</strong>
                         <div class="controls" style="margin-bottom:6px;">
                             <label><input type="radio" name="DB_kwMode" value="category" checked /> 카테고리별</label>
                             <label><input type="radio" name="DB_kwMode" value="global" /> 통합</label>
                             <label class="muted">기간(일)
                                 <select id="DB_kwDays">
-                                    <option value="30" th:selected="${days==30}">30</option>
-                                    <option value="60" th:selected="${days==60}">60</option>
-                                    <option value="90" th:selected="${days==90}">90</option>
+                                    <option value="30" selected>30</option>
+                                    <option value="60">60</option>
+                                    <option value="90">90</option>
                                 </select>
                             </label>
                         </div>
-
-                        <!-- 선택된 카테고리 표시 (없으면 '전체') -->
-                        <div class="muted" style="margin:4px 0;"
-                             th:text="'카테고리: ' + (${category} != null ? ${category} : '전체')">카테고리: 전체</div>
-
+                        <div id="DB_kwTabs" style="margin:6px 0; display:flex; gap:6px; flex-wrap:wrap;"></div>
                         <table id="DB_kwTable" class="ranking-table">
                             <thead>
                             <tr>
@@ -101,18 +125,7 @@
                                 <th class="right" style="width:100px;">언급량</th>
                             </tr>
                             </thead>
-                            <tbody id="DB_keywordRankingBody">
-                            <!-- 서버에서 내려준 리스트로 바로 렌더 -->
-                            <tr th:each="r : ${keywordRanking}">
-                                <td th:text="${r.rank}">1</td>
-                                <td th:text="${r.keyword}">예시키워드</td>
-                                <td class="right" th:text="${r.count}">123</td>
-                            </tr>
-                            <!-- 비어있을 때 -->
-                            <tr th:if="${#lists.isEmpty(keywordRanking)}">
-                                <td colspan="3">데이터가 없습니다.</td>
-                            </tr>
-                            </tbody>
+                            <tbody id="DB_keywordRankingBody"></tbody>
                         </table>
                     </div>
                 </div>
@@ -125,16 +138,16 @@
                 </div>
             </div>
 
-            <!-- 데이터랩 라인차트 -->
+            <!-- 하단 트렌드 -->
             <div class="card" id="panel-hot-datalab">
                 <div class="card__body">
-                    <strong>키워드 핫토픽 그래프 (데이터랩)</strong>
+                    <strong class="strong">키워드 핫토픽 그래프 (데이터랩)</strong>
                     <div class="controls" style="margin-bottom:8px;">
                         <label class="muted">표시 기간(일)
                             <select id="DB_trendDays">
-                                <option value="30" th:selected="${days==30}">30</option>
-                                <option value="60" th:selected="${days==60}">60</option>
-                                <option value="90" th:selected="${days==90}">90</option>
+                                <option value="30" selected>30</option>
+                                <option value="60">60</option>
+                                <option value="90">90</option>
                             </select>
                         </label>
                     </div>
@@ -147,12 +160,19 @@
     </div>
 </main>
 
-<!-- 유틸: data-url 클릭 이동 -->
-<script>
+<!-- footer 프래그먼트가 없으면 주석 -->
+<div th:replace="fragments/footer :: siteFooter"></div>
+
+<script th:inline="javascript">
     (function () {
-        function go(el) { var url = el.dataset.url; if (url) window.location.href = url; }
+        function go(el) {
+            var url = el.dataset.url;
+            if (url) window.location.href = url;
+        }
         function onClick(e) { go(e.currentTarget); }
-        function onKey(e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(e.currentTarget); } }
+        function onKey(e) {
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(e.currentTarget); }
+        }
         var links = document.querySelectorAll('[data-url]');
         links.forEach(function (el) {
             el.addEventListener('click', onClick);
@@ -161,89 +181,5 @@
         });
     })();
 </script>
-
-<!-- 대시보드 초기 데이터 렌더링 -->
-<script th:inline="javascript">
-    (() => {
-        let trendChart;
-
-        const ctx = document.getElementById('DB_categoryTrendChart');
-        const $daysSel = document.getElementById('DB_trendDays');
-
-        function toDatasetsFromServerJson(json) {
-            // 서버가 Chart.js 형태({labels:[], datasets:[]})로 줄 수도 있고,
-            // 커스텀 형식으로 줄 수도 있으니 최대한 유연하게 변환
-            try {
-                const data = (typeof json === 'string') ? JSON.parse(json) : json;
-
-                // 1) 이미 Chart.js 포맷
-                if (data && Array.isArray(data.labels) && Array.isArray(data.datasets)) {
-                    return { labels: data.labels, datasets: data.datasets };
-                }
-
-                // 2) {dates:[], series:{카테고리:[..]}} 또는 {result:[{date, series:{...}}]}
-                if (Array.isArray(data.dates) && data.series && typeof data.series === 'object') {
-                    const labels = data.dates;
-                    const datasets = Object.keys(data.series).map(k => ({
-                        label: k, data: data.series[k]
-                    }));
-                    return { labels, datasets };
-                }
-
-                if (Array.isArray(data.result)) {
-                    const labels = data.result.map(r => r.date || r.label);
-                    // 시리즈 키 자동 추출
-                    const keys = Object.keys(data.result[0] || {}).filter(k => k !== 'date' && k !== 'label');
-                    const datasets = keys.map(k => ({
-                        label: k,
-                        data: data.result.map(r => r[k] ?? 0)
-                    }));
-                    return { labels, datasets };
-                }
-            } catch (e) {
-                console.warn('trend json parse error', e);
-            }
-            return { labels: [], datasets: [] };
-        }
-
-        async function loadTrend(days) {
-            try {
-                const resp = await fetch(`/api/dashboard/category-trends?days=${encodeURIComponent(days)}&time_unit=date`);
-                const text = await resp.text(); // FastAPI가 문자열 JSON 반환하므로 우선 text로
-                const parsed = toDatasetsFromServerJson(text);
-
-                if (trendChart) trendChart.destroy();
-                trendChart = new Chart(ctx, {
-                    type: 'line',
-                    data: {
-                        labels: parsed.labels,
-                        datasets: parsed.datasets.map(ds => ({
-                            label: ds.label,
-                            data: ds.data,
-                            fill: false,
-                            tension: 0.2
-                        }))
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: { legend: { position: 'bottom' } },
-                        scales: { x: { ticks: { maxTicksLimit: 12 } } }
-                    }
-                });
-            } catch (err) {
-                console.error('trend fetch error', err);
-            }
-        }
-
-        // 초기 로드 (서버 모델 값 days 사용)
-        const initDays = /*[[${days}]]*/ 30;
-        loadTrend(initDays);
-
-        // 기간 변경 시 재로드
-        $daysSel.addEventListener('change', () => loadTrend($daysSel.value));
-    })();
-</script>
-
 </body>
 </html>
