@@ -1,18 +1,21 @@
-# chatbot.py — DB 최신뉴스 우선 라우팅 + RAG(문서) + GPT-5 일반 답변 (최적화판 - 오류 수정)
+# chatbot.py — Function Calling + RAG + News + Markets (정리/보완판)
+
+import os, sys, logging, subprocess, io, requests, tempfile, re, shutil, json
+from typing import Dict, Any, List, Optional
+from pathlib import Path
+from datetime import datetime, timezone, timedelta
+from zoneinfo import ZoneInfo
 
 from fastapi import FastAPI, UploadFile, File, Query, Body
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
-from pathlib import Path
-from typing import Optional, Dict, Any, List
+
 from openai import OpenAI
-from datetime import datetime, timezone, timedelta
 from pymongo import MongoClient, DESCENDING
-import os, sys, logging, subprocess, io, requests, tempfile, re, shutil
+from apscheduler.schedulers.background import BackgroundScheduler
 from google.cloud import texttospeech
 from google.oauth2 import service_account
-from apscheduler.schedulers.background import BackgroundScheduler
-from zoneinfo import ZoneInfo
+
 import yfinance as yf
 import pandas as pd
 
@@ -20,24 +23,110 @@ import pandas as pd
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 log = logging.getLogger("chatbot")
 
-# ===== OpenAI (중복 생성 금지, ASCII 헤더만) =====
+# ===== 고정 상수 =====
+KST = ZoneInfo("Asia/Seoul")
+
+# ===== OpenAI =====
 API_KEY = "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"
 client = OpenAI(api_key=API_KEY, default_headers={"User-Agent": "dgict-bot/1.0"})
 
 # ===== 시스템 프롬프트 =====
 SYSTEM_INSTRUCTIONS = """
 너는 'AI 기반 경제 뉴스 분석 웹서비스'의 안내 챗봇이다. 사용자는 '바로 결과'를 원한다.
-- 결론부터 3~6문장 또는 불릿으로 간결히 답하라. 유도 질문/군더더기 금지.
+- 결론부터 3~6문장 또는 불릿으로 간결히 답하라.
 - 가능하면 '제목(링크) · 발행일(KST) · 한줄 요약' 구조를 쓴다.
 - 어려운 용어는 괄호로 짧게 보충한다. (예: 리프라이싱=재가격조정)
 - 에러/빈결과는 한 줄로 원인 + 1가지 대안만 제시한다.
 
-라우팅(서버 정책):
-1) '최신 경제 뉴스' 요청은 서버가 DB에서 처리해 결과만 전달한다.
-2) '웹서비스 기능/도움말' 요청은 파일검색(RAG)로 문서를 바탕으로 답한다.
-3) 그 외 일반 질문(금리 포함)은 너의 모델 지식만으로 바로 답한다.
-4) '100대 경제지표' 또는 특정 경제지표(금리, 물가, GDP 등) 요청은 한국은행 ECOS API로 실시간 조회한다.
+도구 사용 정책:
+- 최신 뉴스/핫이슈: get_latest_news
+- 경제지표(CPI, PPI, GDP, 기준금리/무역수지/경상수지, 미국 금리): get_indicator
+- 주가지수/환율: get_market
+- 웹서비스 기능/사용법/도움말: search_docs
+- 그 외 일반 질문은 도구 없이 답하라.
 """
+
+# ===== Function Calling 도구 스키마 =====
+TOOLS = [
+    {
+        "type": "function",
+        "function": {
+            "name": "get_latest_news",
+            "description": "MongoDB에서 최신 경제 뉴스 N건을 조회한다.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "count": {"type": "integer", "minimum": 1, "maximum": 50, "default": 5}
+                },
+                "required": ["count"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_indicator",
+            "description": "경제지표 조회 (ECOS: CPI/PPI/GDP/기준금리/무역수지/경상수지, FRED: 미국 금리).",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "indicator_type": {
+                        "type": "string",
+                        "enum": [
+                            "CPI", "PPI", "GDP", "BASE_RATE", "TRADE_BALANCE", "CURRENT_ACCOUNT",
+                            "US_FEDFUNDS", "US_FED_TARGET"
+                        ]
+                    }
+                },
+                "required": ["indicator_type"]
+            }
+        }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "get_market",
+        "description": "주요 지수/환율 및 개별 종목 시세를 조회한다.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "market_type": {
+              "type": "string",
+              "enum": [
+                "KOSPI",
+                "KOSDAQ",
+                "MARKET_SUMMARY",
+                "USD_KRW",
+                "JPY_KRW",
+                "EUR_USD",
+                "QUOTE"
+              ]
+            },
+            "ticker": {
+              "type": "string",
+              "description": "개별 종목 심볼 (예: NVDA, AAPL, 005930.KS, 086520.KQ)"
+            }
+          },
+          "required": ["market_type"]
+        }
+      }
+    },
+
+    {
+        "type": "function",
+        "function": {
+            "name": "search_docs",
+            "description": "웹서비스 기능/도움말은 파일검색(RAG)로 문서를 바탕으로 답한다.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string"}
+                },
+                "required": ["query"]
+            }
+        }
+    }
+]
 
 # ===== 벡터스토어 ID (RAG) =====
 VS_ID_PATH = Path(".vector_store_id")
@@ -52,9 +141,548 @@ MONGO_URI = "mongodb+srv://Dgict_TeamB:team1234@cluster0.5d0uual.mongodb.net/"
 DB_NAME = "test123"
 COLL_NAME = "chatbot_rag"
 
+def _get_db():
+    return MongoClient(MONGO_URI)[DB_NAME]
+
+def _ensure_indexes():
+    coll = _get_db()[COLL_NAME]
+    coll.create_index([("published_at", DESCENDING)])
+    coll.create_index([("collected_at", DESCENDING)])
+    log.info("MongoDB 인덱스 확인 완료")
+
 # ===== ECOS =====
 ECOS_API_KEY = "VIU3HJ9GYAQ9P9OMDTCV"
 ECOS_BASE = "https://ecos.bok.or.kr/api"
+
+# ===== FRED =====
+FRED_KEY = "5a10a7875bc215794bf002816f0f530e"
+FRED_BASE = "https://api.stlouisfed.org/fred/series/observations"
+
+def _fred_observations(series_id: str, start: str = "2024-01-01") -> list:
+    params = {
+        "series_id": series_id,
+        "api_key": FRED_KEY,
+        "file_type": "json",
+        "observation_start": start
+    }
+    r = requests.get(FRED_BASE, params=params, timeout=20)
+    r.raise_for_status()
+    obs = r.json().get("observations", []) or []
+    return [o for o in obs if o.get("value") not in ("", ".")]
+
+def get_us_fed_funds_latest(use_target_range: bool = False) -> dict:
+    """
+    use_target_range=False: FEDFUNDS (월별 실효 연방기금금리)
+    use_target_range=True: DFEDTARU/DFEDTARL (일별 목표범위 상·하단)
+    """
+    try:
+        if use_target_range:
+            up = _fred_observations("DFEDTARU")
+            lo = _fred_observations("DFEDTARL")
+            if not up or not lo:
+                raise RuntimeError("target range observations empty")
+            up_last, lo_last = up[-1], lo[-1]
+            date = up_last["date"]
+            upper = float(up_last["value"])
+            lower = float(lo_last["value"])
+            return {"date": date, "value": upper, "lower": lower, "upper": upper, "unit": "%", "source": "FRED"}
+        else:
+            obs = _fred_observations("FEDFUNDS")
+            if not obs:
+                raise RuntimeError("fedfunds observations empty")
+            last = obs[-1]
+            return {"date": last["date"], "value": float(last["value"]), "unit": "%", "source": "FRED"}
+    except requests.Timeout:
+        return {"error": "FRED 응답 지연(Timeout)", "source": "FRED"}
+    except Exception as e:
+        return {"error": f"FRED 조회 실패: {e}", "source": "FRED"}
+
+# ===== ECOS 조회 유틸 =====
+def fetch_all_key_statistics() -> dict:
+    try:
+        url = f"{ECOS_BASE}/KeyStatisticList/{ECOS_API_KEY}/json/kr/1/200/"
+        r = requests.get(url, timeout=30)
+        if r.status_code != 200:
+            return {"error": f"API {r.status_code}"}
+        rows = (r.json().get("KeyStatisticList") or {}).get("row", [])
+        if not rows:
+            return {"error": "데이터 없음"}
+        return {"ok": True, "indicators": rows}
+    except Exception as e:
+        log.exception("ECOS 100대 지표 조회 오류")
+        return {"error": str(e)}
+
+def fetch_ecos_stat_by_code(stat_code: str, start_ym: str = None, end_ym: str = None) -> dict:
+    try:
+        if not end_ym:
+            end_ym = datetime.now(KST).strftime("%Y%m")
+        if not start_ym:
+            start_dt = datetime.now(KST) - timedelta(days=365)
+            start_ym = start_dt.strftime("%Y%m")
+        url = f"{ECOS_BASE}/StatisticSearch/{ECOS_API_KEY}/json/kr/1/100/{stat_code}/M/{start_ym}/{end_ym}/"
+        r = requests.get(url, timeout=30)
+        if r.status_code != 200:
+            return {"error": f"API {r.status_code}"}
+        rows = (r.json().get("StatisticSearch") or {}).get("row", [])
+        if not rows:
+            return {"error": "데이터 없음"}
+        return {"ok": True, "data": rows}
+    except Exception as e:
+        log.exception("ECOS 코드 조회 오류")
+        return {"error": str(e)}
+
+def get_cpi_data() -> str:
+    res = fetch_ecos_stat_by_code("901Y009")
+    if "error" in res: return f"CPI 조회 실패: {res['error']}"
+    d = res["data"]; latest = d[-1]; prev = d[-2] if len(d) >= 2 else None
+    value, time = latest.get("DATA_VALUE","N/A"), latest.get("TIME","")
+    out = [ "**소비자물가지수(CPI)**", f"• 최신값: {value} (기준: {time})" ]
+    if prev:
+        try:
+            change = float(value) - float(prev.get("DATA_VALUE", 0))
+            out.append(f"• 전월 대비: {change:+.2f}%p")
+        except Exception: pass
+    return "\n".join(out)
+
+def get_ppi_data() -> str:
+    res = fetch_ecos_stat_by_code("404Y014")
+    if "error" in res: return f"PPI 조회 실패: {res['error']}"
+    latest = res["data"][-1]
+    return f"**생산자물가지수(PPI)**\n• 최신값: {latest.get('DATA_VALUE','N/A')} (기준: {latest.get('TIME','')})"
+
+def get_gdp_data() -> str:
+    res = fetch_ecos_stat_by_code("200Y101", start_ym=(datetime.now(KST)-timedelta(days=730)).strftime("%Y"), end_ym=datetime.now(KST).strftime("%Y"))
+    if "error" in res: return f"GDP 조회 실패: {res['error']}"
+    latest = res["data"][-1]
+    return f"**GDP 성장률**\n• 최신값: {latest.get('DATA_VALUE','N/A')}% (기준: {latest.get('TIME','')})"
+
+def get_trade_balance() -> str:
+    exp = fetch_ecos_stat_by_code("901Y011"); imp = fetch_ecos_stat_by_code("901Y012")
+    if "error" in exp or "error" in imp: return "무역수지 조회 실패"
+    try:
+        e = float(exp["data"][-1]["DATA_VALUE"]); i = float(imp["data"][-1]["DATA_VALUE"])
+        bal = e - i; t = exp["data"][-1]["TIME"]
+        return f"**무역수지**\n• 수출: ${e:,.0f}백만\n• 수입: ${i:,.0f}백만\n• 무역수지: ${bal:+,.0f}백만 (기준: {t})"
+    except Exception:
+        return "무역수지 데이터 파싱 오류"
+
+def get_current_account() -> str:
+    res = fetch_ecos_stat_by_code("301Y013")
+    if "error" in res: return f"경상수지 조회 실패: {res['error']}"
+    latest = res["data"][-1]
+    return f"**경상수지**\n• 최신값: ${latest.get('DATA_VALUE','N/A')}백만 (기준: {latest.get('TIME','')})"
+
+def get_base_rate() -> str:
+    res = fetch_all_key_statistics()
+    if "error" in res: return f"기준금리 조회 실패: {res['error']}"
+    for ind in res["indicators"]:
+        nm = (ind.get("KEYSTAT_NAME") or "").upper()
+        if "기준" in nm or "BASE RATE" in nm:
+            return f"**한국은행 기준금리**\n• 현재 금리: {ind.get('DATA_VALUE','N/A')}{ind.get('UNIT_NAME','%')} (기준: {ind.get('TIME','')})"
+    return "기준금리 정보를 찾을 수 없습니다."
+
+# ===== yfinance 유틸 =====
+INDEX_MAP: Dict[str, Dict[str, str]] = {
+    # 한국 지수
+    "KOSPI": {"ticker": "^KS11", "name": "코스피"},
+    "KOSDAQ": {"ticker": "^KQ11", "name": "코스닥"},
+
+    # 한국 대표주
+    "SAMSUNG_ELECTRONICS": {"ticker": "005930.KS", "name": "삼성전자"},
+    "SK_HYNIX":            {"ticker": "000660.KS", "name": "SK하이닉스"},
+    "SAMSUNG_BIO":         {"ticker": "207940.KS", "name": "삼성바이오로직스"},
+    "LG_ENERGY_SOLUTION":  {"ticker": "373220.KS", "name": "LG에너지솔루션"},
+    "HYUNDAI_MOTOR":       {"ticker": "005380.KS", "name": "현대차"},
+    "KIA":                 {"ticker": "000270.KS", "name": "기아"},
+    "NAVER":               {"ticker": "035420.KS", "name": "NAVER"},
+    "KAKAO":               {"ticker": "035720.KS", "name": "카카오"},
+    "POSCO_HOLDINGS":      {"ticker": "005490.KS", "name": "POSCO홀딩스"},
+    "CELLTRION":           {"ticker": "068270.KS", "name": "셀트리온"},
+
+    # 미국 지수
+    "DOW":       {"ticker": "^DJI",   "name": "다우존스 산업평균"},
+    "SP500":     {"ticker": "^GSPC",  "name": "S&P 500"},
+    "NASDAQ":    {"ticker": "^IXIC",  "name": "나스닥 종합"},
+    "RUSSELL":   {"ticker": "^RUT",   "name": "러셀 2000"},
+    "VIX":       {"ticker": "^VIX",   "name": "VIX 변동성 지수"},
+
+    # 미국 대표주
+    "APPLE":       {"ticker": "AAPL",  "name": "Apple"},
+    "MICROSOFT":   {"ticker": "MSFT",  "name": "Microsoft"},
+    "ALPHABET_A":  {"ticker": "GOOGL", "name": "Alphabet A"},
+    "ALPHABET_C":  {"ticker": "GOOG",  "name": "Alphabet C"},
+    "AMAZON":      {"ticker": "AMZN",  "name": "Amazon"},
+    "META":        {"ticker": "META",  "name": "Meta Platforms"},
+    "NVIDIA":      {"ticker": "NVDA",  "name": "NVIDIA"},
+    "TESLA":       {"ticker": "TSLA",  "name": "Tesla"},
+    "BERKSHIRE_B": {"ticker": "BRK-B", "name": "Berkshire Hathaway B"},
+    "JPMORGAN":    {"ticker": "JPM",   "name": "JPMorgan Chase"},
+
+    # 유럽
+    "EURO_STOXX50": {"ticker": "^STOXX50E", "name": "Euro Stoxx 50"},
+    "FTSE100":      {"ticker": "^FTSE",     "name": "FTSE 100"},
+    "DAX":          {"ticker": "^GDAXI",    "name": "독일 DAX"},
+
+    # 일본/중국
+    "NIKKEI225": {"ticker": "^N225",     "name": "니케이 225"},
+    "TOPIX":     {"ticker": "^TOPX",     "name": "TOPIX"},
+    "SHANGHAI":  {"ticker": "000001.SS", "name": "상하이 종합"},
+    "HANG_SENG": {"ticker": "^HSI",      "name": "항셍 지수"},
+
+    # 원자재/금리
+    "WTI_OIL":   {"ticker": "CL=F", "name": "WTI 원유 선물"},
+    "BRENT_OIL": {"ticker": "BZ=F", "name": "브렌트유 선물"},
+    "GOLD":      {"ticker": "GC=F", "name": "금 선물"},
+    "SILVER":    {"ticker": "SI=F", "name": "은 선물"},
+    "COPPER":    {"ticker": "HG=F", "name": "구리 선물"},
+    "US10Y":     {"ticker": "^TNX", "name": "미국 10년물 금리(×10)"},
+}
+
+FX_MAP: Dict[str, Dict[str, str]] = {
+    "USD_KRW": {"ticker": "USDKRW=X", "name": "달러/원"},
+    "JPY_KRW": {"ticker": "JPYKRW=X", "name": "엔/원"},
+    "EUR_USD": {"ticker": "EURUSD=X", "name": "유로/달러"},
+    "CNY_KRW": {"ticker": "CNYKRW=X", "name": "위안/원"},
+    "EUR_KRW": {"ticker": "EURKRW=X", "name": "유로/원"},
+    "JPY_USD": {"ticker": "JPYUSD=X", "name": "엔/달러"},
+    "GBP_USD": {"ticker": "GBPUSD=X", "name": "파운드/달러"},
+    "AUD_USD": {"ticker": "AUDUSD=X", "name": "호주달러/미달러"},
+    "USD_JPY": {"ticker": "USDJPY=X", "name": "달러/엔"},
+    "USD_CNY": {"ticker": "USDCNY=X", "name": "달러/위안"},
+}
+
+def _round_or_none(v, nd=2):
+    try: return round(float(v), nd)
+    except Exception: return None
+
+def _normalize_ticker(t: str) -> str:
+    # Yahoo 클래스주 표기 규칙 대응: BRK.B -> BRK-B
+    if "." in t and t.upper().split(".")[-1] in ("A","B","C","D","E","F"):
+        return t.replace(".", "-")
+    return t
+
+def fetch_quote_yf(ticker: str) -> Dict[str, Any]:
+    tkr = _normalize_ticker(ticker)
+    price = prev_close = change = change_pct = None
+    last_ts_kst = None
+
+    def _try_hist(period, interval):
+        try:
+            hist = yf.Ticker(tkr).history(period=period, interval=interval, auto_adjust=False)
+            if hist is not None and "Close" in hist.columns:
+                return hist.dropna(subset=["Close"])
+        except Exception:
+            return pd.DataFrame()
+        return pd.DataFrame()
+
+    # 1) intraday
+    df1 = _try_hist("1d", "1m")
+    # 2) fallback 5d/1d
+    if df1.empty or len(df1) < 2:
+        dfd = _try_hist("5d", "1d")
+    else:
+        dfd = pd.DataFrame()
+
+    # 가격/직전가 산출
+    if not df1.empty:
+        price = float(df1["Close"].iloc[-1])
+        if len(df1) >= 2:
+            prev_close = float(df1["Close"].iloc[-2])
+        # 기준 시각(KST)
+        try:
+            last_ts_kst = df1.index.tz_convert("Asia/Seoul")[-1].isoformat()
+        except Exception:
+            last_ts_kst = None
+    elif not dfd.empty:
+        price = float(dfd["Close"].iloc[-1])
+        if len(dfd) >= 2:
+            prev_close = float(dfd["Close"].iloc[-2])
+        try:
+            last_ts_kst = dfd.index.tz_convert("Asia/Seoul")[-1].isoformat()
+        except Exception:
+            last_ts_kst = None
+
+    if price is not None and prev_close not in (None, 0):
+        change = price - prev_close
+        change_pct = (change / prev_close) * 100.0
+
+    return {
+        "ticker": tkr,
+        "price": _round_or_none(price, 2),
+        "prevClose": _round_or_none(prev_close, 2),
+        "change": _round_or_none(change, 2),
+        "changePct": _round_or_none(change_pct, 2),
+        "ts_kst": last_ts_kst or datetime.now(KST).isoformat()
+    }
+
+def get_market_indices() -> str:
+    results = []
+    for key, info in INDEX_MAP.items():
+        q = fetch_quote_yf(info["ticker"])
+        name, price, pct = info["name"], q.get("price"), q.get("changePct")
+        if price is not None:
+            if pct is not None:
+                sign = "+" if pct >= 0 else ""
+                results.append(f"• **{name}**: {price:,.2f} ({sign}{pct:.2f}%)")
+            else:
+                results.append(f"• **{name}**: {price:,.2f}")
+        else:
+            results.append(f"• **{name}**: 데이터 없음")
+    return "**주요 지수 (실시간)**\n" + "\n".join(results)
+
+def get_fx_rates() -> str:
+    results = []
+    for key, info in FX_MAP.items():
+        q = fetch_quote_yf(info["ticker"])
+        name, price, pct = info["name"], q.get("price"), q.get("changePct")
+        if price is not None:
+            if pct is not None:
+                sign = "+" if pct >= 0 else ""
+                results.append(f"• **{name}**: {price:,.2f} ({sign}{pct:.2f}%)")
+            else:
+                results.append(f"• **{name}**: {price:,.2f}")
+        else:
+            results.append(f"• **{name}**: 데이터 없음")
+    return "**주요 환율 (실시간)**\n" + "\n".join(results)
+
+def get_kospi_index() -> str:
+    q = fetch_quote_yf("^KS11"); price, ch, pct = q.get("price"), q.get("change"), q.get("changePct")
+    if price is None: return "**코스피 지수**\n• 현재 데이터를 가져올 수 없습니다."
+    sign = "+" if (ch or 0) >= 0 else ""
+    return f"**코스피 지수 (실시간)**\n• 현재가: {price:,.2f}\n• 변동: {sign}{ch if ch is not None else 'N/A'} ({sign}{pct if pct is not None else 'N/A'}%)"
+
+def get_kosdaq_index() -> str:
+    q = fetch_quote_yf("^KQ11"); price, ch, pct = q.get("price"), q.get("change"), q.get("changePct")
+    if price is None: return "**코스닥 지수**\n• 현재 데이터를 가져올 수 없습니다."
+    sign = "+" if (ch or 0) >= 0 else ""
+    return f"**코스닥 지수 (실시간)**\n• 현재가: {price:,.2f}\n• 변동: {sign}{ch if ch is not None else 'N/A'} ({sign}{pct if pct is not None else 'N/A'}%)"
+
+def get_usd_krw() -> str:
+    q = fetch_quote_yf("USDKRW=X"); price, ch, pct = q.get("price"), q.get("change"), q.get("changePct")
+    if price is None: return "**원/달러 환율**\n• 현재 데이터를 가져올 수 없습니다."
+    sign = "+" if (ch or 0) >= 0 else ""
+    return f"**원/달러 환율 (실시간)**\n• 현재: {price:,.2f}원\n• 변동: {sign}{(ch or 0):.2f}원 ({sign}{(pct or 0):.2f}%)"
+
+def get_jpy_krw() -> str:
+    q = fetch_quote_yf("JPYKRW=X"); price, ch, pct = q.get("price"), q.get("change"), q.get("changePct")
+    if price is None: return "**원/엔 환율**\n• 현재 데이터를 가져올 수 없습니다."
+    sign = "+" if (ch or 0) >= 0 else ""
+    return f"**원/엔 환율 (실시간)**\n• 현재: {price:,.2f}원\n• 변동: {sign}{(ch or 0):.2f}원 ({sign}{(pct or 0):.2f}%)"
+
+def get_eur_usd() -> str:
+    q = fetch_quote_yf("EURUSD=X"); price, ch, pct = q.get("price"), q.get("change"), q.get("changePct")
+    if price is None: return "**유로/달러 환율**\n• 현재 데이터를 가져올 수 없습니다."
+    sign = "+" if (ch or 0) >= 0 else ""
+    return f"**유로/달러 환율 (실시간)**\n• 현재: {price:,.2f}달러\n• 변동: {sign}{(ch or 0):.2f} ({sign}{(pct or 0):.2f}%)"
+
+# ===== MongoDB 뉴스 =====
+def fetch_latest_topn_from_mongo(n: int = 5):
+    coll = _get_db()[COLL_NAME]
+    pipeline = [
+        {"$addFields": {"_p": {"$ifNull": ["$published_at", "$collected_at"]}}},
+        {"$sort": {"_p": -1}},
+        {"$limit": int(n)},
+        {"$project": {"_id": 0, "title": 1, "url": 1, "published_at": 1}},
+    ]
+    rows = list(coll.aggregate(pipeline))
+    for r in rows:
+        pa = r.get("published_at")
+        if isinstance(pa, datetime):
+            if pa.tzinfo is None: pa = pa.replace(tzinfo=timezone.utc)
+            r["published_at"] = pa.astimezone(KST).strftime("%Y-%m-%d")
+        elif isinstance(pa, str):
+            pass
+        else:
+            r["published_at"] = ""
+    return rows
+
+def format_topn_md(rows):
+    if not rows: return "최신 경제 뉴스가 없습니다."
+    out = ["**최신 경제 뉴스**"]
+    for i, r in enumerate(rows, 1):
+        title = (r.get("title") or "").strip() or "(제목 없음)"
+        url = (r.get("url") or "").strip()
+        date = r.get("published_at", "")
+        if url:
+            out.append(f"{i}. [{title}]\n출처: ({url}) · 날짜: {date}")
+        else:
+            out.append(f"{i}. {title} · {date}")
+    return "\n".join(out)
+
+# ===== 도구 실행기 =====
+def run_tool(tool_name: str, arguments: dict) -> dict:
+    try:
+        if tool_name == "get_latest_news":
+            n = int(arguments.get("count", 5))
+            rows = fetch_latest_topn_from_mongo(n)
+            return {"ok": True, "markdown": format_topn_md(rows)}
+
+        elif tool_name == "get_indicator":
+            t = (arguments.get("indicator_type") or "").upper()
+            if t == "CPI": data = get_cpi_data()
+            elif t == "PPI": data = get_ppi_data()
+            elif t == "GDP": data = get_gdp_data()
+            elif t == "BASE_RATE": data = get_base_rate()
+            elif t == "TRADE_BALANCE": data = get_trade_balance()
+            elif t == "CURRENT_ACCOUNT": data = get_current_account()
+            elif t == "US_FEDFUNDS":
+                d = get_us_fed_funds_latest(False)
+                if "error" in d:
+                    data = "미국 실효 연방기금금리 조회에 실패했습니다. 잠시 후 다시 시도해 주세요."
+                else:
+                    data = f"**미국 실효 연방기금금리(FEDFUNDS)**\n• 최신값: {d['value']:.2f}{d.get('unit','%')} (기준: {d['date']})"
+            elif t == "US_FED_TARGET":
+                d = get_us_fed_funds_latest(True)
+                if "error" in d:
+                    data = "미국 연방기금금리 목표범위 조회에 실패했습니다."
+                else:
+                    rng = f"{d['lower']:.2f}–{d['upper']:.2f}{d.get('unit','%')}"
+                    data = f"**미국 연방기금금리 목표범위**\n• 범위: {rng} (기준: {d['date']})"
+            else:
+                data = "지원하지 않는 지표입니다."
+            return {"ok": True, "markdown": data}
+
+        elif tool_name == "get_market":
+            t = (arguments.get("market_type") or "").upper()
+            if t == "KOSPI":
+                data = get_kospi_index()
+            elif t == "KOSDAQ":
+                data = get_kosdaq_index()
+            elif t == "USD_KRW":
+                data = get_usd_krw()
+            elif t == "JPY_KRW":
+                data = get_jpy_krw()
+            elif t == "EUR_USD":
+                data = get_eur_usd()
+            elif t == "MARKET_SUMMARY":
+                data = f"{get_market_indices()}\n\n{get_fx_rates()}"
+            elif t == "QUOTE":
+                ticker = (arguments.get("ticker") or "").strip()
+                q = fetch_quote_yf(ticker)
+                if q.get("price") is not None:
+                    ch, pct = q.get("change"), q.get("changePct")
+                    sign = "+" if (ch or 0) >= 0 else ""
+                    # f-string은 % 기호 이스케이프 불필요하므로 안전함
+                    data = (
+                        f"{ticker.upper()} {q['price']:,.2f} · 변동 {sign}{(ch or 0):.2f} "
+                        f"({sign}{(pct or 0):.2f}%) · 기준시각 {q.get('ts_kst', '')}"
+                    )
+                else:
+                    data = (
+                        f"시세 API 응답이 비정상이라 {ticker.upper()} 현재가를 가져오지 못했습니다; "
+                        f"대안: 야후파이낸스에서 티커 {ticker.upper()}로 실시간 가격을 확인해 주세요."
+                    )
+            else:
+                data = "지원하지 않는 시장 데이터입니다."
+            return {"ok": True, "markdown": data}
+
+        elif tool_name == "search_docs":
+            q = arguments.get("query") or ""
+            resp = client.responses.create(
+                model="gpt-5",
+                instructions=SYSTEM_INSTRUCTIONS,
+                tools=[{"type": "file_search", "vector_store_ids": [VS_ID]}],
+                input=[{"role":"user","content":[{"type":"input_text","text":q}]}],
+            )
+            ans = (getattr(resp, "output_text", "") or "").strip() or "문서에서 답을 찾지 못했습니다."
+            return {"ok": True, "markdown": ans}
+
+        return {"ok": False, "error": f"Unknown tool: {tool_name}"}
+    except Exception as e:
+        log.exception("Tool execution failed")
+        return {"ok": False, "error": str(e)}
+
+# ===== FastAPI =====
+app = FastAPI(title="Chat+RAG+News+Indicators (Function Calling)")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"],
+)
+
+# 간단 세션 (프로덕션은 Redis 권장)
+SESSIONS: Dict[str, List[Dict[str, str]]] = {}
+MAX_TURNS = 20
+
+def get_session(session_id: str) -> List[Dict[str, str]]:
+    if session_id not in SESSIONS: SESSIONS[session_id] = []
+    return SESSIONS[session_id]
+
+def add_turn(session_id: str, role: str, content: str):
+    sess = get_session(session_id)
+    sess.append({"role": role, "content": content})
+    if len(sess) > 2 * MAX_TURNS:
+        SESSIONS[session_id] = sess[-2*MAX_TURNS:]
+
+# ===== 메인 챗 =====
+@app.post("/api/chat")
+@app.post("/chat")
+async def chat(payload: dict = Body(...)):
+    user_msg = (payload.get("message") or "").strip()
+    session_id = payload.get("session_id", "default")
+    if not user_msg:
+        return {"answer": "질문이 비어있습니다."}
+
+    # 빠른 경로: "뉴스 top N"
+    m = re.search(r"top\s*(\d{1,2})", user_msg, flags=re.IGNORECASE)
+    if "뉴스" in user_msg and ("최신" in user_msg or m):
+        try:
+            n = max(1, min(50, int(m.group(1)))) if m else 5
+            rows = fetch_latest_topn_from_mongo(n)
+            return {"answer": format_topn_md(rows)}
+        except Exception:
+            return {"answer": "DB 조회 오류. 잠시 후 다시 시도해 주세요."}
+
+    # 세션 히스토리(chat.completions 포맷)
+    msgs = [{"role": "system", "content": SYSTEM_INSTRUCTIONS}]
+    for t in get_session(session_id):
+        msgs.append({"role": t["role"], "content": t["content"]})
+    msgs.append({"role": "user", "content": user_msg})
+
+    try:
+        comp = client.chat.completions.create(
+            model="gpt-5",
+            messages=msgs,
+            tools=TOOLS,
+            tool_choice="auto",
+        )
+        msg = comp.choices[0].message
+
+        if getattr(msg, "tool_calls", None):
+            tool_msgs = []
+            for tc in msg.tool_calls:
+                fn = tc.function.name
+                args = json.loads(tc.function.arguments or "{}")
+                result = run_tool(fn, args)
+                tool_msgs.append({"role": "tool", "tool_call_id": tc.id, "content": json.dumps(result, ensure_ascii=False)})
+
+            final = client.chat.completions.create(
+                model="gpt-5",
+                messages=msgs + [msg] + tool_msgs
+            )
+            answer = final.choices[0].message.content or "응답 생성 실패"
+        else:
+            answer = msg.content or "응답 생성 실패"
+
+        add_turn(session_id, "user", user_msg)
+        add_turn(session_id, "assistant", answer)
+        return {"answer": answer, "session_id": session_id}
+    except Exception as e:
+        log.exception("chat failed")
+        return {"answer": "일시적 오류가 발생했습니다. 잠시 후 다시 시도해주세요."}
+
+# ===== 보조 API =====
+@app.get("/api/markets")
+def api_markets(indices: int = 1, fx: int = 1):
+    payload = {"ts_kst": datetime.now(KST).isoformat(), "data": {}}
+    if indices:
+        payload["data"]["indices"] = [{"key": k, "name": v["name"], **fetch_quote_yf(v["ticker"])} for k, v in INDEX_MAP.items()]
+    if fx:
+        payload["data"]["fx"] = [{"key": k, "name": v["name"], **fetch_quote_yf(v["ticker"])} for k, v in FX_MAP.items()]
+    return payload
+
+@app.get("/health")
+def health():
+    return {"status": "ok", "ts_kst": datetime.now(KST).isoformat()}
 
 # ===== FFmpeg =====
 FFMPEG = os.getenv("FFMPEG_BIN") or shutil.which("ffmpeg") or "/opt/homebrew/bin/ffmpeg"
@@ -71,777 +699,6 @@ def _ffmpeg_to_wav16k(in_path: str) -> str:
     if cp.returncode != 0:
         raise RuntimeError(f"ffmpeg 실패: {cp.stderr[:300]}")
     return out_path
-
-# ===== KST (통일) =====
-KST = ZoneInfo("Asia/Seoul")
-
-# ===== MongoDB 헬퍼 =====
-def _get_db():
-    return MongoClient(MONGO_URI)[DB_NAME]
-
-def _ensure_indexes():
-    """앱 시작 시 한 번만 실행"""
-    coll = _get_db()[COLL_NAME]
-    coll.create_index([("published_at", DESCENDING)])
-    coll.create_index([("collected_at", DESCENDING)])
-    log.info("MongoDB 인덱스 확인 완료")
-
-# ===== ECOS 100대 지표 전체 조회 =====
-def fetch_all_key_statistics() -> dict:
-    """한국은행 ECOS 100대 주요통계지표 전체 조회"""
-    try:
-        url = f"{ECOS_BASE}/KeyStatisticList/{ECOS_API_KEY}/json/kr/1/200/"
-        response = requests.get(url, timeout=30)
-        if response.status_code != 200:
-            return {"error": f"API 호출 실패: {response.status_code}"}
-
-        data = response.json()
-        rows = data.get("KeyStatisticList", {}).get("row", [])
-
-        if not rows:
-            return {"error": "데이터가 없습니다"}
-
-        return {"ok": True, "count": len(rows), "indicators": rows}
-    except Exception as e:
-        log.exception("ECOS 100대 지표 조회 오류")
-        return {"error": str(e)}
-
-
-def fetch_ecos_stat_by_code(stat_code: str, start_ym: str = None, end_ym: str = None) -> dict:
-    """
-    ECOS 통계표 코드로 특정 지표 조회
-    예: stat_code='901Y009' (소비자물가지수)
-    """
-    try:
-        if not end_ym:
-            end_ym = datetime.now(KST).strftime("%Y%m")
-        if not start_ym:
-            start_dt = datetime.now(KST) - timedelta(days=365)
-            start_ym = start_dt.strftime("%Y%m")
-
-        url = (f"{ECOS_BASE}/StatisticSearch/{ECOS_API_KEY}/json/kr/"
-               f"1/100/{stat_code}/M/{start_ym}/{end_ym}/")
-
-        response = requests.get(url, timeout=30)
-        if response.status_code != 200:
-            return {"error": f"API 호출 실패: {response.status_code}"}
-
-        data = response.json()
-        rows = data.get("StatisticSearch", {}).get("row", [])
-
-        if not rows:
-            return {"error": f"통계코드 {stat_code}에 대한 데이터가 없습니다"}
-
-        return {"ok": True, "stat_code": stat_code, "data": rows}
-    except Exception as e:
-        log.exception(f"ECOS 통계코드 {stat_code} 조회 오류")
-        return {"error": str(e)}
-
-
-def get_indicator_by_keyword(keyword: str) -> str:
-    """키워드로 ECOS 100대 지표 검색"""
-    result = fetch_all_key_statistics()
-    if "error" in result:
-        return f"지표 조회 실패: {result['error']}"
-
-    indicators = result.get("indicators", [])
-    keyword_upper = keyword.strip().upper()
-    matched = []
-
-    for ind in indicators:
-        name = (ind.get("KEYSTAT_NAME") or "").upper()
-        if keyword_upper in name:
-            matched.append(ind)
-
-    if not matched:
-        return f"'{keyword}' 관련 지표를 찾을 수 없습니다."
-
-    output = [f"**'{keyword}' 관련 경제지표** ({len(matched)}개)"]
-    for i, ind in enumerate(matched[:5], 1):
-        name = ind.get("KEYSTAT_NAME", "이름 없음")
-        value = ind.get("DATA_VALUE", "-")
-        unit = ind.get("UNIT_NAME", "")
-        time = ind.get("TIME", "")
-        output.append(f"{i}. **{name}**: {value} {unit} (기준: {time})")
-
-    return "\n".join(output)
-
-
-# ===== 특정 경제지표 조회 함수들 =====
-def get_cpi_data() -> str:
-    """소비자물가지수(CPI) 조회 - ECOS 통계코드: 901Y009"""
-    result = fetch_ecos_stat_by_code("901Y009")
-    if "error" in result:
-        return f"CPI 조회 실패: {result['error']}"
-
-    data = result.get("data", [])
-    if not data:
-        return "CPI 데이터가 없습니다."
-
-    latest = data[-1]
-    prev = data[-2] if len(data) >= 2 else None
-
-    value = latest.get("DATA_VALUE", "N/A")
-    time = latest.get("TIME", "")
-
-    output = [
-        "**소비자물가지수(CPI)**",
-        f"• 최신값: {value} (기준: {time})"
-    ]
-
-    if prev:
-        try:
-            prev_value = float(prev.get("DATA_VALUE", 0))
-            curr_value = float(value)
-            change = curr_value - prev_value
-            output.append(f"• 전월 대비: {change:+.2f}%p")
-        except (ValueError, TypeError):
-            pass
-
-    return "\n".join(output)
-
-
-def get_ppi_data() -> str:
-    """생산자물가지수(PPI) 조회 - ECOS 통계코드: 404Y014"""
-    result = fetch_ecos_stat_by_code("404Y014")
-    if "error" in result:
-        return f"PPI 조회 실패: {result['error']}"
-
-    data = result.get("data", [])
-    if not data:
-        return "PPI 데이터가 없습니다."
-
-    latest = data[-1]
-    value = latest.get("DATA_VALUE", "N/A")
-    time = latest.get("TIME", "")
-
-    return f"**생산자물가지수(PPI)**\n• 최신값: {value} (기준: {time})"
-
-
-def get_gdp_data() -> str:
-    """GDP 성장률 조회 - ECOS 통계코드: 200Y101"""
-    result = fetch_ecos_stat_by_code("200Y101",
-                                     start_ym=(datetime.now(KST) - timedelta(days=730)).strftime("%Y"),
-                                     end_ym=datetime.now(KST).strftime("%Y"))
-    if "error" in result:
-        return f"GDP 조회 실패: {result['error']}"
-
-    data = result.get("data", [])
-    if not data:
-        return "GDP 데이터가 없습니다."
-
-    latest = data[-1]
-    value = latest.get("DATA_VALUE", "N/A")
-    time = latest.get("TIME", "")
-
-    return f"**GDP 성장률**\n• 최신값: {value}% (기준: {time})"
-
-
-def get_trade_balance() -> str:
-    """무역수지 조회 - ECOS 통계코드: 901Y011 (수출), 901Y012 (수입)"""
-    export_result = fetch_ecos_stat_by_code("901Y011")
-    import_result = fetch_ecos_stat_by_code("901Y012")
-
-    if "error" in export_result or "error" in import_result:
-        return "무역수지 조회 실패"
-
-    export_data = export_result.get("data", [])
-    import_data = import_result.get("data", [])
-
-    if not export_data or not import_data:
-        return "무역수지 데이터가 없습니다."
-
-    exp_latest = export_data[-1]
-    imp_latest = import_data[-1]
-
-    try:
-        exp_value = float(exp_latest.get("DATA_VALUE", 0))
-        imp_value = float(imp_latest.get("DATA_VALUE", 0))
-        balance = exp_value - imp_value
-        time = exp_latest.get("TIME", "")
-
-        return (f"**무역수지**\n"
-                f"• 수출: ${exp_value:,.0f}백만\n"
-                f"• 수입: ${imp_value:,.0f}백만\n"
-                f"• 무역수지: ${balance:+,.0f}백만 (기준: {time})")
-    except (ValueError, TypeError):
-        return "무역수지 데이터 파싱 오류"
-
-
-def get_current_account() -> str:
-    """경상수지 조회 - ECOS 통계코드: 301Y013"""
-    result = fetch_ecos_stat_by_code("301Y013")
-    if "error" in result:
-        return f"경상수지 조회 실패: {result['error']}"
-
-    data = result.get("data", [])
-    if not data:
-        return "경상수지 데이터가 없습니다."
-
-    latest = data[-1]
-    value = latest.get("DATA_VALUE", "N/A")
-    time = latest.get("TIME", "")
-
-    return f"**경상수지**\n• 최신값: ${value}백만 (기준: {time})"
-
-
-def get_base_rate() -> str:
-    """기준금리 조회 - 100대 지표에서 검색"""
-    try:
-        result = fetch_all_key_statistics()
-        if "error" in result:
-            return f"기준금리 조회 실패: {result['error']}"
-
-        indicators = result.get("indicators", [])
-        for ind in indicators:
-            name = (ind.get("KEYSTAT_NAME") or "").upper()
-            if "기준금리" in name or "BASE RATE" in name:
-                rate = ind.get("DATA_VALUE", "N/A")
-                unit = ind.get("UNIT_NAME", "%")
-                time = ind.get("TIME", "")
-                return (f"**한국은행 기준금리**\n"
-                        f"• 현재 금리: {rate}{unit} (기준: {time})")
-
-        return "기준금리 정보를 찾을 수 없습니다."
-    except Exception as e:
-        return f"기준금리 조회 오류: {e}"
-
-
-def fetch_bok_base_rate_from_keystats() -> dict:
-    """
-    ECOS 100대 지표 목록 중 '기준금리' 관련 항목을 찾아 최신값을 리턴.
-    반환: {"rate": float, "unit": str, "name": str, "time": str}
-    """
-    result = fetch_all_key_statistics()
-    if "error" in result:
-        raise RuntimeError(result["error"])
-
-    rows = result.get("indicators", []) or []
-    name_keys = ["기준금리", "기준 금리", "콜금리", "Base rate", "Policy rate", "BOK Base"]
-    cand = []
-    for r in rows:
-        nm = (r.get("KEYSTAT_NAME") or "").strip()
-        up = nm.upper()
-        if any(k.upper() in up for k in name_keys):
-            cand.append(r)
-
-    if not cand:
-        raise RuntimeError("기준금리 관련 지표를 찾지 못했습니다.")
-
-    def score(x):
-        unit = (x.get("UNIT_NAME") or "").strip()
-        nm = (x.get("KEYSTAT_NAME") or "").strip()
-        s = 0
-        if "%" in unit:
-            s += 10
-        if "기준" in nm:
-            s += 5
-        if "콜" in nm:
-            s += 2
-        return s
-
-    cand.sort(key=score, reverse=True)
-    top = cand[0]
-
-    val = top.get("DATA_VALUE")
-    unit = top.get("UNIT_NAME") or "%"
-    name = top.get("KEYSTAT_NAME") or "기준금리"
-    time = top.get("TIME") or top.get("CYCLE") or ""
-
-    try:
-        rate = float(str(val).replace(",", ""))
-    except Exception:
-        raise RuntimeError(f"기준금리 수치 파싱 실패: {val}")
-
-    return {"rate": rate, "unit": unit, "name": name, "time": time}
-
-
-# ===== yfinance =====
-INDEX_MAP: Dict[str, Dict[str, str]] = {
-    "KOSPI": {"ticker": "^KS11", "name": "코스피"},
-    "KOSDAQ": {"ticker": "^KQ11", "name": "코스닥"},
-    "NASDAQ": {"ticker": "^IXIC", "name": "나스닥 종합"},
-    "SP500": {"ticker": "^GSPC", "name": "S&P 500"},
-    "DOW": {"ticker": "^DJI", "name": "다우존스 산업평균"},
-    "RUSSELL": {"ticker": "^RUT", "name": "러셀 2000"},
-    "VIX": {"ticker": "^VIX", "name": "VIX 변동성 지수"},
-}
-
-FX_MAP = {
-    "USD_KRW": {"ticker": "USDKRW=X", "name": "달러/원"},
-    "JPY_KRW": {"ticker": "JPYKRW=X", "name": "엔/원"},
-    "EUR_USD": {"ticker": "EURUSD=X", "name": "유로/달러"},
-}
-
-
-def _round_or_none(v, nd=2):
-    try:
-        return round(float(v), nd)
-    except Exception:
-        return None
-
-
-def fetch_quote_yf(ticker: str) -> Dict[str, Any]:
-    """yfinance로 실시간 시세 조회 (1분봉 → 일봉 폴백)"""
-    price = prev_close = change = change_pct = None
-
-    try:
-        hist = yf.Ticker(ticker).history(period="1d", interval="1m", auto_adjust=False)
-        closes: pd.Series = hist["Close"].dropna()
-        if len(closes) >= 2:
-            price = float(closes.iloc[-1])
-            prev_close = float(closes.iloc[-2])
-        elif len(closes) == 1:
-            price = float(closes.iloc[-1])
-    except Exception:
-        pass
-
-    if prev_close is None:
-        try:
-            d = yf.Ticker(ticker).history(period="5d", interval="1d", auto_adjust=False)
-            dcloses: pd.Series = d["Close"].dropna()
-            if price is None and len(dcloses) >= 1:
-                price = float(dcloses.iloc[-1])
-            if len(dcloses) >= 2:
-                prev_close = float(dcloses.iloc[-2])
-        except Exception:
-            pass
-
-    if price is not None and prev_close is not None and prev_close != 0:
-        change = price - prev_close
-        change_pct = (change / prev_close) * 100.0
-
-    now_kst = datetime.now(KST).isoformat()
-
-    return {
-        "ticker": ticker,
-        "price": _round_or_none(price, 2),
-        "prevClose": _round_or_none(prev_close, 2),
-        "change": _round_or_none(change, 2),
-        "changePct": _round_or_none(change_pct, 2),
-        "ts_kst": now_kst,
-    }
-
-
-def get_market_indices() -> str:
-    """주요 지수 조회"""
-    results = []
-    for key, info in INDEX_MAP.items():
-        q = fetch_quote_yf(info["ticker"])
-        name = info["name"]
-        price = q.get("price")
-        change_pct = q.get("changePct")
-
-        if price is not None:
-            if change_pct is not None:
-                sign = "+" if change_pct >= 0 else ""
-                results.append(f"• **{name}**: {price:,.2f} ({sign}{change_pct:.2f}%)")
-            else:
-                results.append(f"• **{name}**: {price:,.2f}")
-        else:
-            results.append(f"• **{name}**: 데이터 없음")
-
-    return "**주요 지수 (실시간)**\n" + "\n".join(results)
-
-
-def get_fx_rates() -> str:
-    """주요 환율 조회"""
-    results = []
-    for key, info in FX_MAP.items():
-        q = fetch_quote_yf(info["ticker"])
-        name = info["name"]
-        price = q.get("price")
-        change_pct = q.get("changePct")
-
-        if price is not None:
-            if change_pct is not None:
-                sign = "+" if change_pct >= 0 else ""
-                results.append(f"• **{name}**: {price:,.2f} ({sign}{change_pct:.2f}%)")
-            else:
-                results.append(f"• **{name}**: {price:,.2f}")
-        else:
-            results.append(f"• **{name}**: 데이터 없음")
-
-    return "**주요 환율 (실시간)**\n" + "\n".join(results)
-
-
-def get_kospi_index() -> str:
-    """코스피 지수 조회"""
-    q = fetch_quote_yf("^KS11")
-    price = q.get("price")
-    change = q.get("change")
-    change_pct = q.get("changePct")
-
-    if price is None:
-        return "**코스피 지수**\n• 현재 데이터를 가져올 수 없습니다."
-
-    sign = "+" if (change or 0) >= 0 else ""
-    change_str = f"{sign}{change:,.2f}" if change is not None else "N/A"
-    pct_str = f"{sign}{change_pct:.2f}%" if change_pct is not None else "N/A"
-
-    return (f"**코스피 지수 (실시간)**\n"
-            f"• 현재가: {price:,.2f}\n"
-            f"• 변동: {change_str} ({pct_str})")
-
-def get_kosdk_index() -> str:
-    """코스닥 지수 조회"""
-    q = fetch_quote_yf("^KQ11")
-    price = q.get("price")
-    change = q.get("change")
-    change_pct = q.get("changePct")
-
-    if price is None:
-        return "**코스닥 지수**\n• 현재 데이터를 가져올 수 없습니다."
-
-    sign = "+" if (change or 0) >= 0 else ""
-    change_str = f"{sign}{change:,.2f}" if change is not None else "N/A"
-    pct_str = f"{sign}{change_pct:.2f}%" if change_pct is not None else "N/A"
-
-    return (f"**코스닥 지수 (실시간)**\n"
-            f"• 현재가: {price:,.2f}\n"
-            f"• 변동: {change_str} ({pct_str})")
-
-def get_usd_krw() -> str:
-    """원달러 환율 조회"""
-    q = fetch_quote_yf("USDKRW=X")
-    price = q.get("price")
-    change = q.get("change")
-    change_pct = q.get("changePct")
-
-    if price is None:
-        return "**원/달러 환율**\n• 현재 데이터를 가져올 수 없습니다."
-
-    sign = "+" if (change or 0) >= 0 else ""
-    change_str = f"{sign}{change:,.2f}원" if change is not None else "N/A"
-    pct_str = f"{sign}{change_pct:.2f}%" if change_pct is not None else "N/A"
-
-    return (f"**원/달러 환율 (실시간)**\n"
-            f"• 현재: {price:,.2f}원\n"
-            f"• 변동: {change_str} ({pct_str})")
-
-def get_jpy_krw() -> str:
-    """원엔 환율 조회"""
-    q = fetch_quote_yf("JPYKRW=X")
-    price = q.get("price")
-    change = q.get("change")
-    change_pct = q.get("changePct")
-
-    if price is None:
-        return "**원/엔 환율**\n• 현재 데이터를 가져올 수 없습니다."
-
-    sign = "+" if (change or 0) >= 0 else ""
-    change_str = f"{sign}{change:,.2f}원" if change is not None else "N/A"
-    pct_str = f"{sign}{change_pct:.2f}%" if change_pct is not None else "N/A"
-
-    return (f"**원/엔 환율 (실시간)**\n"
-            f"• 현재: {price:,.2f}원\n"
-            f"• 변동: {change_str} ({pct_str})")
-
-def get_eur_usd() -> str:
-    """유로달러 환율 조회"""
-    q = fetch_quote_yf("EURUSD=X")
-    price = q.get("price")
-    change = q.get("change")
-    change_pct = q.get("changePct")
-
-    if price is None:
-        return "**유로/달러 환율**\n• 현재 데이터를 가져올 수 없습니다."
-
-    sign = "+" if (change or 0) >= 0 else ""
-    change_str = f"{sign}{change:,.2f}달러" if change is not None else "N/A"
-    pct_str = f"{sign}{change_pct:.2f}%" if change_pct is not None else "N/A"
-
-    return (f"**유로/달러 환율 (실시간)**\n"
-            f"• 현재: {price:,.2f}달러\n"
-            f"• 변동: {change_str} ({pct_str})")
-
-# ===== MongoDB - 최신 뉴스 조회 =====
-def fetch_latest_topn_from_mongo(n: int = 5):
-    """MongoDB에서 최신 뉴스 N건 조회"""
-    coll = _get_db()[COLL_NAME]
-    pipeline = [
-        {"$addFields": {"_p": {"$ifNull": ["$published_at", "$collected_at"]}}},
-        {"$sort": {"_p": -1}},
-        {"$limit": int(n)},
-        {"$project": {"_id": 0, "title": 1, "url": 1, "published_at": 1}},
-    ]
-    rows = list(coll.aggregate(pipeline))
-
-    for r in rows:
-        pa = r.get("published_at")
-        if isinstance(pa, datetime):
-            if pa.tzinfo is None:
-                pa = pa.replace(tzinfo=timezone.utc)
-            r["published_at"] = pa.astimezone(KST).strftime("%Y-%m-%d")
-        elif isinstance(pa, str):
-            pass
-        else:
-            r["published_at"] = ""
-    return rows
-
-
-def format_topn_md(rows):
-    """최신 뉴스 N건 포맷팅"""
-    if not rows:
-        return "최신 경제 뉴스가 없습니다."
-    out = ["**최신 경제 뉴스**"]
-    for i, r in enumerate(rows, start=1):
-        title = (r.get("title") or "").strip() or "(제목 없음)"
-        url = (r.get("url") or "").strip()
-        date = r.get("published_at", "")
-        if url:
-            out.append(f"{i}. [{title}]\n출처: ({url}) · 날짜: {date}")
-        else:
-            out.append(f"{i}. {title} · {date}")
-    return "\n".join(out)
-
-
-# ===== 의도 판별 패턴 =====
-CPI_PATTERNS = [r"(소비자\s*물가|CPI|소비자물가지수|물가상승률)"]
-PPI_PATTERNS = [r"(생산자\s*물가|PPI|생산자물가지수)"]
-GDP_PATTERNS = [r"(GDP|국내총생산|경제성장률|성장률)"]
-TRADE_PATTERNS = [r"(무역수지|수출입|수출\s*수입)"]
-CURRENT_ACCOUNT_PATTERNS = [r"(경상수지|경기수지)"]
-RATE_PATTERNS = [r"(기준\s*금리|정책\s*금리|금리|한국은행\s*금리)"]
-KOSPI_PATTERNS = [r"(코스피|KOSPI|한국\s*주가)"]
-KOSDAQ_PATTERNS = [r"(코스닥|KOSDAQ)"]
-FX_PATTERNS_JPY = [r"(원\s*엔|엔\s*원|엔화\s*환율|JPY|엔\s*환율|엔화|일본\s*엔)"]
-FX_PATTERNS_USD = [r"(원\s*달러|달러\s*원|달러\s*환율|USD|미국\s*달러)"]
-FX_PATTERNS_EUR = [r"(유로\s*달러|유로\s*환율|EUR|유로)"]
-MARKET_PATTERNS = [r"(지수|다우|나스닥|S&P|VIX|주가지수)"]
-NEWS_PATTERNS = [r"(최신\s*뉴스|경제\s*뉴스|뉴스|top\s*\d+)"]
-
-ECOS_100_PATTERNS = [
-    r"100대\s*(지표|통계)",
-    r"경제지표\s*(전체|목록|리스트)",
-    r"주요\s*경제지표",
-]
-
-LATEST_NEWS_PATTERNS = [
-    r"최신\s*경제\s*뉴스",
-    r"오늘\s*경제\s*뉴스",
-    r"실시간\s*경제\s*뉴스",
-    r"경제\s*뉴스\s*top\s*\d+",
-]
-
-SITE_HELP_PATTERNS = [
-    r"(웹|웹\s*서비스|사이트).*?(기능|도움말|사용법|소개|무엇|뭐가|설명)",
-    r"(기능|도움말|사용법|소개)\s*(알려줘|설명|가이드)",
-]
-
-
-def match_intent(q: str, patterns: list) -> bool:
-    return any(re.search(p, q, flags=re.IGNORECASE) for p in patterns)
-
-
-def is_rate_query(q: str) -> bool:
-    return match_intent(q, RATE_PATTERNS)
-
-
-def is_latest_news_query(q: str) -> bool:
-    q = (q or "").lower()
-    return match_intent(q, LATEST_NEWS_PATTERNS) or ("뉴스" in q and ("최신" in q or "top" in q))
-
-
-def is_site_help_query(q: str) -> bool:
-    return match_intent(q, SITE_HELP_PATTERNS)
-
-
-def parse_topn(q: str, default_n: int = 5) -> int:
-    if not q:
-        return default_n
-    m = re.search(r"top\s*(\d{1,2})", q, flags=re.IGNORECASE)
-    if m:
-        return max(1, min(50, int(m.group(1))))
-    m2 = re.search(r"(\d{1,2})\s*(개|건)", q)
-    return max(1, min(50, int(m2.group(1)))) if m2 else default_n
-
-
-# ===== FastAPI 앱 =====
-app = FastAPI(title="Chat+RAG+News+Indicators")
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-# 세션 메모리 (간단한 히스토리, 프로덕션에서는 Redis 등 사용 권장)
-history = []
-MAX_HISTORY_LENGTH = 50  # 메모리 누수 방지
-
-
-# ===== 메인 챗 라우팅 =====
-@app.post("/chat")
-@app.post("/api/chat")
-async def chat(payload: dict):
-    global history
-    q = (payload.get("message") or "").strip()
-    if not q:
-        return {"answer": "질문이 비어있습니다."}
-
-    # 히스토리 길이 제한
-    if len(history) > MAX_HISTORY_LENGTH:
-        history = history[-MAX_HISTORY_LENGTH:]
-
-    # 1) 최신 뉴스 → Mongo
-    if is_latest_news_query(q):
-        try:
-            n = parse_topn(q, default_n=5)
-            rows = fetch_latest_topn_from_mongo(n)
-            return {"answer": format_topn_md(rows)}
-        except Exception as e:
-            log.exception("Mongo 최신뉴스 조회 오류")
-            return {"answer": f"DB 조회 오류: {e}"}
-
-    # 2) CPI
-    if match_intent(q, CPI_PATTERNS):
-        return {"answer": get_cpi_data()}
-
-    # 3) PPI
-    if match_intent(q, PPI_PATTERNS):
-        return {"answer": get_ppi_data()}
-
-    # 4) GDP
-    if match_intent(q, GDP_PATTERNS):
-        return {"answer": get_gdp_data()}
-
-    # 5) 무역수지
-    if match_intent(q, TRADE_PATTERNS):
-        return {"answer": get_trade_balance()}
-
-    # 6) 경상수지
-    if match_intent(q, CURRENT_ACCOUNT_PATTERNS):
-        return {"answer": get_current_account()}
-
-    # 7) 기준금리
-    if is_rate_query(q):
-        try:
-            info = fetch_bok_base_rate_from_keystats()
-            rate = info["rate"]
-            unit = info.get("unit") or "%"
-            nm = info.get("name") or "기준금리"
-            tm = info.get("time") or ""
-            ans = (
-                "• 금리: 돈을 빌리거나 예치할 때의 가격(이자율)입니다.\n"
-                "• 한국은행 기준금리: 금통위가 정하는 단일 정책금리로 단기시장금리의 기준입니다.\n"
-                f"• 최신 {nm}: **{rate:.2f}{unit}**" + (f" (기준시점: {tm})" if tm else "") + "\n"
-                f"• 출처: 한국은행 ECOS 100대 주요통계지표"
-            )
-            return {"answer": ans}
-        except Exception as e:
-            log.warning(f"ECOS 기준금리 조회 실패: {e}")
-            return {
-                "answer": "실시간 기준금리 조회에 실패했습니다. 최신값은 한국은행 보도자료(금통위 의결 결과)에서 확인해 주세요."
-            }
-
-    # 8) 코스피, 코스닥
-    if match_intent(q, KOSPI_PATTERNS):
-        return {"answer": get_kospi_index()}
-
-    if match_intent(q, KOSDAQ_PATTERNS):
-        return {"answer": get_kosdk_index()}
-
-    # 9) 환율
-    if match_intent(q, FX_PATTERNS_USD):
-        return {"answer": get_usd_krw()}
-
-    if match_intent(q, FX_PATTERNS_JPY):
-        return {"answer": get_jpy_krw()}
-
-    if match_intent(q, FX_PATTERNS_EUR):
-        return {"answer": get_eur_usd()}
-
-    # 10) 주요 지수
-    if match_intent(q, MARKET_PATTERNS):
-        indices = get_market_indices()
-        fx = get_fx_rates()
-        return {"answer": f"{indices}\n\n{fx}"}
-
-    # 11) 웹서비스 기능/도움말 → RAG(file_search)
-    if is_site_help_query(q):
-        history.append({"role": "user", "content": [{"type": "input_text", "text": q}]})
-        try:
-            resp = client.responses.create(
-                model="gpt-5",
-                instructions=SYSTEM_INSTRUCTIONS,
-                tools=[{"type": "file_search", "vector_store_ids": [VS_ID]}],
-                input=history,
-            )
-            answer = (getattr(resp, "output_text", "") or "").strip()
-            if not answer:
-                answer = "문서를 확인했지만 응답을 생성하지 못했어요."
-            history.append({"role": "assistant", "content": [{"type": "output_text", "text": answer}]})
-            return {"answer": answer}
-        except Exception as e:
-            log.exception("RAG 호출 실패")
-            return {"answer": f"RAG 호출 실패: {e}"}
-
-    # 12) 그 외 → GPT-5 단독
-    history.append({"role": "user", "content": [{"type": "input_text", "text": q}]})
-    try:
-        resp = client.responses.create(
-            model="gpt-5",
-            instructions=SYSTEM_INSTRUCTIONS,
-            input=history,
-        )
-        answer = (getattr(resp, "output_text", "") or "").strip()
-        if not answer:
-            answer = "응답이 비었습니다."
-        history.append({"role": "assistant", "content": [{"type": "output_text", "text": answer}]})
-        return {"answer": answer}
-    except Exception as e:
-        log.exception("모델 호출 실패")
-        return {"answer": f"모델 호출 실패: {e}"}
-
-
-# ===== API 엔드포인트 =====
-@app.get("/api/indices")
-def api_indices():
-    """주요 지수 API 엔드포인트"""
-    results = []
-    for key, info in INDEX_MAP.items():
-        q = fetch_quote_yf(info["ticker"])
-        results.append({"key": key, "name": info["name"], **q})
-    return {"data": results, "ts_kst": datetime.now(KST).isoformat()}
-
-
-@app.get("/api/fx")
-def api_fx():
-    """환율 API 엔드포인트"""
-    results = []
-    for key, info in FX_MAP.items():
-        q = fetch_quote_yf(info["ticker"])
-        results.append({"key": key, "name": info["name"], **q})
-    return {"data": results, "ts_kst": datetime.now(KST).isoformat()}
-
-
-@app.get("/api/markets")
-def api_markets(indices: int = 1, fx: int = 1):
-    """통합 마켓 데이터 API"""
-    payload = {"ts_kst": datetime.now(KST).isoformat(), "data": {}}
-    if indices:
-        idx_items = [{"key": k, "name": v["name"], **fetch_quote_yf(v["ticker"])}
-                     for k, v in INDEX_MAP.items()]
-        payload["data"]["indices"] = idx_items
-    if fx:
-        fx_items = [{"key": k, "name": v["name"], **fetch_quote_yf(v["ticker"])}
-                    for k, v in FX_MAP.items()]
-        payload["data"]["fx"] = fx_items
-    return payload
-
-
-# ===== 가이드 =====
-@app.get("/api/chat")
-def chat_get_info():
-    return {"detail": 'Use POST /api/chat with JSON: {"message":"..."}'}
-
-
-@app.get("/chat")
-def chat_get_info2():
-    return {"detail": 'Use POST /chat with JSON: {"message":"..."}'}
-
 
 # ===== CLOVA STT =====
 CLOVA_KEY_ID = "xfug9sgeb9"
@@ -922,7 +779,7 @@ def tts_google_post(payload: dict = Body(...)):
     if not text:
         return JSONResponse({"error": "text is required"}, status_code=400)
 
-    GCP_KEY_PATH = "/Users/yoo/key/absolute-text-473306-c1-b75ae69ab526.json"
+    GCP_KEY_PATH = "C:/dgict-teamb/fast_api/chatbot/key/absolute-text-473306-c1-b75ae69ab526.json"
     gcp_credentials = service_account.Credentials.from_service_account_file(
         GCP_KEY_PATH
     )

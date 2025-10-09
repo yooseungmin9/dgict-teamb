@@ -2,7 +2,8 @@
 // 전체 교체본 — 음성(STT) 결과는 입력창에만 채우고, 전송은 사용자가 직접 수행
 
 // ========== 0) 기본 설정 ==========
-const APP_NAME  = "AI 경제 상담봇";
+const APP_NAME  = "AI 경제질문 챗봇";
+const APP_NAME_US = "AI Economy Q&A Chatbot";
 const CHAT_URL  = "/api/chat";
 const RESET_URL = "/api/reset";
 const STT_URL   = "/api/stt";
@@ -36,7 +37,7 @@ const I18N = {
     btnSend: "Send",
     btnTts: "🔈 Read answer",
     inputPh: "Speak or type your question...",
-    welcome: `Hello! This is <b>${APP_NAME}</b>. How can I help you today?`,
+    welcome: `Hello! This is <b>${APP_NAME_US}</b>. How can I help you today?`,
     statusIdle: "Status: idle",
     statusTyping: "Typing...",
     sttStart: "🎤️ Live speech recognition started.",
