@@ -1,8 +1,8 @@
 package com.bgroup.news.recommend.controller;
 
-import com.bgroup.news.origin.dto.BookResponse;
-import com.bgroup.news.origin.dto.YoutubeResponse;
-import com.bgroup.news.origin.repository.BookRepository;
+import com.bgroup.news.recommend.dto.BookResponse;
+import com.bgroup.news.recommend.dto.YoutubeResponse;
+import com.bgroup.news.recommend.repository.BookRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Controller;

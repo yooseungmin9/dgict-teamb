@@ -51,13 +51,27 @@
   grid-template-columns: 1fr 1fr 1fr;
   gap:20px;
   grid-template-areas:
-    "left center right"
-    "wide wide  right";
+    "topwide topwide rightTop"   /* 상단: 키워드 핫토픽 그래프(2열) + 어제/오늘 top3 */
+    "today   chart   rightTop"   /* 2행: 오늘의 감성점수 + 감성점수 그래프 */
+    "cluster chart   rank"       /* 3행: 30일 기사 클러스터 시작 + 키워드 랭킹 */
+    "cluster media   newsCount"; /* 4행: 좌 클러스터 연장 + 중앙 통합오피니언 + 우 뉴스개수 */
   /* 자동 배치 간섭 방지 */
   grid-auto-flow: row;
   min-width: 0;
   margin-bottom: 20px;
 }
+
+#panel-hot-datalab        { grid-area: topwide; }
+#panel-hot-topic-yesterday{ grid-area: rightTop; }
+#panel-today-sentiment    { grid-area: today; }
+#panel-sentiment-series   { grid-area: chart; }
+#panel-keyword-rank       { grid-area: rank; }
+#panel-news-count         { grid-area: newsCount; }
+#panel-cluster            { grid-area: cluster; }
+#panel-opinion            { grid-area: media; }
+
+/* 3) 이전 컬럼 래퍼가 남아있다면 비활성화(안 쓰도록) */
+#col-left, #col-center, #col-right, .row-2 { display: contents !important; }
 
 .card
 .dashboard-card {
@@ -112,22 +126,19 @@
 .hide-category th.col-category,
 .hide-category td.col-category{ display:none; }
 
-/* 유틸리티 클래스 추가 */
-/* 영역 매핑 */
-#col-left{   grid-area:left; }
-#col-center{ grid-area:center; }
-#col-right{  grid-area:right; }
-#panel-hot-datalab{ grid-area:wide; }
-
 /* 반응형: 1열 전개 시 자동 복귀 */
-@media (max-width: 1200px){
+@media (max-width:1280px){
   .dash__grid{
-      grid-template-columns: 1fr;
-      grid-template-areas:
-        "left"
-        "center"
-        "right"
-        "wide";
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "topwide"
+      "rightTop"
+      "chart"
+      "today"
+      "rank"
+      "cluster"
+      "media"
+      "newsCount";
   }
 }
 
@@ -177,7 +188,7 @@
 .ticker-wrap{
   position:relative; overflow:hidden;
   background: #3b82f6; color:#fff;
-  border-radius:10px; height:42px;
+  border-radius:10px; height:42px;``
   margin: 10px 0;
 }
 /* 키프레임 삭제! (JS가 직접 이동 제어) */

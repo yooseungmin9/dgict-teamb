@@ -1,6 +1,6 @@
 package com.bgroup.news.member.domain;
 
-import com.bgroup.news.origin.dto.Interests;
+import com.bgroup.news.member.dto.Interests;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;

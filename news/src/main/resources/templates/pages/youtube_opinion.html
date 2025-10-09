@@ -4,61 +4,62 @@
     <meta charset="UTF-8">
     <title>Opinion Mining Dashboard</title>
     <link rel="stylesheet" href="/css/style.css"/>
-    <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <!-- WordCloud.js (CDN 교체 ✅) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/wordcloud2.js/1.1.1/wordcloud2.min.js"></script>
-    <!-- youtube.js (캐시 무효화를 위해 버전 쿼리 추가) -->
-    <script defer src="/js/youtube.js?v=20251003"></script>
+    <script defer src="/js/youtube.js"></script>
     <style>
-        body {
-          margin:0;
-          display:flex;
-          flex-direction:column;
-          min-height:100vh;
-        }
-        .page {
-          display:flex;
-          gap:20px;
-          min-height:calc(100vh - var(--header-h,0px));
-        }
-        .sidebar {
-          width: 280px;
-          padding: 10px;
-          box-sizing:border-box;
-          overflow-y:auto;
-          max-height: calc(100vh - 100px);
-          border-right:1px solid #ddd;
-        }
-        .sidebar h2 { font-size: 18px; margin-bottom: 15px; }
-        .thumbnail-scroll { display: flex; flex-direction: column; gap: 10px; }
-        .thumbnail-box {
-          cursor: pointer; padding: 5px; border-radius: 6px;
-          transition: background 0.2s; text-align:center;
-        }
-        .thumbnail-box:hover { background: #f5f5f5; }
+        body { margin:0; display:flex; flex-direction:column; min-height:100vh; }
+        .page { display:flex; gap:20px; min-height:calc(100vh - var(--header-h,0px)); }
+        .sidebar { width:280px; padding:10px; box-sizing:border-box; overflow-y:auto;
+            max-height:calc(100vh - 100px); border-right:1px solid #ddd; }
+        .sidebar h2 { font-size:18px; margin-bottom:15px; }
+        .thumbnail-scroll { display:flex; flex-direction:column; gap:10px; }
+        .thumbnail-box { cursor:pointer; padding:5px; border-radius:6px; transition:background .2s; text-align:center; }
+        .thumbnail-box:hover { background:#f5f5f5; }
         .thumbnail-box img { width:100%; max-width:240px; border-radius:6px; }
-        .thumbnail-title {
-          font-size: 13px; margin-top: 4px; text-align: center;
-          line-height:1.2em; max-height:2.4em; overflow:hidden; text-overflow:ellipsis;
-        }
+        .thumbnail-title { font-size:13px; margin-top:4px; text-align:center; line-height:1.2em; max-height:2.4em; overflow:hidden; text-overflow:ellipsis; }
         .main { flex:1 1 auto; padding:20px; display:flex; flex-direction:column; align-items:center; }
-        .video-info { text-align: center; margin-bottom: 15px; }
-        .video-info h2 { font-size: 24px; margin-bottom: 10px; color: #222; }
-        .video-meta { display: flex; justify-content: center; gap: 20px; font-size: 14px; color: #555; }
-        .video-meta span { background: #f7f7f7; padding: 5px 10px; border-radius: 12px; font-weight: 500; }
+        .video-info { text-align:center; margin-bottom:15px; }
+        .video-info h2 { font-size:24px; margin-bottom:10px; color:#222; }
+        .video-meta { display:flex; justify-content:center; gap:20px; font-size:14px; color:#555; }
+        .video-meta span { background:#f7f7f7; padding:5px 10px; border-radius:12px; font-weight:500; }
         .video-player { display:flex; justify-content:center; margin-bottom:40px; }
-        .charts { display:flex; justify-content:space-between; width:100%; max-width:900px; margin-bottom:30px; gap:20px; }
+        .charts {
+            display: flex;
+            justify-content: space-between;
+            align-items: stretch; /* ✅ 세로 정렬 균일화 */
+            width: 100%;
+            max-width: 900px;
+            margin-bottom: 30px;
+            gap: 20px;
+        }
         .chart-box {
-          flex:1; background:#fafafa; padding:15px;
-          border-radius:8px; box-shadow:0 2px 5px rgba(0,0,0,0.1); text-align:center;
+            flex: 1;
+            background: #fafafa;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, .1);
+            display: flex;
+            flex-direction: column;       /* 내부 요소를 세로로 배치 (제목 위, 내용 아래) */
+            align-items: center;          /* 중앙 정렬 */
+            justify-content: flex-start;
+            text-align: center;
         }
-        #pieChart { max-width:240px; max-height:240px; margin:auto; }
+
+        .chart-box h4 {
+            writing-mode: horizontal-tb;  /* ✅ 세로 글씨 방지 */
+            transform: none;              /* 혹시 회전되어 있다면 원복 */
+            margin-bottom: 10px;          /* 제목과 차트 간격 */
+        }
+
+        #pieChart {
+            width: 280px;        /* 원하는 너비 */
+            max-width: 100%;
+            height: auto;        /* 자동 */
+            aspect-ratio: 1 / 1; /* ✅ 정사각형 유지 */
+        }
         #wordCloud { width:100%; height:300px; border:1px solid #ddd; }
-        .analysis {
-          background:#fff; padding:20px; border-radius:8px;
-          box-shadow:0 2px 5px rgba(0,0,0,0.1); width:100%; max-width:900px;
-        }
+        .analysis { background:#fff; padding:20px; border-radius:8px; box-shadow:0 2px 5px rgba(0,0,0,.1); width:100%; max-width:900px; }
         .comments { margin-top:15px; }
         .comment { margin-bottom:10px; font-size:14px; }
     </style>
@@ -67,16 +68,13 @@
 <div th:replace="fragments/header :: siteHeader"></div>
 <main>
     <div class="page">
-        <!-- 좌측 사이드바 -->
         <div class="sidebar">
             <h2>카테고리 추천 유튜브</h2>
             <div id="thumbnailList" class="thumbnail-scroll"></div>
         </div>
 
-        <!-- 메인 -->
         <div class="container">
             <div class="main">
-                <!-- 영상 정보 -->
                 <div class="video-info">
                     <h2 id="mainTitle">영상 제목</h2>
                     <div class="video-meta">
@@ -86,7 +84,6 @@
                     </div>
                 </div>
 
-                <!-- 영상 플레이어 -->
                 <div class="video-player">
                     <iframe id="videoFrame" width="640" height="360"
                             src="" frameborder="0"
@@ -94,7 +91,6 @@
                             allowfullscreen></iframe>
                 </div>
 
-                <!-- 분석 시각화 -->
                 <div class="charts">
                     <div class="chart-box">
                         <h4>감정 분포</h4>
@@ -106,7 +102,6 @@
                     </div>
                 </div>
 
-                <!-- 분석 요약 -->
                 <div class="analysis">
                     <h4>분석 요약</h4>
                     <p id="analysisText">이 영상 댓글 분석 결과</p>

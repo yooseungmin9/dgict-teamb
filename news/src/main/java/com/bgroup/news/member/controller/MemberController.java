@@ -3,6 +3,7 @@ package com.bgroup.news.member.controller;
 import com.bgroup.news.member.domain.MemberDoc;
 import com.bgroup.news.member.dto.SignupRequest;
 import com.bgroup.news.member.service.MemberService;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
@@ -43,5 +44,12 @@ public class MemberController {
     public String signupSubmit(@ModelAttribute SignupRequest req) {
         memberService.register(req);
         return "redirect:/pages/dashboard";
+    }
+
+    @GetMapping("/account")
+    public String account(HttpServletRequest request, Model model) {
+        boolean ajax = "XMLHttpRequest".equalsIgnoreCase(request.getHeader("X-Requested-With"));
+        // model.addAttribute("me", memberService.current()); // 필요시
+        return ajax ? "member/account :: accountPanel" : "member/account";
     }
 }
