@@ -24,12 +24,11 @@ public class RecommendController {
     @GetMapping("/pages/recommend")
     public String discover(@RequestParam(defaultValue = "경제 강의") String q, Model model) {
 
-        // ✅ DB에서 책 가져오기
-//        List<BookResponse> books = bookRepository.findTop10ByOrderByPubDateDesc();
+
+        //  List<BookResponse> books = bookRepository.findTop10ByOrderByPubDateDesc();
         List<BookResponse> books = bookRepository.findTop10ByCategoryIdOrderByPubDateDesc(3065);
         model.addAttribute("books", books);
 
-        // ✅ 유튜브는 여전히 API 호출
         Mono<YoutubeResponse> ytMono = youtubeClient.get()
                 .uri(uri -> uri.path("/youtube/search")
                         .queryParam("q", q)
