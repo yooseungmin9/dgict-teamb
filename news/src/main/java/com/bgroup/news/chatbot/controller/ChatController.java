@@ -1,11 +1,11 @@
 // src/main/java/com/bgroup/news/chatbot_cont/ChatController.java
-// [핵심만] /api/tts 프록시: 이중 인코딩 제거(URI 템플릿), Java 8 호환 + 수신값 로그
 package com.bgroup.news.chatbot.controller;
 
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.*;
-import org.springframework.stereotype.Controller;
 import org.springframework.core.io.ByteArrayResource;
+import org.springframework.http.*;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
+import org.springframework.stereotype.Controller;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.bind.annotation.*;
@@ -13,9 +13,9 @@ import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
 
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.logging.Logger;
@@ -25,113 +25,123 @@ public class ChatController {
 
     private static final Logger log = Logger.getLogger(ChatController.class.getName());
 
-    @Value("${fastapi.url:http://localhost:8002}")
+    // FastAPI 주소 (application.properties: fastapi.url=http://localhost:8000)
+    @Value("${fastapi.chat:http://localhost:8002}")
     private String FASTAPI_URL;
 
     private static RestTemplate createRestTemplate() {
-        // 요청 팩토리 생성
-        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
-        factory.setConnectTimeout(5000); // 연결 타임아웃 (ms)
-        factory.setReadTimeout(180000);  // 읽기 타임아웃 (ms)
-
-        return new RestTemplate(factory);
+        SimpleClientHttpRequestFactory f = new SimpleClientHttpRequestFactory();
+        f.setConnectTimeout(5_000);
+        f.setReadTimeout(180_000);
+        return new RestTemplate(f);
     }
-
     private final RestTemplate rest = createRestTemplate();
 
-//    @GetMapping("/chat") public String chatPage() { return "chat"; }
-    @GetMapping("/pages/chat") public String chatPage() { return "pages/chat"; }
+    // (선택) 챗봇 페이지
+    @GetMapping("/pages/chat")
+    public String chatPage() { return "pages/chat"; }
 
-    @PostMapping("/api/chat") @ResponseBody
+    // === Chat: POST /api/chat → FastAPI /chat ===
+    @PostMapping(value = "/api/chat", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    @ResponseBody
     public ResponseEntity<String> proxyChat(@RequestBody Map<String, Object> body) {
+        final String url = FASTAPI_URL + "/chat";
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.setAccept(Arrays.asList(MediaType.APPLICATION_JSON));
+
         try {
-            return rest.postForEntity(FASTAPI_URL + "/chat", body, String.class);
-        } catch (RestClientException e) {
+            return rest.postForEntity(url, new HttpEntity<>(body, headers), String.class);
+        } catch (HttpStatusCodeException ex) { // 4xx/5xx 그대로 전달
+            return ResponseEntity.status(ex.getStatusCode())
+                    .contentType(ex.getResponseHeaders() != null
+                            ? ex.getResponseHeaders().getContentType()
+                            : MediaType.APPLICATION_JSON)
+                    .body(ex.getResponseBodyAsString());
+        } catch (RestClientException e) {      // 연결 실패일 때만 502
+            log.severe("proxyChat upstream error: " + e.getMessage());
             return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
                     .contentType(MediaType.APPLICATION_JSON)
-                    .body("{\"answer\":\"게이트웨이 오류: FastAPI /chat 접속 실패\"}");
+                    .body("{\"error\":\"게이트웨이 오류: FastAPI /chat 접속 실패\"}");
         }
     }
 
-    @PostMapping("/api/reset") @ResponseBody
+    // === Reset: POST /api/reset → FastAPI /reset ===
+    @PostMapping(value = "/api/reset", produces = MediaType.APPLICATION_JSON_VALUE)
+    @ResponseBody
     public ResponseEntity<String> proxyReset() {
         try {
             return rest.postForEntity(FASTAPI_URL + "/reset", null, String.class);
+        } catch (HttpStatusCodeException ex) {
+            return ResponseEntity.status(ex.getStatusCode())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(ex.getResponseBodyAsString());
         } catch (RestClientException e) {
+            log.severe("proxyReset upstream error: " + e.getMessage());
             return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
                     .contentType(MediaType.APPLICATION_JSON)
                     .body("{\"message\":\"게이트웨이 오류: FastAPI /reset 접속 실패\"}");
         }
     }
 
-    // ===== STT (변경 없음) =====
-    @PostMapping(value = "/api/stt", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    // === STT: POST multipart /api/stt → FastAPI /api/stt ===
+    @PostMapping(value = "/api/stt", consumes = MediaType.MULTIPART_FORM_DATA_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     @ResponseBody
-    public ResponseEntity<String> proxyStt(@RequestParam("audio_file") MultipartFile audioFile,
-                                           @RequestParam(name = "lang", defaultValue = "Kor") String lang) {
-        String url = FASTAPI_URL + "/api/stt?lang=" + lang;
+    public ResponseEntity<String> proxyStt(
+            @RequestParam("audio_file") MultipartFile audioFile,
+            @RequestParam(name = "lang", defaultValue = "Kor") String lang
+    ) {
+        final String url = FASTAPI_URL + "/api/stt?lang=" + lang;
 
-        ByteArrayResource filePart = new ByteArrayResource(toBytes(audioFile)) {
+        // 파일 파트에 Content-Disposition/Type 명시
+        HttpHeaders fileHdr = new HttpHeaders();
+        fileHdr.setContentType(MediaType.APPLICATION_OCTET_STREAM);
+        fileHdr.setContentDisposition(ContentDisposition.formData()
+                .name("audio_file")
+                .filename(audioFile.getOriginalFilename())
+                .build());
+        ByteArrayResource fileRes = new ByteArrayResource(toBytes(audioFile)) {
             @Override public String getFilename() { return audioFile.getOriginalFilename(); }
         };
+        HttpEntity<ByteArrayResource> fileEntity = new HttpEntity<>(fileRes, fileHdr);
+
         MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
-        body.add("audio_file", filePart);
+        body.add("audio_file", fileEntity);
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.MULTIPART_FORM_DATA);
+        headers.setAccept(Arrays.asList(MediaType.APPLICATION_JSON));
 
         try {
             return rest.postForEntity(url, new HttpEntity<>(body, headers), String.class);
+        } catch (HttpStatusCodeException ex) { // FastAPI 4xx/5xx 그대로
+            MediaType ct = ex.getResponseHeaders() != null ? ex.getResponseHeaders().getContentType() : MediaType.APPLICATION_JSON;
+            return ResponseEntity.status(ex.getStatusCode()).contentType(ct).body(ex.getResponseBodyAsString());
         } catch (RestClientException e) {
+            log.severe("proxyStt upstream error: " + e.getMessage());
             return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
                     .contentType(MediaType.APPLICATION_JSON)
                     .body("{\"error\":\"게이트웨이 오류: FastAPI /api/stt 접속 실패\"}");
         }
     }
 
-    // ===== TTS (→ FastAPI /api/tts, 이중 인코딩 방지) =====
-    @GetMapping("/api/tts")
-    public ResponseEntity<byte[]> proxyTts(@RequestParam Map<String, String> allParams) {
+    // === TTS: POST JSON /api/tts → FastAPI /api/tts ===
+    @PostMapping(value = "/api/tts", consumes = MediaType.APPLICATION_JSON_VALUE)
+    @ResponseBody
+    public ResponseEntity<byte[]> proxyTtsPost(@RequestBody Map<String, Object> body) {
+        final String url = FASTAPI_URL + "/api/tts";
         try {
-            // 0) 필수 파라미터 가드 + 수신값 로그(스프링 단계에서 '한글'이어야 정상)
-            String text = (allParams.getOrDefault("text", "")).trim();
-            if (text.isEmpty()) {
-                return jsonError("{\"error\":\"Missing required query param: text\"}", HttpStatus.BAD_REQUEST);
-            }
-            log.info("[/api/tts] received text len=" + text.length() + " sample=" + text.substring(0, Math.min(20, text.length())));
-
-            // 1) 템플릿 URL (RestTemplate가 단 한 번만 인코딩)
-            String urlTpl = FASTAPI_URL
-                    + "/api/tts"
-                    + "?text={text}"
-                    + "&lang={lang}"
-                    + "&voice={voice}"
-                    + "&fmt={fmt}"
-                    + "&rate={rate}"
-                    + "&pitch={pitch}";
-
-            // 2) 기본값 보정
-            String lang  = allParams.getOrDefault("lang",  "ko-KR");
-            String voice = allParams.getOrDefault("voice", "ko-KR-Standard-B"); // 남성
-            String fmt   = allParams.getOrDefault("fmt",   "MP3");
-            String rate  = allParams.getOrDefault("rate",  "1.0");
-            String pitch = allParams.getOrDefault("pitch", "0.0");
-
-            // 3) 오디오/JSON 응답 허용
-            HttpHeaders reqHdr = new HttpHeaders();
-            reqHdr.setAccept(Arrays.asList(
+            HttpHeaders hdr = new HttpHeaders();
+            hdr.setContentType(MediaType.APPLICATION_JSON);
+            hdr.setAccept(Arrays.asList(
                     MediaType.valueOf("audio/mpeg"),
                     MediaType.valueOf("audio/ogg"),
                     MediaType.valueOf("audio/wav"),
                     MediaType.APPLICATION_JSON
             ));
 
-            ResponseEntity<byte[]> res = rest.exchange(
-                    urlTpl, HttpMethod.GET, new HttpEntity<>(reqHdr), byte[].class,
-                    text, lang, voice, fmt, rate, pitch
-            );
+            ResponseEntity<byte[]> res = rest.exchange(url, HttpMethod.POST, new HttpEntity<>(body, hdr), byte[].class);
 
-            // 4) FastAPI 응답 그대로 전달
             HttpHeaders out = new HttpHeaders();
             MediaType ct = res.getHeaders().getContentType();
             out.setContentType(ct != null ? ct : MediaType.APPLICATION_OCTET_STREAM);
@@ -141,13 +151,11 @@ public class ChatController {
 
             return new ResponseEntity<>(res.getBody(), out, res.getStatusCode());
 
-        } catch (HttpStatusCodeException e) {
+        } catch (HttpStatusCodeException ex) {
+            // FastAPI가 JSON 에러 반환 시 그대로 전달
             HttpHeaders out = new HttpHeaders();
-            MediaType ct = e.getResponseHeaders() != null ? e.getResponseHeaders().getContentType() : null;
-            out.setContentType(ct != null ? ct : MediaType.APPLICATION_JSON);
-            out.setCacheControl(CacheControl.noCache());
-            byte[] body = e.getResponseBodyAsByteArray();
-            return new ResponseEntity<>(body != null ? body : new byte[0], out, e.getStatusCode());
+            out.setContentType(MediaType.APPLICATION_JSON);
+            return new ResponseEntity<>(ex.getResponseBodyAsByteArray(), out, ex.getStatusCode());
         } catch (RestClientException e) {
             return jsonError("{\"error\":\"Gateway error: cannot reach FastAPI /api/tts\"}", HttpStatus.BAD_GATEWAY);
         } catch (Exception e) {
@@ -155,11 +163,12 @@ public class ChatController {
         }
     }
 
-    // ===== Util =====
+    // === 유틸 ===
     private byte[] toBytes(MultipartFile f) {
         try { return f.getBytes(); }
         catch (Exception e) { throw new RuntimeException("파일 읽기 실패", e); }
     }
+
     private ResponseEntity<byte[]> jsonError(String json, HttpStatus status) {
         HttpHeaders hdr = new HttpHeaders();
         hdr.setContentType(MediaType.APPLICATION_JSON);

@@ -805,18 +805,20 @@ select.form-control {
 }
 .icon { width:18px; height:18px; }
 
-/* 컨테이너 없이 가로 100% 고정 높이 바 */
+
 .appbar{
   position: sticky; top: 0; z-index: 1000;
+  width:100%;
+  max-width: var(--container-xl);
   height: 64px; /* 고정 높이 */
   display: grid;
   grid-template-columns: auto 1fr auto;
   align-items: center;
+  margin: 0 auto;
   gap: var(--space-16);
   padding: 0 var(--space-16);
   background: var(--color-surface);
-  border-bottom: 1px solid var(--color-card-border);
-  box-shadow: var(--shadow-sm);
+  border-bottom: 1px solid rgba(0,0,0,0.2);
 }
 
 /* 좌측 로고+브랜드 */

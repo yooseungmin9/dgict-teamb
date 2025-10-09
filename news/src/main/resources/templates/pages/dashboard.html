@@ -15,19 +15,20 @@
     <!-- 추가 -->
     <script defer src="/js/ticker.js"></script>
     <script defer src="/js/emoa.js"></script>
+    <script defer src="/js/hot-topic.js"></script>
+    <script defer src="/js/count.js"></script>
 
     <!-- trands.js가 전역에서 읽어갈 API 경로(없으면 상대경로 기본값 사용) -->
     <script>
         window.API_ENDPOINTS = {
-            sentimentLine: "/dashboard/sentiment/line",   // ← 실제 스프링 경로로 맞추기
+            sentimentLine: "/dashboard/sentiment/line",
             keywordRanking: "/dashboard/keywords/ranking",
             categoryTrend:  "/dashboard/trend/categories",
-            emoaScore:      "/emoa/score"                 // 필요시 "/dashboard/emoa/score" 로 변경
+            emoaScore:      "/emoa/score"
         };
     </script>
 </head>
 
-<!-- emoa.js가 body data 속성으로도 경로를 읽을 수 있게 함 -->
 <body data-page="dashboard" data-emoa-api="/api/dashboard/emoa/score">
 <div th:replace="fragments/header :: siteHeader"></div>
 
@@ -56,7 +57,7 @@
                 <div class="card" id="panel-sentiment-series">
                     <article class="card__body">
                         <div class="feature-card" id="sentiment-card"
-                             data-api="/api/dashboard/sentiment/line"><!-- ★ 기존 8000 포트 → 스프링 경로로 교체 -->
+                             data-api="http://localhost:8007/sentiment/line">
                             <strong class="strong">긍·부정추이</strong>
                             <div class="controls" style="display:flex; gap:8px; align-items:center; margin-left:auto;">
                                 <button id="btn-mode-count" class="btn btn--sm">건수</button>
@@ -78,15 +79,17 @@
             <div class="stack" id="col-center">
                 <div class="card" id="panel-hot-topic-yesterday">
                     <div class="card__title">키워드 핫토픽 (어제 대비)</div>
-                    <div class="card__body placeholder">핫토픽 리스트/차트</div>
+                    <!-- ✅ placeholder 클래스 제거, hot-topic.js가 채움 -->
+                    <div class="card__body" id="hot-topic-body">
+                        <p style="text-align:center; color:#999;">로딩 중...</p>
+                    </div>
                 </div>
 
                 <div class="card" id="panel-news-count">
                     <div class="card__title">분석된 뉴스 개수</div>
-                    <div class="card__body placeholder">카운트/스파크라인</div>
+                    <div class="card__body placeholder">카운트</div>
                 </div>
 
-                <!-- 감성 요약 + 도넛(분포가 오면) -->
                 <div class="card" id="panel-today-sentiment">
                     <div class="card__title">오늘의 감성 요약</div>
                     <div class="card__body" id="emoa-summary">
@@ -160,7 +163,6 @@
     </div>
 </main>
 
-<!-- footer 프래그먼트가 없으면 주석 -->
 <div th:replace="fragments/footer :: siteFooter"></div>
 
 <script th:inline="javascript">

@@ -4,8 +4,8 @@ from fastapi import FastAPI, Query, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 import requests
 
-NAVER_CLIENT_ID = "Dg2N296yjI3TGkftcbyW"
-NAVER_CLIENT_SECRET = "QTCRa_8ZJ0"
+NAVER_CLIENT_ID = "TxScmBoNbELMfRqjtQpG"
+NAVER_CLIENT_SECRET = "mcFuF9QBPw"
 
 app = FastAPI(title="KR Econ News via NAVER")
 app.add_middleware(
