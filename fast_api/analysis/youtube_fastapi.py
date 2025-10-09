@@ -19,6 +19,8 @@ app = FastAPI(title="YouTube Opinion API")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
+        "http://localhost:8080",  # ✅ 대시보드 주소 추가
+        "http://127.0.0.1:8080",
         "http://localhost:8081",
         "http://127.0.0.1:8081",
     ],
@@ -115,8 +117,8 @@ def get_analysis(
     # 1) 댓글 로딩
     q = {"video_id": video_id}
     cursor = col_comments.find(q, {"_id": 0, "text": 1, "emotion": 1})
-    if limit:
-        cursor = cursor.limit(limit)
+    if limit is not None:
+        cursor = cursor.limit(int(limit))
     cmts = list(cursor)
 
     # fallback: video 문서 내 comments 배열 사용
@@ -198,3 +200,52 @@ def get_analysis(
         "summary": summary,
         "comments": samples,
     }
+# ✅ app.py 내 패치: /youtube/results 만 교체
+from random import randint
+
+@app.get("/youtube/results")
+def get_random_youtube_video() -> dict:
+    """대시보드용: 랜덤 1개 영상 + 경량 분석 포함."""
+    try:
+        # 1) 영상 개수 확인
+        count = col_video.count_documents({})
+        if count == 0:
+            return {"error": "no_data"}
+
+        # 2) 랜덤 1건 조회 (_id 제외, 필요한 필드만)
+        v = (
+            col_video.find(
+                {}, {"_id": 0, "video_id": 1, "title": 1, "thumbnail_url": 1}
+            )
+            .skip(randint(0, count - 1))
+            .limit(1)[0]
+        )
+        vid = v.get("video_id")
+        if not vid:
+            return {"error": "missing_video_id"}
+
+        # 3) 경량 분석 호출: 무한 조회 방지 (속도 안정)
+        #    get_analysis는 이미 'if limit is not None: cursor.limit(int(limit))' 로 안전
+        result = get_analysis(vid, limit=200, topn=80)
+
+        # 4) 합쳐서 반환
+        return {
+            "video_id": vid,
+            "title": v.get("title", ""),
+            "thumbnail_url": v.get("thumbnail_url", ""),
+            "summary": result.get("summary"),
+            "wordcloud": result.get("wordcloud"),
+            "sentiment": result.get("sentiment"),
+        }
+
+    except Exception as e:
+        # 디버깅 편의용 로그 + 에러 메시지 반환(대시보드에서 처리)
+        import traceback
+        traceback.print_exc()
+        return {"error": f"{type(e).__name__}: {e}"}
+
+
+# ✅ 참고: get_analysis 내부 limit 처리(이미 반영되어 있으면 그대로 두세요)
+# cursor = col_comments.find(q, {"_id": 0, "text": 1, "emotion": 1})
+# if limit is not None:
+#     cursor = cursor.limit(int(limit))

@@ -7,16 +7,19 @@
     <link rel="stylesheet" href="/css/dashboard-grid.css"/>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-    <!-- 기존 스크립트 -->
+    <!-- 반드시 opinion-widget.js보다 먼저 -->
+    <script src="/js/wordcloud2.js"></script>
+    <script defer src="/js/opinion-widget.js"></script>
+
+    <!-- 나머지는 그대로 -->
     <script defer src="/js/sentiment.js"></script>
     <script defer src="/js/trands.js"></script>
     <script defer src="/js/app.js"></script>
-
-    <!-- 추가 -->
     <script defer src="/js/ticker.js"></script>
     <script defer src="/js/emoa.js"></script>
     <script defer src="/js/hot-topic.js"></script>
     <script defer src="/js/count.js"></script>
+
 
     <!-- trands.js가 전역에서 읽어갈 API 경로(없으면 상대경로 기본값 사용) -->
     <script>
@@ -136,7 +139,9 @@
                 <div class="row-2">
                     <div class="card" id="panel-opinion">
                         <div class="card__title">오피니언 마이닝 요약</div>
-                        <div class="card__body placeholder">요약 텍스트</div>
+                        <div class="card__body" id="opinion-body">
+                            <p style="text-align:center;color:#999;">로딩 중...</p>
+                        </div>
                     </div>
                 </div>
             </div>
