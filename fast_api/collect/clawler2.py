@@ -231,27 +231,31 @@ from typing import Set
 okt = Okt()
 TOKEN_RE = re.compile(r"[가-힣A-Za-z0-9]{2,}")
 
-def load_stopwords(path: str = "stopwords.txt", extra: Set[str] | None = None) -> set:
+from typing import Optional, Set
+
+def load_stopwords(path: str = "stopwords.txt", extra: Optional[Set[str]] = None) -> set:
     """
-    한국어 뉴스용 불용어 로더.
+    한국어 뉴스용 불용어 로더 (Python 3.9~3.10 호환).
     - 파일이 없으면 기본 세트를 사용.
     - extra 인자로 추가 단어를 합침.
     """
     base = {
-        # 조사·접속사·기타 기능어
-        "은","는","이","가","을","를","에","에서","으로","로","과","와","의","도","만","보다","까지",
-        "했다","있다","되다","하다","위해","통해","대한","및","등","중","것","수","때문","관련","대해",
+        # 조사·접속사
+        "은","는","이","가","을","를","에","에서","으로","로","과","와","의","도","만",
+        "보다","까지","했다","있다","되다","하다","위해","통해","대한","및","등","중","것","수","때문","관련","대해",
         # 시점·빈출 서술
         "오늘","어제","내일","현재","최근","당시","작년","올해","이번","지난","금주","전일","전날","기자","사진","영상","속보"
     }
-    # 외부 파일 병합
-    p = Path(path)
-    if p.exists():
-        with p.open(encoding="utf-8") as f:
+
+    try:
+        with open(path, encoding="utf-8") as f:
             base |= {w.strip().lower() for w in f if w.strip()}
-    # 호출 시 추가 단어 병합
+    except FileNotFoundError:
+        pass
+
     if extra:
         base |= {w.lower() for w in extra}
+
     return base
 
 # 언론사명(OIDS 값)을 불용어에 자동 포함
@@ -334,7 +338,7 @@ def fetch_article(link: str) -> Dict[str, str]:
 # -------------------
 # 실행 본체
 # -------------------
-def crawl_and_save(days: int = 4, limit_per_day: int = 50):
+def crawl_and_save(days: int = 30, limit_per_day: int = 5):
     col = get_collection()
     counters = {}
 
@@ -395,4 +399,4 @@ def crawl_and_save(days: int = 4, limit_per_day: int = 50):
     logging.info("✅ 전체 수집 완료 (일별 카운트: %s)", counters)
 
 if __name__ == "__main__":
-    crawl_and_save(days=4, limit_per_day=50)
+    crawl_and_save(days=30, limit_per_day=5)
