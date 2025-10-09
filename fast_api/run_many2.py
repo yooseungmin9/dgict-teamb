@@ -1,4 +1,4 @@
-# run_many.py
+# run_many2.py
 import subprocess, sys, signal, os
 
 # ❗️여기에 서버 목록을 추가하세요.
