@@ -27,7 +27,7 @@ def _load_ids_from_file(path="categories_econ.txt") -> List[int]:
     except FileNotFoundError:
         return []
 
-# 최종 기본 리스트: env > 파일 > [3065]
+# 최종 기본 리스트: .env > 파일 > [3065]
 DEFAULT_ECON_IDS = [
     170, 3057, 3059, 3061, 3062, 3063, 8586, 3065, 3140, 8587,
     2172, 3103, 2173, 2841, 8593, 2747, 3123, 3069, 2028, 853,

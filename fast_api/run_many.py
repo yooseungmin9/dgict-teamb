@@ -13,6 +13,7 @@ SERVERS = [
     ("C:/dgict-teamb/fast_api/dashboard_analysis", "main:app", 8009, None),
     ("C:/dgict-teamb/fast_api/global_news", "main:app", 8010, None),
     ("C:/dgict-teamb/fast_api/new_count", "main:app", 8011, None),
+    ("C:/dgict-teamb/fast_api/viz", "app_clusters:app", 8012, None),
 ]
 
 PROCS = []

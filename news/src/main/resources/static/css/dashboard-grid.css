@@ -51,10 +51,12 @@
   grid-template-columns: 1fr 1fr 1fr;
   gap:20px;
   grid-template-areas:
-    "topwide topwide rightTop"   /* 상단: 키워드 핫토픽 그래프(2열) + 어제/오늘 top3 */
-    "today   chart   rightTop"   /* 2행: 오늘의 감성점수 + 감성점수 그래프 */
-    "cluster chart   rank"       /* 3행: 30일 기사 클러스터 시작 + 키워드 랭킹 */
-    "cluster media   newsCount"; /* 4행: 좌 클러스터 연장 + 중앙 통합오피니언 + 우 뉴스개수 */
+    "topwide topwide rightTop"
+    "today   chart   rightTop"
+    "cluster chart   rightTop"
+    "cluster chart   rank"
+    "media  media    rank"
+    "media  media    newsCount";
   /* 자동 배치 간섭 방지 */
   grid-auto-flow: row;
   min-width: 0;
@@ -69,6 +71,14 @@
 #panel-news-count         { grid-area: newsCount; }
 #panel-cluster            { grid-area: cluster; }
 #panel-opinion            { grid-area: media; }
+
+#panel-news-count .strong { padding:28px 20px 20px; }
+#panel-hot-topic-yesterday .strong { padding:28px 20px 20px; }
+#panel-sentiment-series .strong { padding:28px 20px 20px; }
+#panel-keyword-rank .strong { padding:28px 20px 20px; }
+#panel-cluster .strong { padding:28px 20px 20px; }
+#panel-opinion .strong { padding:28px 20px 20px; }
+
 
 /* 3) 이전 컬럼 래퍼가 남아있다면 비활성화(안 쓰도록) */
 #col-left, #col-center, #col-right, .row-2 { display: contents !important; }
@@ -211,18 +221,6 @@
   justify-content: space-between;
   margin-bottom: 8px;
 }
-#panel-opinion {
-  grid-column: span 2;         /* 가로 2칸 확장 (right 영역 넓힘) */
-  width: 100%;
-  text-align: center;
-}
-
-#panel-opinion .card__title {
-  font-size: 18px;
-  font-weight: 600;
-  margin-bottom: 10px;
-  color: #222;
-}
 
 #panel-opinion .card__body {
   display: flex;
@@ -234,20 +232,43 @@
 #panel-opinion img {
   width: 260px;
   border-radius: 8px;
-  margin-top: 6px;
-  margin-bottom: 10px;
 }
 
 #panel-opinion canvas {
-  width: 320px !important;   /* 워드클라우드 크기 확대 */
-  height: 320px !important;
-  margin-top: 12px;
+  width: 240px !important;   /* 워드클라우드 크기 확대 */
+  height: 240px !important;
+}
+
+#panel-opinion img,
+#panel-opinion canvas {
+  margin: 0;
 }
 
 #panel-opinion p {
-  max-width: 360px;
+  max-width: 500px;
   font-size: 13px;
   color: #555;
   line-height: 1.5;
   text-align: center;
+  margin-top: 12px;
 }
+
+/*  클러스터  */
+#treemap { position: relative; }
+
+#cluster-overlay{
+  position: absolute; inset: 0;
+  z-index: 999;
+  display: none;                 /* ← 이 한 줄만 남김 */
+  background: rgba(255,255,255,.75);
+  align-items: center;           /* flex일 때 적용됨 */
+  justify-content: center;
+  pointer-events: auto; cursor: pointer;
+  font-size: 18px; color: #0d1b2a; text-align: center;
+}
+#cluster-overlay .content{
+  background: rgba(255,255,255,.95);
+  border: 1px solid #ddd; border-radius: 8px;
+  padding: 10px 14px; box-shadow: 0 2px 6px rgba(0,0,0,.08);
+  font-weight: 600;
+}   /*     */
