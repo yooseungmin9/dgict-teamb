@@ -211,3 +211,43 @@
   justify-content: space-between;
   margin-bottom: 8px;
 }
+#panel-opinion {
+  grid-column: span 2;         /* 가로 2칸 확장 (right 영역 넓힘) */
+  width: 100%;
+  text-align: center;
+}
+
+#panel-opinion .card__title {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 10px;
+  color: #222;
+}
+
+#panel-opinion .card__body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 12px;
+}
+
+#panel-opinion img {
+  width: 260px;
+  border-radius: 8px;
+  margin-top: 6px;
+  margin-bottom: 10px;
+}
+
+#panel-opinion canvas {
+  width: 320px !important;   /* 워드클라우드 크기 확대 */
+  height: 320px !important;
+  margin-top: 12px;
+}
+
+#panel-opinion p {
+  max-width: 360px;
+  font-size: 13px;
+  color: #555;
+  line-height: 1.5;
+  text-align: center;
+}
