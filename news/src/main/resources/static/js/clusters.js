@@ -1,4 +1,4 @@
-const API = "http://127.0.0.1:8010";
+const API = "http://127.0.0.1:8012";
 
 async function loadSummary() {
   const url = `${API}/api/clusters/summary?top=60&min_size=3`;
