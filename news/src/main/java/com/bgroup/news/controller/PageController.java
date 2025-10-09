@@ -103,4 +103,8 @@ public class PageController {
 
         return "pages/youtube_opinion";
     }
+    @GetMapping("/clusters")
+    public String clustersPage() {
+        return "pages/clusters";
+    }
 }
