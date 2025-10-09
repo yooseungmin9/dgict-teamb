@@ -1,5 +1,5 @@
 (function () {
-  const API = "http://127.0.0.1:8088/count";
+  const API = "http://127.0.0.1:8011/count";
   const panel = document.querySelector("#panel-news-count .card__body");
   if (!panel) return;
 

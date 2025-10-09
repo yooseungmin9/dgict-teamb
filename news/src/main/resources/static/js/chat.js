@@ -1,18 +1,58 @@
-// public/js/chat.js — 음성+텍스트 챗봇 JS (실시간 인식 + 서버 업로드 폴백 + 무음자동전사)
+// public/js/chat.js
+// 전체 교체본 — 음성(STT) 결과는 입력창에만 채우고, 전송은 사용자가 직접 수행
 
-// (1) 서버 엔드포인트
+// ========== 0) 기본 설정 ==========
+const APP_NAME  = "AI 경제 상담봇";
 const CHAT_URL  = "/api/chat";
 const RESET_URL = "/api/reset";
-const STT_URL   = "/api/stt";   // Spring → FastAPI(/stt)
-const TTS_URL   = "/api/tts";   // (미사용: 브라우저 TTS 사용 중, 필요시 전환)
+const STT_URL   = "/api/stt";
+const TTS_URL   = "/api/tts";
 const TIMEOUT_MS = 180000;
 
-// ====== 무음 자동 전사 설정 ======
-const SILENCE_LIMIT_MS   = 5000;   // 무음 지속 시간 임계값 (ms)
-const SILENCE_THRESHOLD  = 0.02;   // 무음 판단 임계값(0~1). 마이크가 약하면 0.01로
-const MONITOR_INTERVAL   = 200;    // 볼륨 체크 주기(ms)
+// i18n
+const I18N = {
+  "ko-KR": {
+    appTitle: APP_NAME,
+    pageHeading: "경제 질문 챗봇",
+    labelLang: "언어",
+    btnReset: "대화 초기화",
+    btnSend: "전송",
+    btnTts: "🔈 답변 듣기",
+    inputPh: "질문을 말하거나 입력하세요...",
+    welcome: `안녕하세요! <b>${APP_NAME}</b>입니다. 무엇을 도와드릴까요?`,
+    statusIdle: "상태: 대기",
+    statusTyping: "입력 중...",
+    sttStart: "🎤️ 실시간 음성 인식을 시작합니다.",
+    sttRec: "녹음 중(서버 업로드)...",
+    sttAuto: "🎤️ 녹음 시작! 말을 멈추면 5초 뒤 자동 입력됩니다.",
+    sttDone: "인식 완료.",
+    cleared: "대화 기록을 초기화했습니다."
+  },
+  "en-US": {
+    appTitle: APP_NAME + " (EN)",
+    pageHeading: "Economy Q&A Chatbot",
+    labelLang: "Language",
+    btnReset: "Reset",
+    btnSend: "Send",
+    btnTts: "🔈 Read answer",
+    inputPh: "Speak or type your question...",
+    welcome: `Hello! This is <b>${APP_NAME}</b>. How can I help you today?`,
+    statusIdle: "Status: idle",
+    statusTyping: "Typing...",
+    sttStart: "🎤️ Live speech recognition started.",
+    sttRec: "Recording (server upload)...",
+    sttAuto: "🎤️ Recording! <b>Auto-transcribe 5s after silence</b>.",
+    sttDone: "Recognition finished.",
+    cleared: "Conversation cleared."
+  }
+};
 
-// (2) DOM 요소
+// ========== 1) DOM ==========
+const titleEl     = document.getElementById("appTitle");
+const headingEl   = document.getElementById("pageHeading");
+const labelLangEl = document.getElementById("labelLang");
+const langSelect  = document.getElementById("langSelect");
+
 const chatEl      = document.getElementById("chat");
 const formEl      = document.getElementById("chatForm");
 const inputEl     = document.getElementById("messageInput");
@@ -21,39 +61,15 @@ const resetBtn    = document.getElementById("resetBtn");
 
 const sttStartBtn = document.getElementById("sttStartBtn");
 const sttStopBtn  = document.getElementById("sttStopBtn");
-const langSelect  = document.getElementById("langSelect");
-const recStatusEl = document.getElementById("recStatus");
-
 const ttsBtn      = document.getElementById("ttsBtn");
-const ttsAudio    = document.getElementById("ttsAudio"); // 현재 미사용(브라우저 TTS)
+const ttsAudio    = document.getElementById("ttsAudio");
 
-// (3) 상태
-let mediaRecorder = null;
-let audioChunks   = [];
-let rec = null;               // Web SpeechRecognition
-let interimBuf = "";          // Web Speech 확정 결과 누적
+let LANG = localStorage.getItem("chat_lang") || (langSelect?.value || "ko-KR");
 
-// 무음 감지용 (폴백 경로에서만 사용)
-let audioCtx = null, micSource = null, analyser = null, monitorTimer = null, silenceMs = 0;
-
-// (4) 유틸
+// ========== 2) 도우미 ==========
 const escapeHtml = (s)=>String(s||"").replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
-const scrollToBottom = ()=>{ chatEl.scrollTop = chatEl.scrollHeight; };
 const mdSafe = (text)=> escapeHtml(text).replace(/^-\s/gm,"• ").replace(/\n/g,"<br>");
-const setRecStatus = (t)=>{ if(recStatusEl) recStatusEl.textContent = t; };
-
-// ========== ★ 여기서부터 '엔터=전송 / 쉬프트+엔터=줄바꿈' 전용 핸들러 (중복 선언 제거) ==========
-inputEl.addEventListener("keydown", function (e) {
-  // IME(한글 입력) 조합 중에는 엔터 입력 무시
-  if (e.isComposing) return;
-
-  if (e.key === "Enter" && !e.shiftKey) {
-    e.preventDefault();        // 기본 줄바꿈 막기
-    formEl.requestSubmit();    // submit 핸들러로 위임
-  }
-  // Shift+Enter는 기본 동작(줄바꿈) 유지
-});
-// ============================================================================================
+const scrollToBottom = ()=>{ chatEl.scrollTop = chatEl.scrollHeight; };
 
 function bubbleUser(text){
   chatEl.insertAdjacentHTML("beforeend",
@@ -62,59 +78,122 @@ function bubbleUser(text){
 }
 function bubbleAI(html){
   chatEl.insertAdjacentHTML("beforeend",
-    `<div class="message bot-message"><div class="message-content">${html}</div></div>`);
+    `<div class="message bot-message"><div class="message-content" data-tts="${escapeHtml(html).replace(/<[^>]+>/g,'')}">${html}</div></div>`);
+  scrollToBottom();
+}
+function bubbleStatus(text){
+  chatEl.insertAdjacentHTML("beforeend",
+    `<div class="message bot-message"><div class="message-content muted">${escapeHtml(text)}</div></div>`);
   scrollToBottom();
 }
 function bubbleTyping(){
   const id = "typing-" + (crypto?.randomUUID?.() || Math.random().toString(36).slice(2));
   chatEl.insertAdjacentHTML("beforeend",
-    `<div id="${id}" class="message bot-message"><div class="message-content">입력 중...</div></div>`);
+    `<div id="${id}" class="message bot-message"><div class="message-content">${escapeHtml(I18N[LANG].statusTyping)}</div></div>`);
   scrollToBottom();
   return id;
 }
 function removeEl(id){ const el=document.getElementById(id); if(el) el.remove(); }
 
-// (5) 채팅 전송
-formEl?.addEventListener("submit", async (e)=>{
-  e.preventDefault();
-  const q = inputEl.value.trim();
-  if(!q) return;
-  bubbleUser(q);
-  inputEl.value="";
+// i18n 적용
+function setLang(next){
+  LANG = (next === "en-US" ? "en-US" : "ko-KR");
+  localStorage.setItem("chat_lang", LANG);
+  if (langSelect && langSelect.value !== LANG) langSelect.value = LANG;
+
+  titleEl && (titleEl.textContent = I18N[LANG].appTitle);
+  headingEl && (headingEl.textContent = I18N[LANG].pageHeading);
+  labelLangEl && (labelLangEl.textContent = I18N[LANG].labelLang);
+  resetBtn && (resetBtn.textContent = I18N[LANG].btnReset);
+  sendBtn  && (sendBtn.textContent  = I18N[LANG].btnSend);
+  ttsBtn   && (ttsBtn.textContent   = I18N[LANG].btnTts);
+  inputEl  && (inputEl.placeholder  = I18N[LANG].inputPh);
+}
+
+// 환영/상태 렌더
+function renderWelcome(){
+  chatEl.innerHTML = "";
+  bubbleAI(I18N[LANG].welcome);
+  bubbleStatus(I18N[LANG].statusIdle);
+}
+
+// ========== 3) FAQ 즉시 전송 ==========
+function sendQuestion(q){
+  const text = (q || "").trim();
+  if(!text) return;
+  bubbleUser(text);
+  inputEl.value = "";
   sendBtn.disabled = true;
   const typingId = bubbleTyping();
 
-  try{
-    const ctrl = new AbortController();
-    const to = setTimeout(()=>ctrl.abort("timeout"), TIMEOUT_MS);
+  (async ()=>{
+    try{
+      const ctrl = new AbortController();
+      const to = setTimeout(()=>ctrl.abort("timeout"), TIMEOUT_MS);
 
-    const res = await fetch(CHAT_URL, {
-      method:"POST",
-      headers: {"Content-Type":"application/json"},
-      body: JSON.stringify({ message: q }),
-      signal: ctrl.signal
+      const res = await fetch(CHAT_URL, {
+        method:"POST",
+        headers: {"Content-Type":"application/json"},
+        body: JSON.stringify({ message: text, lang: LANG }),
+        signal: ctrl.signal
+      });
+      clearTimeout(to);
+
+      if(!res.ok){ removeEl(typingId); return bubbleAI(`서버 오류(${res.status})`); }
+      const data = await res.json();
+      removeEl(typingId);
+      bubbleAI(mdSafe(data.answer || "응답이 비었습니다."));
+    }catch(err){
+      removeEl(typingId);
+      bubbleAI("요청 실패: " + (err?.message || err));
+    }finally{
+      sendBtn.disabled = false;
+    }
+  })();
+}
+
+function bindFAQ(){
+  document.querySelectorAll(".faq-item").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      const q = btn.getAttribute("data-question") || btn.textContent || "";
+      sendQuestion(q);
     });
-    clearTimeout(to);
+  });
+}
 
-    if(!res.ok){ removeEl(typingId); return bubbleAI(`서버 오류(${res.status})`); }
-    const data = await res.json();
-    removeEl(typingId);
-    bubbleAI(mdSafe(data.answer || "응답이 비었습니다."));
-  }catch(err){
-    removeEl(typingId);
-    bubbleAI("요청 실패: " + (err?.message || err));
-  }finally{
-    sendBtn.disabled = false;
+// ========== 4) 초기화 ==========
+setLang(LANG);
+renderWelcome();
+bindFAQ();
+
+// ========== 5) 이벤트 ==========
+langSelect?.addEventListener("change", ()=>{
+  setLang(langSelect.value);
+  renderWelcome();
+});
+
+inputEl.addEventListener("keydown", function (e) {
+  if (e.isComposing) return;
+  if (e.key === "Enter" && !e.shiftKey) {
+    e.preventDefault();
+    formEl.requestSubmit();
   }
 });
 
-// (6) 초기화
+formEl?.addEventListener("submit", (e)=>{
+  e.preventDefault();
+  const q = inputEl.value.trim();
+  if(!q) return;
+  sendQuestion(q);
+});
+
 resetBtn?.addEventListener("click", async ()=>{
   resetBtn.disabled = true;
   try{
-    const res = await fetch(RESET_URL, { method:"POST" });
-    if(res.ok) bubbleAI("대화 기록을 초기화했습니다.");
-    else bubbleAI("초기화 실패.");
+    await fetch(RESET_URL, { method:"POST" });
+    localStorage.removeItem("chat_messages");
+    renderWelcome();
+    bubbleStatus(I18N[LANG].cleared);
   }catch{
     bubbleAI("초기화 요청 실패.");
   }finally{
@@ -122,227 +201,167 @@ resetBtn?.addEventListener("click", async ()=>{
   }
 });
 
-// (7) FAQ 버튼 자동 입력
-document.querySelectorAll(".faq-item")?.forEach(btn=>{
-  btn.addEventListener("click", ()=>{
-    inputEl.value = btn.dataset.question || btn.textContent.trim();
-    formEl.requestSubmit();
-  });
-});
+// ========== 6) STT: 마이크 실시간 받아적기(입력창에만 채움, 전송은 수동) ==========
+let recognition = null;
+let recogRunning = false;
+let baseBeforeRec = "";         // 시작 시 입력창에 있던 텍스트
+let finalSoFar = "";            // 엔진이 확정한 문장 누적
 
-// ======== Web Speech API (실시간 인식) — HTTPS/localhost, Chrome/Edge 권장 ========
-const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-
-// ======== 무음 감지(폴백 경로) ========
-function startSilenceMonitor(stream){
-  stopSilenceMonitor(); // 중복 방지
-  audioCtx   = new (window.AudioContext || window.webkitAudioContext)();
-  micSource  = audioCtx.createMediaStreamSource(stream);
-  analyser   = audioCtx.createAnalyser();
-  analyser.fftSize = 2048;
-  micSource.connect(analyser);
-
-  const buf = new Uint8Array(analyser.fftSize);
-  silenceMs = 0;
-
-  monitorTimer = setInterval(()=>{
-    analyser.getByteTimeDomainData(buf);
-    let sum = 0;
-    for (let i=0;i<buf.length;i++){
-      const v = (buf[i]-128)/128; // -1..1
-      sum += Math.abs(v);
-    }
-    const avg = sum / buf.length; // 0..1
-    if (avg < SILENCE_THRESHOLD){
-      silenceMs += MONITOR_INTERVAL;
-      setRecStatus(`무음 감지… ${Math.max(0, Math.ceil((SILENCE_LIMIT_MS - silenceMs)/1000))}초 후 전사`);
-      if (silenceMs >= SILENCE_LIMIT_MS) {
-        stopAndUpload(); // 자동 정지+업로드
-      }
-    } else {
-      silenceMs = 0;
-      setRecStatus("녹음 중…");
-    }
-  }, MONITOR_INTERVAL);
-}
-function stopSilenceMonitor(){
-  if (monitorTimer){ clearInterval(monitorTimer); monitorTimer = null; }
-  try { if (audioCtx && audioCtx.state !== "closed") audioCtx.close(); } catch {}
-  analyser=null; micSource=null; audioCtx=null;
+function isSpeechAPIAvailable(){
+  return !!(window.SpeechRecognition || window.webkitSpeechRecognition);
 }
 
-// ======== 폴백 경로: 정지 후 업로드 ========
-async function stopAndUpload(){
-  // Web Speech 중이면 여기 안 오지만 안전 가드
-  if (rec && typeof rec.stop === "function") {
-    try { rec.stop(); } catch {}
-  }
-  if (!mediaRecorder || mediaRecorder.state === "inactive") return;
-
-  sttStopBtn.disabled = true;
-  setRecStatus("전송 중…");
-  stopSilenceMonitor();
-
-  mediaRecorder.stop();
-  mediaRecorder.onstop = async ()=>{
-    try{
-      const mime = mediaRecorder.mimeType || "audio/webm";
-      const ext  = mime.includes("ogg") ? "ogg" : mime.includes("mp4") ? "mp4" : "webm";
-      const blob = new Blob(audioChunks, { type: mime });
-
-      // 마이크 트랙 해제
-      mediaRecorder.stream?.getTracks()?.forEach(t=>t.stop());
-
-      const fd = new FormData();
-      fd.append("audio_file", blob, `speech.${ext}`);
-
-      const lang = (langSelect?.value || "ko-KR");
-      const res = await fetch(`${STT_URL}?lang=${encodeURIComponent(lang)}`, { method:"POST", body: fd });
-      const data = await res.json();
-
-      if (data?.text){
-        inputEl.value = data.text;
-        bubbleAI("📝 인식(자동 전사): " + escapeHtml(data.text));
-      } else {
-        bubbleAI("STT 오류: " + escapeHtml(data?.error || "응답 없음"));
-      }
-    }catch(err){
-      bubbleAI("STT 전송 실패: " + (err?.message || err));
-    }finally{
-      sttStartBtn.disabled = false;
-      sttStopBtn.disabled  = true;
-      mediaRecorder = null;
-      audioChunks = [];
-      setRecStatus("대기");
-    }
-  };
+function makeRecognition(){
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const r = new SR();
+  r.lang = LANG;                // ko-KR / en-US 등
+  r.interimResults = true;      // 중간(회색) 결과도 계속 옴
+  r.continuous = true;          // 멈출 때까지 계속 듣기
+  return r;
 }
 
-// (8) 녹음 시작 — 브라우저 실시간 인식 우선, 불가 시 서버 업로드 폴백(+무음자동전사)
-sttStartBtn?.addEventListener("click", async ()=>{
-  try{
-    await navigator.mediaDevices.getUserMedia({ audio:true }); // 권한 확인
+async function startSTT(){
+  if (recogRunning) return;
 
-    // 8-1) 브라우저 실시간 인식 경로
-    if (SpeechRecognition){
-      rec = new SpeechRecognition();
-      rec.continuous = true;
-      rec.interimResults = true;
-      rec.lang = (langSelect?.value || "ko-KR");
-
-      interimBuf = "";
-      rec.onresult = (e)=>{
-        let tmp = "";
-        for (let i=e.resultIndex; i<e.results.length; i++){
-          const seg = e.results[i][0].transcript;
-          if (e.results[i].isFinal) interimBuf += seg;
-          else tmp += seg;
-        }
-        inputEl.value = (interimBuf + " " + tmp).trim(); // ★ 실시간 채움
-      };
-      rec.onerror = (e)=> bubbleAI("브라우저 인식 오류: " + (e.error || e.message || e));
-      rec.onend = ()=>{
-        sttStartBtn.disabled = false;
-        sttStopBtn.disabled  = true;
-        setRecStatus("대기");
-      };
-      rec.start();
-
-      sttStartBtn.disabled = true;
-      sttStopBtn.disabled  = false;
-      setRecStatus("듣는 중…");
-      bubbleAI("🎤️ 실시간 음성 인식을 시작합니다.");
-      return; // 실시간 사용 시 여기서 종료
-    }
-
-    // 8-2) 폴백: 서버 업로드 (MediaRecorder) + 무음 자동 전사
-    const stream = await navigator.mediaDevices.getUserMedia({ audio:true });
-
-    let mime = "";
-    if (MediaRecorder.isTypeSupported("audio/webm")) mime = "audio/webm";
-    else if (MediaRecorder.isTypeSupported("audio/ogg")) mime = "audio/ogg";
-    else if (MediaRecorder.isTypeSupported("audio/mp4")) mime = "audio/mp4";
-
-    mediaRecorder = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
-    audioChunks = [];
-    mediaRecorder.ondataavailable = e => { if (e.data && e.data.size>0) audioChunks.push(e.data); };
-    mediaRecorder.onerror = e => bubbleAI("녹음 에러: " + (e?.error?.message || e.message || e));
-    mediaRecorder.start(300); // chunk 주기 수집
-
-    // 무음 모니터 시작
-    startSilenceMonitor(stream);
-
-    sttStartBtn.disabled = true;
-    sttStopBtn.disabled  = false;
-    setRecStatus("녹음 중(서버 업로드)...");
-    bubbleAI("🎤️ 녹음 시작! **말을 멈추면 5초 뒤 자동 전사**합니다.");
-  }catch(err){
-    bubbleAI("마이크 접근 실패: " + (err?.message || err));
-  }
-});
-
-// (9) 녹음 정지 — 실시간은 stop, 폴백은 stopAndUpload
-sttStopBtn?.addEventListener("click", async ()=>{
-  // 실시간 인식 사용 중이면 중지
-  if (rec && typeof rec.stop === "function") {
-    try { rec.stop(); } catch {}
-    sttStartBtn.disabled = false;
-    sttStopBtn.disabled  = true;
-    setRecStatus("대기");
-    bubbleAI("📝 인식 완료.");
-    rec = null;
+  if (!isSpeechAPIAvailable()) {
+    bubbleAI(LANG.startsWith('ko')
+      ? '이 브라우저는 실시간 음성인식(Web Speech API)을 지원하지 않습니다. 크롬(HTTPS/localhost)에서 시도해 주세요.'
+      : 'This browser does not support the Web Speech API. Try Chrome (HTTPS/localhost).');
     return;
   }
-  // 폴백 업로드
-  await stopAndUpload();
-});
+  if (!window.isSecureContext) {
+    bubbleAI(LANG.startsWith('ko')
+      ? '마이크는 HTTPS(또는 localhost)에서만 동작합니다.'
+      : 'Microphone requires HTTPS (or localhost).');
+    return;
+  }
 
-// 서버 TTS(mp3) 가져와서 <audio>로 재생하도록 교체
+  // 준비
+  recognition = makeRecognition();
+  baseBeforeRec = inputEl.value;  // 시작 전에 입력창 내용 보존
+  finalSoFar = "";
+
+  recognition.onstart = ()=>{
+    recogRunning = true;
+    sttStartBtn.disabled = true;
+    sttStopBtn.disabled  = false;
+    bubbleStatus(I18N[LANG].sttStart);
+  };
+
+  recognition.onresult = (e)=>{
+    // resultIndex부터 최신까지 스캔하여 확정/임시 분리
+    let interim = "";
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      const res = e.results[i];
+      if (res.isFinal) {
+        finalSoFar += res[0].transcript;
+      } else {
+        interim += res[0].transcript;
+      }
+    }
+    // 입력창에 실시간 반영: (기존내용) + (확정누적) + (임시)
+    const composed = (baseBeforeRec ? baseBeforeRec + " " : "") + (finalSoFar + interim).trim();
+    inputEl.value = composed;
+    // 커서를 맨 뒤로
+    try { inputEl.setSelectionRange(inputEl.value.length, inputEl.value.length); } catch {}
+  };
+
+  recognition.onerror = (e)=>{
+    bubbleAI('음성 인식 오류: ' + (e.error || 'unknown'));
+  };
+
+  recognition.onend = ()=>{
+    // 끝났을 때(사용자가 stop 누르거나 침묵 등)
+    recogRunning = false;
+    sttStartBtn.disabled = false;
+    sttStopBtn.disabled  = true;
+    bubbleStatus(I18N[LANG].sttDone);
+    recognition = null;
+  };
+
+  // 시작
+  try {
+    recognition.start();
+  } catch (err) {
+    recogRunning = false;
+    sttStartBtn.disabled = false;
+    sttStopBtn.disabled  = true;
+    bubbleAI('음성 인식 시작 실패: ' + (err?.message || err));
+  }
+}
+
+function stopSTT(){
+  try {
+    if (recognition && recogRunning) {
+      recognition.stop(); // onend에서 버튼/상태 정리
+    }
+  } catch (e) {
+    bubbleAI('STT 정지 오류: ' + (e?.message || e));
+  }
+}
+
+sttStartBtn?.addEventListener('click', startSTT);
+sttStopBtn?.addEventListener('click', stopSTT);
+
+// ========== 7) TTS: 버튼/말풍선 ==========
 ttsBtn?.addEventListener("click", async ()=>{
-  const lastBot = chatEl.querySelector(".bot-message:last-child .message-content");
-  if(!lastBot) return alert("읽을 답변이 없습니다.");
-  const text = (lastBot.innerText || lastBot.textContent || "").trim();
-  if(!text) return alert("읽을 답변이 없습니다.");
-
-  // 선택된 언어 가져오기 (없으면 ko-KR)
-  const langSel = document.getElementById("langSelect");
-  const lang = (langSel?.value || "ko-KR");
-
+  const last = [...document.querySelectorAll(".bot-message .message-content")].pop();
+  if (!last) return;
+  const text = last.getAttribute("data-tts") || last.innerText || "";
+  if (!text.trim()) return;
   try{
-    const q = new URLSearchParams({
-      text: text.slice(0, 2000),
-      lang,                      // ko-KR / en-US ...
-      voice: "ko-KR-Standard-B",  // 남성
-      fmt: "MP3",
-      rate: "1.0",
-      pitch: "0.0"
-    }).toString();
-
-    const res = await fetch(`/api/tts?${q}`);
-    const ct = (res.headers.get("content-type") || "").toLowerCase();
-
+    const res = await fetch(TTS_URL, {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({
+        text: text.slice(0,2000), lang: LANG,
+        voice: LANG.startsWith("ko") ? "ko-KR-Neural2-B" : "en-US-Neural2-C",
+        fmt: "MP3", rate: 1.0, pitch: 0.0
+      })
+    });
+    const ct = (res.headers.get("content-type")||"").toLowerCase();
     if(res.ok && ct.includes("audio")){
       const blob = await res.blob();
-      const url  = URL.createObjectURL(blob);
-      const audioEl = document.getElementById("ttsAudio");
-      if (audioEl) {
-        audioEl.src = url;
-        await audioEl.play();
-      } else {
-        new Audio(url).play();
-      }
-    }else{
+      const url = URL.createObjectURL(blob);
+      if (ttsAudio){ ttsAudio.src = url; await ttsAudio.play(); }
+      else { new Audio(url).play(); }
+    } else {
       const txt = await res.text().catch(()=> "");
       bubbleAI("TTS 오류: " + (txt || `HTTP ${res.status}`));
     }
-  }catch(err){
+  }catch(err){ bubbleAI("TTS 호출 실패: " + (err?.message || err)); }
+});
+
+chatEl.addEventListener("click", async (e)=>{
+  const msg = e.target.closest(".bot-message .message-content");
+  if (!msg) return;
+  const text = msg.getAttribute("data-tts") || msg.innerText || msg.textContent || "";
+  if (!text.trim()) return;
+
+  try {
+    const res = await fetch(TTS_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        text: text.slice(0, 2000),
+        lang: LANG,
+        voice: LANG.startsWith("ko") ? "ko-KR-Neural2-B" : "en-US-Neural2-C",
+        fmt: "MP3",
+        rate: 1.0,
+        pitch: 0.0
+      })
+    });
+    const ct = (res.headers.get("content-type") || "").toLowerCase();
+    if(res.ok && ct.includes("audio")){
+      const blob = await res.blob();
+      const url  = URL.createObjectURL(blob);
+      if (ttsAudio) { ttsAudio.src = url; await ttsAudio.play(); }
+      else { new Audio(url).play(); }
+    } else {
+      const txt = await res.text().catch(()=> "");
+      bubbleAI("TTS 오류: " + (txt || `HTTP ${res.status}`));
+    }
+  } catch (err) {
     bubbleAI("TTS 호출 실패: " + (err?.message || err));
   }
 });
-
-/*
-[간단 테스트]
-1) 입력창에 문장 입력 → Enter → 전송(줄바꿈 없음)
-2) 입력창에 문장 입력 → Shift+Enter → 줄바꿈 됨
-3) 브라우저 콘솔에서 에러(Identifier 'inputEl' has already been declared)가 없어야 정상
-*/

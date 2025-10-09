@@ -1,203 +1,192 @@
 <!DOCTYPE html>
 <html lang="ko" xmlns:th="http://www.thymeleaf.org">
 <head>
-  <meta charset="utf-8"/>
-  <title>써머릭스 SUMMARIX</title>
-  <link rel="stylesheet" href="/css/style.css"/>
-  <link rel="stylesheet" href="/css/dashboard-grid.css"/>
+    <meta charset="utf-8"/>
+    <title>써머릭스 SUMMARIX</title>
+    <link rel="stylesheet" href="/css/style.css"/>
+    <link rel="stylesheet" href="/css/dashboard-grid.css"/>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script defer src="/js/app.js"></script>
+
+    <!-- 반드시 opinion-widget.js보다 먼저 -->
+    <script src="/js/wordcloud2.js"></script>
+    <script defer src="/js/opinion-widget.js"></script>
+
+    <!-- 나머지는 그대로 -->
     <script defer src="/js/sentiment.js"></script>
     <script defer src="/js/trands.js"></script>
-    <script defer src="/js/count.js"></script>
+    <script defer src="/js/app.js"></script>
+    <script defer src="/js/ticker.js"></script>
     <script defer src="/js/emoa.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
-    <script defer src="/js/clusters.js"></script>
+    <script defer src="/js/hot-topic.js"></script>
+    <script defer src="/js/count.js"></script>
 
+
+    <!-- trands.js가 전역에서 읽어갈 API 경로(없으면 상대경로 기본값 사용) -->
+    <script>
+        window.API_ENDPOINTS = {
+            sentimentLine: "/dashboard/sentiment/line",
+            keywordRanking: "/dashboard/keywords/ranking",
+            categoryTrend:  "/dashboard/trend/categories",
+            emoaScore:      "/emoa/score"
+        };
+    </script>
 </head>
-<body data-page="dashboard">
-<!-- 헤더는 프래그먼트 호출만 -->
+
+<body data-page="dashboard" data-emoa-api="/api/dashboard/emoa/score">
 <div th:replace="fragments/header :: siteHeader"></div>
 
 <main class="dash">
-  <div class="container">
-    <!-- 헤드라인 영역 -->
-    <div class="dash__headline">
-      <h2>~ 글로벌 뉴스 속보 모니터링 ~</h2>
-    </div>
-    <div>
-      <button class="report-btn" type="button" id="aiReportBtn">AI 리포트 생성</button>
-    </div>
+    <div class="container">
+        <!-- 상단 속보 바 -->
+        <div class="dash__headline">
+            <section id="news-ticker" class="ticker-wrap"
+                     data-api-base="http://127.0.0.1:8010"
+                     data-q="미국 경제"
+                     data-n="5"
+                     data-sort="date">
+                <div class="ticker-content" id="track-a" aria-label="뉴스 트랙 A"></div>
+                <div class="ticker-content" id="track-b" aria-label="뉴스 트랙 B"></div>
+            </section>
+        </div>
 
-    <!-- 3열 그리드 -->
-    <section class="dash__grid">
-      <!-- 좌열 -->
-      <!-- dashboard.html : #panel-sentiment-series 블록만 교체 -->
-      <div class="stack">
-        <div class="card" id="panel-sentiment-series">
-          <!-- [설명] 기존 제목/placeholder 제거, 제공 카드 삽입 -->
-          <article class="metric-card">
-              <div class="feature-card" id="sentiment-card" data-api="/api/sentiment/line">
-              <div class="card__header">
-                <strong>긍·부정추이</strong>
-                <div style="display:flex; gap:8px; align-items:center; margin-left:auto;">
-                  <button id="btn-mode-count" class="btn btn--sm">건수</button>
-                  <button id="btn-mode-ratio" class="btn btn--sm">비율</button>
-                  <button id="btn-g-day"   class="btn btn--sm">일별</button>
-                  <button id="btn-g-week"  class="btn btn--sm">주별</button>
-                  <button id="btn-g-month" class="btn btn--sm">월별</button>
+        <div>
+            <button class="report-btn" type="button" id="aiReportBtn">AI 리포트 생성</button>
+        </div>
+
+        <!-- 3열 대시보드 -->
+        <section class="dash__grid">
+            <!-- 좌열 -->
+            <div class="stack" id="col-left">
+                <div class="card" id="panel-sentiment-series">
+                    <article class="card__body">
+                        <div class="feature-card" id="sentiment-card"
+                             data-api="http://localhost:8007/sentiment/line">
+                            <strong class="strong">긍·부정추이</strong>
+                            <div class="controls" style="display:flex; gap:8px; align-items:center; margin-left:auto;">
+                                <button id="btn-mode-count" class="btn btn--sm">건수</button>
+                                <button id="btn-mode-ratio" class="btn btn--sm">비율</button>
+                                <button id="btn-g-day"   class="btn btn--sm">일별</button>
+                                <button id="btn-g-week"  class="btn btn--sm">주별</button>
+                                <button id="btn-g-month" class="btn btn--sm">월별</button>
+                            </div>
+                            <div id="sentiment-status" style="font-size:12px;color:#666;margin:4px 0;">준비됨</div>
+                            <div style="height:400px;">
+                                <canvas id="sentiment-chart"></canvas>
+                            </div>
+                        </div>
+                    </article>
                 </div>
-              </div>
-              <div class="card__body">
-                <div id="sentiment-status" style="font-size:12px;color:#666;margin:4px 0;">준비됨</div>
-                <div style="height:280px;">
-                  <canvas id="sentiment-chart"><!-- Chart.js가 이 캔버스에 그립니다 --></canvas>
-                </div>
-              </div>
             </div>
-          </article>
-        </div>
 
-          <div class="card" id="panel-hot-datalab">
+            <!-- 중앙열 -->
+            <div class="stack" id="col-center">
+                <div class="card" id="panel-hot-topic-yesterday">
+                    <div class="card__title">키워드 핫토픽 (어제 대비)</div>
+                    <!-- ✅ placeholder 클래스 제거, hot-topic.js가 채움 -->
+                    <div class="card__body" id="hot-topic-body">
+                        <p style="text-align:center; color:#999;">로딩 중...</p>
+                    </div>
+                </div>
 
-              <div class="card__body">
-                  <strong>키워드 핫토픽 그래프 (데이터랩)</strong>
-                  <div class="controls" style="margin-bottom:8px;">
-                      <label class="muted">표시 기간(일)
-                          <select id="DB_trendDays">
-                              <option value="30" selected>30</option>
-                              <option value="60">60</option>
-                              <option value="90">90</option>
-                          </select>
-                      </label>
-                  </div>
-                  <div class="chart-container">
-                      <canvas id="DB_categoryTrendChart"></canvas>
-                  </div>
-              </div>
-          </div>
-      </div>
+                <div class="card" id="panel-news-count">
+                    <div class="card__title">분석된 뉴스 개수</div>
+                    <div class="card__body placeholder">카운트</div>
+                </div>
 
+                <div class="card" id="panel-today-sentiment">
+                    <div class="card__title">오늘의 감성 요약</div>
+                    <div class="card__body" id="emoa-summary">
+                        <p>데이터 수집 중...</p>
+                    </div>
+                </div>
 
+                <div class="card" id="panel-tbd">
+                    <div class="card__title">미정</div>
+                    <div class="card__body placeholder">추후 위젯</div>
+                </div>
+            </div>
 
+            <!-- 우열 -->
+            <div class="stack" id="col-right">
+                <div class="card" id="panel-keyword-rank">
+                    <div class="card__body">
+                        <strong class="strong">키워드 랭킹</strong>
+                        <div class="controls" style="margin-bottom:6px;">
+                            <label><input type="radio" name="DB_kwMode" value="category" checked /> 카테고리별</label>
+                            <label><input type="radio" name="DB_kwMode" value="global" /> 통합</label>
+                            <label class="muted">기간(일)
+                                <select id="DB_kwDays">
+                                    <option value="30" selected>30</option>
+                                    <option value="60">60</option>
+                                    <option value="90">90</option>
+                                </select>
+                            </label>
+                        </div>
+                        <div id="DB_kwTabs" style="margin:6px 0; display:flex; gap:6px; flex-wrap:wrap;"></div>
+                        <table id="DB_kwTable" class="ranking-table">
+                            <thead>
+                            <tr>
+                                <th style="width:64px;">순위</th>
+                                <th>키워드</th>
+                                <th class="right" style="width:100px;">언급량</th>
+                            </tr>
+                            </thead>
+                            <tbody id="DB_keywordRankingBody"></tbody>
+                        </table>
+                    </div>
+                </div>
 
+                <div class="row-2">
+                    <div class="card" id="panel-opinion">
+                        <div class="card__title">오피니언 마이닝 요약</div>
+                        <div class="card__body" id="opinion-body">
+                            <p style="text-align:center;color:#999;">로딩 중...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
-
-
-      <!-- 중앙열 -->
-      <div class="stack">
-        <div class="card" id="panel-hot-topic-yesterday">
-          <div class="card__title">키워드 핫토픽 (어제 대비)</div>
-          <div class="card__body placeholder">핫토픽 리스트/차트</div>
-        </div>
-
-        <div class="card" id="panel-news-count">
-          <div class="card__title">분석된 뉴스 개수</div>
-          <div class="card__body placeholder">카운트</div>
-        </div>
-
-          <div class="card" id="panel-today-sentiment">
-              <div class="card__title">오늘의 감성 점수</div>
-              <div class="card__body" data-ssr="1">
-                  <p>-</p>
-                  <p>평균 감성점수: -</p>
-                  <p>전일 대비: -</p>
-              </div>
-          </div>
-
-          <div class="card" id="panel-clusters">
-              <div class="card__title">유사 기사 클러스터</div>
-              <div class="card__body">
-                  <div id="treemap" style="width:100%;height:520px;position:relative;">
-                      <div id="cluster-overlay"></div>
-                  </div>
-                  <ol id="toplist" class="top10"></ol>
-              </div>
-          </div>
-
-          <!-- 우열 -->
-      <div class="stack">
-          <div class="card" id="panel-keyword-rank">
-              <div class="card__title">키워드 랭킹</div>
-              <div class="card__body">
-                  <!-- ▼ trends.html의 .ranking-section 본문 이식 (제목 h3 제거) -->
-                  <div class="controls" style="margin-bottom:6px;">
-                      <!-- 보기 모드 -->
-                      <label><input type="radio" name="DB_kwMode" value="category" checked /> 카테고리별</label>
-                      <label><input type="radio" name="DB_kwMode" value="global" /> 통합</label>
-
-                      <!-- 카테고리 선택 -->
-                      <select id="DB_kwCategorySelect" style="min-width:140px; display:none;"></select>
-
-                      <!-- TopN -->
-                      <label class="muted">Top
-                          <select id="DB_kwTopN">
-                              <option value="10" selected>10</option>
-                              <option value="20">20</option>
-                              <option value="30">30</option>
-                          </select>
-                      </label>
-                      <!-- 기간(일) -->
-                      <label class="muted">기간(일)
-                          <select id="DB_kwDays">
-                              <option value="30" selected>30</option>
-                              <option value="60">60</option>
-                              <option value="90">90</option>
-                          </select>
-                      </label>
-                  </div>
-
-                  <!-- 탭 버튼 -->
-                  <div id="DB_kwTabs" style="margin:6px 0; display:flex; gap:6px; flex-wrap:wrap;"></div>
-
-                  <table id="DB_kwTable" class="ranking-table">
-                      <thead>
-                      <tr>
-                          <th style="width:64px;">순위</th>
-                          <th>키워드</th>
-                          <th id="DB_kwHeaderCategory" class="col-category" style="width:140px;">카테고리</th>
-                          <th class="right" style="width:100px;">언급량</th>
-                      </tr>
-                      </thead>
-                      <tbody id="DB_keywordRankingBody"></tbody>
-                  </table>
-              </div>
-          </div>
-
-        <div class="row-2">
-          <div class="card" id="panel-opinion">
-            <div class="card__title">오피니언 마이닝 요약</div>
-            <div class="card__body placeholder">요약 텍스트</div>
-          </div>
-        </div>
-    </section>
-
-    <!-- 하단 대형 푸터영역 -->
-    <section class="dash__footer">
-      <div class="card card--footer">
-        <div class="card__body placeholder">푸터 등등</div>
-      </div>
-    </section>
-  </div>
+            <!-- 하단 트렌드 -->
+            <div class="card" id="panel-hot-datalab">
+                <div class="card__body">
+                    <strong class="strong">키워드 핫토픽 그래프 (데이터랩)</strong>
+                    <div class="controls" style="margin-bottom:8px;">
+                        <label class="muted">표시 기간(일)
+                            <select id="DB_trendDays">
+                                <option value="30" selected>30</option>
+                                <option value="60">60</option>
+                                <option value="90">90</option>
+                            </select>
+                        </label>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="DB_categoryTrendChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </div>
 </main>
-</body>
+
+<div th:replace="fragments/footer :: siteFooter"></div>
 
 <script th:inline="javascript">
-  (function () {
-    function go(el) {
-      var url = el.dataset.url;
-      if (url) window.location.href = url;
-    }
-    function onClick(e) { go(e.currentTarget); }
-    function onKey(e) {
-      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(e.currentTarget); }
-    }
-    var links = document.querySelectorAll('[data-url]');
-    links.forEach(function (el) {
-      el.addEventListener('click', onClick);
-      el.addEventListener('keydown', onKey);
-      el.style.cursor = 'pointer';
-    });
-  })();
+    (function () {
+        function go(el) {
+            var url = el.dataset.url;
+            if (url) window.location.href = url;
+        }
+        function onClick(e) { go(e.currentTarget); }
+        function onKey(e) {
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(e.currentTarget); }
+        }
+        var links = document.querySelectorAll('[data-url]');
+        links.forEach(function (el) {
+            el.addEventListener('click', onClick);
+            el.addEventListener('keydown', onKey);
+            el.style.cursor = 'pointer';
+        });
+    })();
 </script>
+</body>
 </html>

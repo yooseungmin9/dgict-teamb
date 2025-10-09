@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>회원 목록</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { border: 1px solid #ccc; padding: 8px; text-align: center; }
+    th { background-color: #f4f4f4; }
+    h1 { margin-bottom: 20px; }
+    .actions { margin-top: 20px; }
+    .actions a, .actions button {
+      margin-right: 10px;
+      padding: 6px 12px;
+      background: #007bff;
+      color: white;
+      border: none;
+      text-decoration: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .actions a:hover, .actions button:hover { background: #0056b3; }
+
+    /* 페이징 스타일 */
+    .pagination {
+      margin-top: 25px;
+      text-align: center;
+    }
+    .pagination a {
+      display: inline-block;
+      margin: 0 4px;
+      padding: 6px 10px;
+      border: 1px solid #007bff;
+      border-radius: 4px;
+      text-decoration: none;
+      color: #007bff;
+    }
+    .pagination a.active {
+      background-color: #007bff;
+      color: white;
+      pointer-events: none;
+    }
+    .pagination a:hover:not(.active) {
+      background-color: #0056b3;
+      color: white;
+    }
+  </style>
+</head>
+<body>
+
+<h1>회원 목록</h1>
+
+<table>
+  <thead>
+  <tr>
+    <th>ID</th>
+    <th>이름</th>
+    <th>출생년도</th>
+    <th>전화번호</th>
+    <th>지역</th>
+    <th>성별</th>
+    <th>거시경제</th>
+    <th>국제경제</th>
+    <th>정책/제도</th>
+    <th>산업/기업</th>
+    <th>금융/투자</th>
+    <th>기타</th>
+  </tr>
+  </thead>
+  <tbody>
+  <tr th:if="${#lists.isEmpty(members)}">
+    <td colspan="12">등록된 회원이 없습니다.</td>
+  </tr>
+
+  <tr th:each="m : ${members}">
+    <td th:text="${m.id}">user001</td>
+    <td th:text="${m.name}">홍길동</td>
+    <td th:text="${m.birthYear}">1992</td>
+    <td th:text="${m.phone}">010-1234-5678</td>
+    <td th:text="${m.region}">경남</td>
+    <td th:text="${m.gender}">남</td>
+    <td th:text="${m.interests != null ? m.interests.goshi : 0}">0</td>
+    <td th:text="${m.interests != null ? m.interests.gukje : 0}">0</td>
+    <td th:text="${m.interests != null ? m.interests.jeongchaek : 0}">0</td>
+    <td th:text="${m.interests != null ? m.interests.saneob : 0}">0</td>
+    <td th:text="${m.interests != null ? m.interests.geumyung : 0}">0</td>
+    <td th:text="${m.interests != null ? m.interests.etc : 0}">0</td>
+  </tr>
+  </tbody>
+</table>
+
+<!-- ✅ 페이징 블록 계산 (5개 단위) -->
+<div th:with="
+        blockSize=5,
+        currentBlock=${currentPage / blockSize},
+        startPage=${(currentBlock * blockSize)},
+        endPage=${(startPage + blockSize - 1) >= totalPages ? totalPages - 1 : (startPage + blockSize - 1)}"
+     class="pagination"
+     th:if="${totalPages > 1}">
+
+  <!-- 이전 블록 -->
+  <a th:if="${startPage > 0}"
+     th:href="@{'/member/list'(page=${startPage - 1}, size=20)}">&laquo; 이전</a>
+
+  <!-- 페이지 번호 5개 -->
+  <a th:each="i : ${#numbers.sequence(startPage, endPage)}"
+     th:href="@{'/member/list'(page=${i}, size=20)}"
+     th:text="${i + 1}"
+     th:classappend="${i == currentPage} ? 'active'"></a>
+
+  <!-- 다음 블록 -->
+  <a th:if="${endPage + 1 < totalPages}"
+     th:href="@{'/member/list'(page=${endPage + 1}, size=20)}">다음 &raquo;</a>
+</div>
+
+<div class="actions">
+  <a th:href="@{/member/signup}">회원가입</a>
+  <button type="button" th:onclick="|location.href='@{/dashboard}'|">메인화면</button>
+  <form th:action="@{/auth/logout}" method="post" style="display:inline;">
+    <button type="submit">로그아웃</button>
+  </form>
+</div>
+
+</body>
+</html>

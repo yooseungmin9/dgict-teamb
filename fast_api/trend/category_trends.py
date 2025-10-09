@@ -64,6 +64,19 @@ def category_trends(days: int = 30, time_unit: str = "date"):
 
     return {"source": "naver", "dates": labels, "categories": categories}
 
+@app.get("/sentiment/line")
+def sentiment_line():
+    data = [
+        {"date":"2025-10-01","positive":50,"neutral":30,"negative":20},
+        {"date":"2025-10-02","positive":48,"neutral":31,"negative":21}
+    ]
+    return {"labels": [d["date"] for d in data],
+            "series": {
+                "positive": [d["positive"] for d in data],
+                "neutral": [d["neutral"] for d in data],
+                "negative": [d["negative"] for d in data]
+            }}
+
 @app.get("/health")
 def health():
     return {"ok": True, "service": "trends"}

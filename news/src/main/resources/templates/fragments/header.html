@@ -1,76 +1,58 @@
-<header class="header" th:fragment="siteHeader" xmlns:th="http://www.w3.org/1999/xhtml">
-  <!-- [1] 상단 바: 로고 · 타이틀 · 서브타이틀 -->
-  <div class="container header__top">
-    <!-- 좌: 원형 로고 (이미지 없는 상태의 더미) -->
-    <a class="logo" data-url="/pages/" aria-label="대시보드로 이동">
-      <svg viewBox="0 0 24 24" class="brand__logo">
-        <path d="M3 12h3l3 7 4-14 3 7h5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>
-    </a>
+<header class="appbar" th:fragment="siteHeader" xmlns:th="http://www.w3.org/1999/xhtml">
+  <!-- 좌측: 로고 -->
+  <a class="appbar__logo" data-url="/pages/" aria-label="대시보드로 이동">
+    <!-- 기존 로고 SVG 재사용 -->
+    <svg viewBox="0 0 24 24" class="brand__logo" aria-hidden="true">
+      <path d="M3 12h3l3 7 4-14 3 7h5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <span class="appbar__brand">SUMMARIX</span>
+  </a>
 
-    <!-- 중앙: 서비스 타이틀 -->
-    <div class="title" data-url="/pages/" aria-label="대시보드로 이동">
-      <h1 class="title__main">써머릭스 SUMMARIX</h1>
-      <p class="title__sub">경제뉴스 분석 대시보드</p>
-    </div>
+  <!-- 중앙: 탭 내비게이션(가로 스크롤 가능) -->
+  <nav class="appbar__tabs" aria-label="주 메뉴">
+    <!-- 버튼은 기존 data-url 방식 그대로 -->
+    <button class="tab-btn" data-url="/pages/news">뉴스 요약</button>
+    <button class="tab-btn" data-url="/pages/youtube_opinion">분석</button>
+    <button class="tab-btn" data-url="/pages/chat">챗봇</button>
+    <button class="tab-btn" data-url="/pages/recommend">추천</button>
+  </nav>
 
-    <!-- 우: 비워서 중앙 정렬 균형 유지 -->
-    <div aria-hidden="true"></div>
-  </div>
-
-  <hr class="header__divider"/>
-
-  <!-- [2] 하단 바: 좌(네비) · 우(검색/로그인) -->
-  <div class="container header__bottom">
-    <!-- 좌측 네비 -->
-    <nav class="nav nav--pills" aria-label="주 메뉴">
-      <button class="nav-btn" data-url="/pages/news">뉴스 요약</button>
-      <button class="nav-btn" data-url="/pages/youtube_opinion">분석</button>
-      <button class="nav-btn" data-url="/pages/chat">챗봇</button>
-      <button class="nav-btn" data-url="/pages/recommend">추천</button>
-    </nav>
-
-    <!-- 우측 검색/로그인 영역 -->
-    <div class="actions">
-      <!-- 검색창: 디자인 목적의 버튼형 인풋 -->
-      <div class="searchbox" role="search">
-        <input type="text" id="q" placeholder="검색창" aria-label="검색어 입력"/>
-      </div>
-      <button class="icon-btn" type="button" title="검색 실행" id="searchBtn" aria-label="검색">
-        <!-- 돋보기 아이콘 (stroke) -->
-        <svg viewBox="0 0 24 24" class="icon" aria-hidden="true">
+  <!-- 우측: 검색 + 계정 -->
+  <div class="appbar__actions">
+    <div class="searchbox" role="search">
+      <input class="search__input" type="text" id="q" placeholder="검색" aria-label="검색어 입력" />
+      <button class="search__btn" type="button" id="searchBtn" aria-label="검색 실행">
+        <svg viewBox="0 0 24 24" class="icon" aria-hidden="true" width="18" height="18">
           <circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2"/>
           <path d="M16.5 16.5L21 21" fill="none" stroke="currentColor" stroke-width="2"/>
         </svg>
       </button>
+    </div>
 
-      <!-- 로그인 상태 -->
-      <div th:if="${session.loginUser != null}">
-        <button id="accountBtn" class="account-btn" type="button" title="계정정보">
-          <svg viewBox="0 0 24 24" class="account-icon" aria-hidden="true">
-            <path d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5Zm0 2c-4.42 0-8 2.24-8 5v1h16v-1c0-2.76-3.58-5-8-5Z"/>
-          </svg>
-        </button>
-      </div>
+    <!-- 로그인 상태 -->
+    <div th:if="${session.loginUser != null}">
+      <button id="accountBtn" class="account-btn" type="button" title="계정정보">
+        <svg viewBox="0 0 24 24" class="account-icon" aria-hidden="true">
+          <path fill="#fff" d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5Zm0 2c-4.42 0-8 2.24-8 5v1h16v-1c0-2.76-3.58-5-8-5Z"/>
+        </svg>
+      </button>
+    </div>
+    <div th:if="${session.loginUser != null}">
+      <form th:action="@{/auth/logout}" method="post">
+        <button id="logoutBtn" class="logout-btn" type="submit" title="로그아웃">Logout</button>
+      </form>
+    </div>
 
-      <div th:if="${session.loginUser != null}">
-        <form th:action="@{/pages/logout}" method="post">
-          <button id="logoutBtn" class="logout-btn" type="submit" title="로그아웃">Logout</button>
-        </form>
-      </div>
-
-
-      <!-- 비로그인 상태 -->
-      <div th:if="${session.loginUser == null}">
-        <button id="loginBtn" class="login-btn" title="로그인" data-url="/pages/login">Login</button>
-      </div>
+    <!-- 비로그인 상태 -->
+    <div th:if="${session.loginUser == null}">
+      <button id="loginBtn" class="login-btn" title="로그인" data-url="/auth/login">Login</button>
     </div>
   </div>
 
-  <hr class="header__divider"/>
-  <!-- 공용 라우팅 + 간단 테스트 스크립트 -->
+  <!-- 접근성/라우팅 스크립트: 기존 data-url 처리 재사용 -->
   <script>
     (function () {
+      // data-url 속성이 있으면 클릭/Enter/Space로 이동
       function go(el){ var u=el.dataset.url; if(u) window.location.href=u; }
       function onClick(e){ go(e.currentTarget); }
       function onKey(e){ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); go(e.currentTarget);} }
@@ -78,6 +60,12 @@
         el.addEventListener('click', onClick);
         el.addEventListener('keydown', onKey);
         el.style.cursor='pointer';
+      });
+
+      // 현재 경로와 동일한 탭에 .active 부여
+      var path = location.pathname;
+      document.querySelectorAll('.appbar__tabs .tab-btn').forEach(function(b){
+        if(path.startsWith(b.dataset.url)) b.classList.add('active');
       });
     })();
   </script>
