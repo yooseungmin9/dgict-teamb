@@ -43,7 +43,7 @@ SYSTEM_INSTRUCTIONS = """
 - 경제지표(CPI, PPI, GDP, 기준금리/무역수지/경상수지, 미국 금리): get_indicator
 - 주가지수/환율: get_market
 - 웹서비스 기능/사용법/도움말: search_docs
-- 그 외 일반 질문은 도구 없이 답하라.
+- 그 외 일반 질문은 도구 없이 답하라. (GPT-5모델)
 """
 
 # ===== Function Calling 도구 스키마 =====
