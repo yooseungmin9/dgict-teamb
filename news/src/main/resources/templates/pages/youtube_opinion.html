@@ -92,42 +92,44 @@
         }
         .comments { margin-top:15px; }
         .comment { margin-bottom:10px; font-size:14px; }
-        /* ✅ 필터 전체 박스 (패딩 줄임) */
+        /* ✅ 필터 전체 박스 */
         .filter-bar {
           display: flex;
           flex-direction: column;
           align-items: center;
           justify-content: center;
-          gap: 6px; /* 🔹 간격 축소 */
-          padding: 8px 6px; /* 🔹 위아래 여백 줄이기 */
+          gap: 6px;
+          padding: 10px;
           background: #f9fafb;
           border-radius: 14px;
           box-shadow: inset 0 0 0 1px rgba(0,0,0,0.05);
           box-sizing: border-box;
+          width: 100%;
+          max-width: 260px; /* ✅ 사이드바 안에서 고정 폭 제한 */
+          margin: 0 auto;
         }
 
-        /* ✅ 카테고리 버튼 그룹 (한 줄 중앙 고정) */
+        /* ✅ 카테고리 버튼 그룹 */
         .category-group {
-          display: flex;
-          justify-content: center;
-          align-items: center;
-          gap: 6px; /* 🔹 버튼 사이 간격 줄이기 */
-          flex-wrap: nowrap;
-          margin: 0;
+          display: grid;
+          grid-template-columns: repeat(4, 1fr); /* ✅ 4등분 균등폭 */
+          gap: 6px;
           width: 100%;
           box-sizing: border-box;
         }
 
-        /* ✅ 버튼 디자인 (색상 유지) */
+        /* ✅ 버튼 (디자인 유지) */
         .category-group button {
+          width: 100%; /* ✅ 각 칸 가득 채우기 */
           background: #fff;
           border: 1px solid #d1d5db;
           border-radius: 20px;
-          padding: 4px 13px; /* 🔹 버튼 크기 약간 축소 */
+          padding: 5px 0;
           font-size: 13px;
           color: #374151;
           cursor: pointer;
           white-space: nowrap;
+          text-align: center;
           transition: all 0.15s ease;
           box-sizing: border-box;
         }
@@ -145,9 +147,9 @@
           border-color: #2563eb;
         }
 
-        /* ✅ 정렬 셀렉트 (살짝 위로 올림) */
+        /* ✅ 정렬 드롭다운 */
         #sortSelect {
-          width: 90%;
+          width: 95%;
           padding: 5px 10px;
           border-radius: 8px;
           border: 1px solid #d1d5db;
@@ -157,7 +159,6 @@
           cursor: pointer;
           transition: border 0.2s ease;
           box-sizing: border-box;
-          margin-top: 4px; /* 🔹 위 버튼과 간격 최소화 */
         }
         #sortSelect:hover {
           border-color: #2563eb;
