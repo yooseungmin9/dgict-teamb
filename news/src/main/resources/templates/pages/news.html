@@ -5,6 +5,7 @@
   <title>오늘의 경제 뉴스</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="stylesheet" th:href="@{/css/style.css}" />
+  <link rel="stylesheet" href="/css/footer.css"/>
 
   <style>
     /* ===== 뉴스 카드(기존 디자인 유지) ===== */
@@ -124,6 +125,8 @@
     </div>
   </div>
 </div>
+
+<div th:replace="fragments/footer :: siteFooter"></div>
 
 <script th:src="@{/js/app.js}" defer></script>
 
