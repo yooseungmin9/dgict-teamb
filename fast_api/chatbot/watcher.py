@@ -10,33 +10,31 @@ from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 from openai import OpenAI
 
-# ====== OpenAI API 키 ======
+# ===== OpenAI API 키 =====
 # 보통은 환경변수로 설정하지만, 여기서는 코드에 직접 넣어둔 상태
 API_KEY= "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"   # 실제 서비스용 코드에서는 환경변수로 처리
 
-# =========[ 기본 설정 ]=========
+# ===== 기본 설정 =====
 DOCS_DIR = Path("./docs")                 # 감시할 폴더 (여기에 파일 넣으면 자동 업로드)
 STAGING_DIR = Path(".staging")            # 업로드 전 임시 복사하는 폴더 (잠금/충돌 회피용)
 STATE_FILE = Path(".vs_state.json")       # 파일 상태 기록 (hash, file_id 저장)
 VS_ID_FILE = Path(".vector_store_id")     # 생성된 벡터스토어 ID를 저장
 
-# 이벤트 처리 정책
+# ===== 이벤트 처리 정책 =====
 ONLY_MOVE_CREATE = True   # True면 "on_modified" 이벤트 무시 (최종 저장/이동만 반영)
 DEBOUNCE_SECS = 1.5       # 여러 이벤트가 동시에 터지면 1.5초 기다렸다가 한 번만 실행
 DWELL_SECS = 2.0          # 파일이 "완전히 저장 끝난 상태"인지 확인하기 위한 대기 시간
 
-# 허용되는 파일 확장자 및 임시파일 패턴
+# ===== 허용 파일 확장자 및 임시파일 패턴 =====
 ALLOW_EXTS = {".pdf", ".docx", ".pptx", ".xlsx", ".txt", ".md"}  # 허용 확장자
 LOCK_PREFIXES = ("~$",)           # MS 오피스가 생성하는 잠금파일 접두사
 LOCK_SUFFIXES = (".tmp", ".part", ".lock")  # 임시 확장자
 
-# OpenAI 연결 설정
+# ===== OpenAI 연결 설정 =====
 client = OpenAI(api_key = API_KEY)
 VECTOR_STORE_NAME = "econ-news-spec-store"
-# ===========================
 
-
-# ---------- 상태 관리 ----------
+# ===== 상태 관리 =====
 def load_state() -> Dict:
     """이전에 어떤 파일을 올렸는지 기억하는 상태 파일을 불러옴"""
     if STATE_FILE.exists():
@@ -68,7 +66,7 @@ DOCS_DIR.mkdir(parents=True, exist_ok=True)   # 감시 폴더 없으면 새로 �
 STAGING_DIR.mkdir(exist_ok=True)              # 스테이징 폴더 없으면 새로 생성
 
 
-# ---------- 유틸 함수 ----------
+# ===== 유틸 함수 =====
 def is_lock_like(p: Path) -> bool:
     """임시/잠금 파일인지 판별"""
     name = p.name
@@ -112,7 +110,7 @@ def safe_copy_to_staging(src: Path) -> Path:
             delay = min(4.0, delay * 1.7)
 
 
-# ---------- 업로드/링크 ----------
+# ===== 업로드/링크 =====
 def upload_and_link(path: Path):
     """파일을 벡터스토어에 업로드하거나 기존 파일을 갱신"""
     if not path.exists():
@@ -190,7 +188,7 @@ def remove_from_vector_store(path: Path):
     save_state(state)
 
 
-# ---------- 디바운스 ----------
+# ===== 디바운스 =====
 _timers: Dict[str, threading.Timer] = {}
 
 def schedule_upload(path: Path):
@@ -204,7 +202,7 @@ def schedule_upload(path: Path):
     timer.start()
 
 
-# ---------- 이벤트 핸들러 ----------
+# ===== 이벤트 핸들러 =====
 class DocEventHandler(FileSystemEventHandler):
     """폴더 감시 중 발생하는 이벤트별 처리"""
 
@@ -235,7 +233,7 @@ class DocEventHandler(FileSystemEventHandler):
             remove_from_vector_store(p)
 
 
-# ---------- 초기 스캔 ----------
+# ===== 초기 스캔 =====
 def initial_scan():
     """프로그램 시작 시 이미 있는 파일도 업로드"""
     for p in DOCS_DIR.rglob("*"):
@@ -243,7 +241,7 @@ def initial_scan():
             schedule_upload(p)
 
 
-# ---------- 메인 ----------
+# ===== 메인 =====
 if __name__ == "__main__":
     print(f"[WATCH] dir={DOCS_DIR.resolve()}  vs_id={VS_ID}")
     initial_scan()

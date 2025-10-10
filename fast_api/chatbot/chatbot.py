@@ -1,4 +1,4 @@
-# chatbot.py — Function Calling + RAG + News + Markets (정리/보완판)
+# chatbot.py — GPT-5 + RAG + API + MongoDB + Function Calling
 
 import os, sys, logging, subprocess, io, requests, tempfile, re, shutil, json
 from typing import Dict, Any, List, Optional
@@ -150,14 +150,45 @@ def _ensure_indexes():
     coll.create_index([("collected_at", DESCENDING)])
     log.info("MongoDB 인덱스 확인 완료")
 
-# ===== ECOS =====
-ECOS_API_KEY = "VIU3HJ9GYAQ9P9OMDTCV"
-ECOS_BASE = "https://ecos.bok.or.kr/api"
+# ===== MongoDB 조회 유틸 =====
+def fetch_latest_topn_from_mongo(n: int = 5):
+    coll = _get_db()[COLL_NAME]
+    pipeline = [
+        {"$addFields": {"_p": {"$ifNull": ["$published_at", "$collected_at"]}}},
+        {"$sort": {"_p": -1}},
+        {"$limit": int(n)},
+        {"$project": {"_id": 0, "title": 1, "url": 1, "published_at": 1}},
+    ]
+    rows = list(coll.aggregate(pipeline))
+    for r in rows:
+        pa = r.get("published_at")
+        if isinstance(pa, datetime):
+            if pa.tzinfo is None: pa = pa.replace(tzinfo=timezone.utc)
+            r["published_at"] = pa.astimezone(KST).strftime("%Y-%m-%d")
+        elif isinstance(pa, str):
+            pass
+        else:
+            r["published_at"] = ""
+    return rows
+
+def format_topn_md(rows):
+    if not rows: return "최신 경제 뉴스가 없습니다."
+    out = ["**최신 경제 뉴스**"]
+    for i, r in enumerate(rows, 1):
+        title = (r.get("title") or "").strip() or "(제목 없음)"
+        url = (r.get("url") or "").strip()
+        date = r.get("published_at", "")
+        if url:
+            out.append(f"{i}. [{title}]\n출처: ({url}) · 날짜: {date}")
+        else:
+            out.append(f"{i}. {title} · {date}")
+    return "\n".join(out)
 
 # ===== FRED =====
 FRED_KEY = "5a10a7875bc215794bf002816f0f530e"
 FRED_BASE = "https://api.stlouisfed.org/fred/series/observations"
 
+# ===== FRED 조회 유틸 =====
 def _fred_observations(series_id: str, start: str = "2024-01-01") -> list:
     params = {
         "series_id": series_id,
@@ -196,6 +227,10 @@ def get_us_fed_funds_latest(use_target_range: bool = False) -> dict:
         return {"error": "FRED 응답 지연(Timeout)", "source": "FRED"}
     except Exception as e:
         return {"error": f"FRED 조회 실패: {e}", "source": "FRED"}
+
+# ===== ECOS =====
+ECOS_API_KEY = "VIU3HJ9GYAQ9P9OMDTCV"
+ECOS_BASE = "https://ecos.bok.or.kr/api"
 
 # ===== ECOS 조회 유틸 =====
 def fetch_all_key_statistics() -> dict:
@@ -375,9 +410,9 @@ def fetch_quote_yf(ticker: str) -> Dict[str, Any]:
             return pd.DataFrame()
         return pd.DataFrame()
 
-    # 1) intraday
+    # intraday
     df1 = _try_hist("1d", "1m")
-    # 2) fallback 5d/1d
+    # fallback 5d/1d
     if df1.empty or len(df1) < 2:
         dfd = _try_hist("5d", "1d")
     else:
@@ -475,40 +510,6 @@ def get_eur_usd() -> str:
     sign = "+" if (ch or 0) >= 0 else ""
     return f"**유로/달러 환율 (실시간)**\n• 현재: {price:,.2f}달러\n• 변동: {sign}{(ch or 0):.2f} ({sign}{(pct or 0):.2f}%)"
 
-# ===== MongoDB 뉴스 =====
-def fetch_latest_topn_from_mongo(n: int = 5):
-    coll = _get_db()[COLL_NAME]
-    pipeline = [
-        {"$addFields": {"_p": {"$ifNull": ["$published_at", "$collected_at"]}}},
-        {"$sort": {"_p": -1}},
-        {"$limit": int(n)},
-        {"$project": {"_id": 0, "title": 1, "url": 1, "published_at": 1}},
-    ]
-    rows = list(coll.aggregate(pipeline))
-    for r in rows:
-        pa = r.get("published_at")
-        if isinstance(pa, datetime):
-            if pa.tzinfo is None: pa = pa.replace(tzinfo=timezone.utc)
-            r["published_at"] = pa.astimezone(KST).strftime("%Y-%m-%d")
-        elif isinstance(pa, str):
-            pass
-        else:
-            r["published_at"] = ""
-    return rows
-
-def format_topn_md(rows):
-    if not rows: return "최신 경제 뉴스가 없습니다."
-    out = ["**최신 경제 뉴스**"]
-    for i, r in enumerate(rows, 1):
-        title = (r.get("title") or "").strip() or "(제목 없음)"
-        url = (r.get("url") or "").strip()
-        date = r.get("published_at", "")
-        if url:
-            out.append(f"{i}. [{title}]\n출처: ({url}) · 날짜: {date}")
-        else:
-            out.append(f"{i}. {title} · {date}")
-    return "\n".join(out)
-
 # ===== 도구 실행기 =====
 def run_tool(tool_name: str, arguments: dict) -> dict:
     try:
@@ -599,7 +600,7 @@ app.add_middleware(
     allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"],
 )
 
-# 간단 세션 (프로덕션은 Redis 권장)
+# ===== 세션 =====
 SESSIONS: Dict[str, List[Dict[str, str]]] = {}
 MAX_TURNS = 20
 
@@ -707,14 +708,12 @@ CSR_URL = "https://naveropenapi.apigw.ntruss.com/recog/v1/stt"
 
 LANG_MAP = {"ko": "Kor", "en": "Eng", "ja": "Jpn"}
 
-
 def normalize_lang(l: str) -> str:
     if not l:
         return "Kor"
     if l.lower() in ("kor", "eng", "jpn"):
         return l.title()
     return LANG_MAP.get(l.split("-")[0].lower(), "Kor")
-
 
 @app.post("/api/stt")
 async def stt_clova(audio_file: UploadFile = File(...), lang: str = Query("Kor")):
@@ -752,7 +751,6 @@ async def stt_clova(audio_file: UploadFile = File(...), lang: str = Query("Kor")
             except Exception:
                 pass
 
-
 # ===== Google Cloud TTS =====
 DEFAULT_VOICE = {
     "ko-KR": "ko-KR-Neural2-B",
@@ -760,13 +758,11 @@ DEFAULT_VOICE = {
     "ja-JP": "ja-JP-Neural2-B",
 }
 
-
 def _pick_voice(lang: str, voice: Optional[str]) -> str:
     if voice:
         return voice
     base = (lang or "ko-KR").split(",")[0]
     return DEFAULT_VOICE.get(base, "ko-KR-Neural2-B")
-
 
 @app.post("/api/tts")
 def tts_google_post(payload: dict = Body(...)):
@@ -779,10 +775,12 @@ def tts_google_post(payload: dict = Body(...)):
     if not text:
         return JSONResponse({"error": "text is required"}, status_code=400)
 
-    GCP_KEY_PATH = "C:/dgict-teamb/fast_api/chatbot/key/absolute-text-473306-c1-b75ae69ab526.json"
+    # Google API key
+    GCP_KEY_PATH = "Users/yoo/bootcamp_dgict/dgict-teamb/fast_api/chatbot/key/absolute-text-473306-c1-b75ae69ab526.json"
     gcp_credentials = service_account.Credentials.from_service_account_file(
         GCP_KEY_PATH
     )
+
     tts_client = texttospeech.TextToSpeechClient(credentials=gcp_credentials)
 
     try:
@@ -827,7 +825,6 @@ def tts_google_post(payload: dict = Body(...)):
         log.exception("Google TTS 실패")
         return JSONResponse({"error": f"TTS 실패: {e}"}, status_code=500)
 
-
 # ===== 유틸 =====
 @app.post("/reset")
 @app.post("/api/reset")
@@ -836,15 +833,12 @@ async def reset():
     history = []
     return {"status": "ok", "message": "대화 기록 초기화 완료"}
 
-
 @app.get("/health")
 def health():
     return {"status": "ok", "ts_kst": datetime.now(KST).isoformat()}
 
-
 # ===== 스케줄러 =====
 scheduler = BackgroundScheduler(timezone=KST)
-
 
 def _job_naver():
     try:
@@ -852,7 +846,6 @@ def _job_naver():
         crawl_today(limit_per_run=50)
     except Exception as e:
         log.exception("네이버 수집 실패: %s", e)
-
 
 @app.on_event("startup")
 def _start_scheduler():
@@ -867,7 +860,7 @@ def _start_scheduler():
         scheduler.add_job(
             _job_naver,
             "interval",
-            hours=1,
+            minutes=10, # hours=1
             id="naver_hourly",
             max_instances=1,
             coalesce=True,
@@ -877,7 +870,6 @@ def _start_scheduler():
         log.info("APScheduler started.")
     except Exception:
         log.exception("APScheduler 시작 실패")
-
 
 @app.on_event("shutdown")
 def _stop_scheduler():
