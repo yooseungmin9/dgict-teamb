@@ -9,11 +9,11 @@ SERVERS = [
     ("C:/dgict-teamb/fast_api/brief", "main:app", 8005, None),
     ("C:/dgict-teamb/fast_api/trend", "category_trends:app", 8006, None),
     ("C:/dgict-teamb/fast_api/senti_keyword", "main:app", 8007, None),
-    ("C:/dgict-teamb/fast_api/analysis", "youtube_fastapi:app", 8008, None),
-    ("C:/dgict-teamb/fast_api/dashboard_analysis", "main:app", 8009, None),
-    ("C:/dgict-teamb/fast_api/global_news", "main:app", 8010, None),
-    ("C:/dgict-teamb/fast_api/new_count", "main:app", 8011, None),
-    ("C:/dgict-teamb/fast_api/viz", "app_clusters:app", 8012, None),
+    ("C:/dgict-teamb/fast_api/analysis", "opinion_mining:app", 8008, None),
+    ("C:/dgict-teamb/fast_api/dashboard_analysis", "emoa:app", 8009, None),
+    ("C:/dgict-teamb/fast_api/dashboard_analysis", "headline:app", 8010, None),
+    ("C:/dgict-teamb/fast_api/dashboard_analysis", "count:app", 8011, None),
+    ("C:/dgict-teamb/fast_api/amonth_cluster", "app_clusters:app", 8012, None),
 ]
 
 PROCS = []

@@ -85,7 +85,7 @@
 
         <!-- 목록 -->
         <div class="book-list" th:if="${!#lists.isEmpty(books)}">
-          <div class="book-card" th:each="book,iter : ${books}" th:if="${iter.index} < 10">
+          <div class="book-card" th:each="book,iter : ${books}" th:if="${iter.index} < 5">
             <a th:href="${book.link}" target="_blank" rel="noopener">
               <img th:src="${book.cover}" alt="cover"/>
             </a>

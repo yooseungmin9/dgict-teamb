@@ -1,4 +1,4 @@
-# main.py — 통합본: /news, /news/{id}, /briefing/yesterday, /health
+# emoa.py — 통합본: /news, /news/{id}, /briefing/yesterday, /health
 # 실행: uvicorn main:app --reload --port 8000
 # 필요 패키지:
 #   pip install "fast_api>=0.110" uvicorn "pydantic<3" "pymongo==4.10.1" "openai>=1.46.0" "bson>=0.5.10"
