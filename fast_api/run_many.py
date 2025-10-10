@@ -1,19 +1,19 @@
-# run_many2.py
+# run_many.py
 import subprocess, sys, signal, os
 
 # ❗️여기에 서버 목록을 추가하세요.
 #   (작업폴더, "모듈:앱", 포트, [선택]가상환경 파이썬 경로)
 SERVERS = [
-    ("C:/dgict-teamb/fast_api/chatbot", "chatbot:app", 8002, None),
-    ("C:/dgict-teamb/fast_api/recommend", "youtube_api:app", 8004, None),
-    ("C:/dgict-teamb/fast_api/brief", "main:app", 8005, None),
-    ("C:/dgict-teamb/fast_api/trend", "category_trends:app", 8006, None),
-    ("C:/dgict-teamb/fast_api/senti_keyword", "main:app", 8007, None),
-    ("C:/dgict-teamb/fast_api/analysis", "opinion_mining:app", 8008, None),
-    ("C:/dgict-teamb/fast_api/dashboard_analysis", "emoa:app", 8009, None),
-    ("C:/dgict-teamb/fast_api/dashboard_analysis", "headline:app", 8010, None),
-    ("C:/dgict-teamb/fast_api/dashboard_analysis", "count:app", 8011, None),
-    ("C:/dgict-teamb/fast_api/amonth_cluster", "app_clusters:app", 8012, None),
+    ("/Users/yoo/bootcamp_dgict/dgict-teamb/fast_api/chatbot", "chatbot:app", 8002, None),
+    ("/Users/yoo/bootcamp_dgict/dgict-teamb/fast_api/recommend", "youtube_api:app", 8004, None),
+    ("/Users/yoo/bootcamp_dgict/dgict-teamb/fast_api/brief", "main:app", 8005, None),
+    ("/Users/yoo/bootcamp_dgict/dgict-teamb/fast_api/trend", "category_trends:app", 8006, None),
+    ("/Users/yoo/bootcamp_dgict/dgict-teamb/fast_api/senti_keyword", "main:app", 8007, None),
+    ("/Users/yoo/bootcamp_dgict/dgict-teamb/fast_api/analysis", "opinion_mining:app", 8008, None),
+    ("/Users/yoo/bootcamp_dgict/dgict-teamb/fast_api/dashboard_analysis", "emoa:app", 8009, None),
+    ("/Users/yoo/bootcamp_dgict/dgict-teamb/fast_api/dashboard_analysis", "headline:app", 8010, None),
+    ("/Users/yoo/bootcamp_dgict/dgict-teamb/fast_api/dashboard_analysis", "count:app", 8011, None),
+    ("/Users/yoo/bootcamp_dgict/dgict-teamb/fast_api/amonth_cluster", "app_clusters:app", 8012, None),
 ]
 
 PROCS = []

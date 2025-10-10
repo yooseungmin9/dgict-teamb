@@ -9,6 +9,7 @@ from zoneinfo import ZoneInfo
 from fastapi import FastAPI, UploadFile, File, Query, Body
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
+from typing import Generator
 
 from openai import OpenAI
 from pymongo import MongoClient, DESCENDING
@@ -681,9 +682,9 @@ def api_markets(indices: int = 1, fx: int = 1):
         payload["data"]["fx"] = [{"key": k, "name": v["name"], **fetch_quote_yf(v["ticker"])} for k, v in FX_MAP.items()]
     return payload
 
-@app.get("/health")
-def health():
-    return {"status": "ok", "ts_kst": datetime.now(KST).isoformat()}
+# ==================
+#     S T T part
+# ==================
 
 # ===== FFmpeg =====
 FFMPEG = os.getenv("FFMPEG_BIN") or shutil.which("ffmpeg") or "/opt/homebrew/bin/ffmpeg"
@@ -751,6 +752,10 @@ async def stt_clova(audio_file: UploadFile = File(...), lang: str = Query("Kor")
             except Exception:
                 pass
 
+# ==================
+#     T T S part
+# ==================
+
 # ===== Google Cloud TTS =====
 DEFAULT_VOICE = {
     "ko-KR": "ko-KR-Neural2-B",
@@ -776,7 +781,7 @@ def tts_google_post(payload: dict = Body(...)):
         return JSONResponse({"error": "text is required"}, status_code=400)
 
     # Google API key
-    GCP_KEY_PATH = "Users/yoo/bootcamp_dgict/dgict-teamb/fast_api/chatbot/key/absolute-text-473306-c1-b75ae69ab526.json"
+    GCP_KEY_PATH = "/Users/yoo/bootcamp_dgict/dgict-teamb/fast_api/chatbot/key/absolute-text-473306-c1-b75ae69ab526.json"
     gcp_credentials = service_account.Credentials.from_service_account_file(
         GCP_KEY_PATH
     )

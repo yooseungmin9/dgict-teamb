@@ -9,16 +9,28 @@
   <link rel="stylesheet" href="/css/footer.css"/>
   <link rel="stylesheet" href="/css/header.css"/>
   <style>
+    :root { color-scheme: light dark; }
+    html, body { scroll-behavior: smooth; }
+    .bubble { max-width: 80%; }
+    .dot { animation: blink 1.4s infinite both }
+    .dot:nth-child(2){ animation-delay:.2s }
+    .dot:nth-child(3){ animation-delay:.4s }
+    @keyframes blink{ 0%,80%,100%{opacity:0} 40%{opacity:1} }
+    .scroll-thin::-webkit-scrollbar{ width:10px }
+    .scroll-thin::-webkit-scrollbar-thumb{ background:#cbd5e1; border-radius:8px }
+    @media (prefers-color-scheme: dark){
+        .scroll-thin::-webkit-scrollbar-thumb{ background:#475569 }
+    }
     .chatbot-container { position: relative; }
     .top-controls {
       position: absolute; top: 8px; right: 8px;
       display: flex; flex-direction: column; gap: 6px; align-items: flex-end;
     }
     .top-controls select { padding: 4px; font-size: 14px; }
-  </style>
+    </style>
 </head>
 <body>
-  <div th:replace="fragments/header :: siteHeader"></div>
+  <div th:replace="~{fragments/header :: siteHeader}"></div>
 
   <main class="main">
     <div class="container">
@@ -64,7 +76,7 @@
     </div>
   </main>
 
-  <div th:replace="fragments/footer :: siteFooter"></div>
+  <div th:replace="~{fragments/footer :: siteFooter}"></div>
 
   <script src="/js/chat.js"></script>
 </body>
