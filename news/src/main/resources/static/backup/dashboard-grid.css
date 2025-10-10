@@ -51,12 +51,11 @@
   grid-template-columns: 1fr 1fr 1fr;
   gap:20px;
   grid-template-areas:
-    "topwide topwide rightTop"
-    "today   chart   rightTop"
-    "cluster chart   rightTop"
-    "cluster chart   rank"
-    "media  media    rank"
-    "media  media    newsCount";
+    "topwide  topwide  hotTopic"
+    "today    cluster  hotTopic"
+    "newsCount    cluster  rank"
+    "chart    cluster  rank"
+    "media    media    void";
   /* 자동 배치 간섭 방지 */
   grid-auto-flow: row;
   min-width: 0;
@@ -64,19 +63,20 @@
 }
 
 #panel-hot-datalab        { grid-area: topwide; }
-#panel-hot-topic-yesterday{ grid-area: rightTop; }
+#panel-hot-topic-yesterday{ grid-area: hotTopic; }
 #panel-today-sentiment    { grid-area: today; }
 #panel-sentiment-series   { grid-area: chart; }
 #panel-keyword-rank       { grid-area: rank; }
 #panel-news-count         { grid-area: newsCount; }
-#panel-cluster            { grid-area: cluster; }
+#panel-clusters           { grid-area: cluster; }
 #panel-opinion            { grid-area: media; }
+#panel-void               { grid-area: void; }
 
 #panel-news-count .strong { padding:28px 20px 20px; }
 #panel-hot-topic-yesterday .strong { padding:28px 20px 20px; }
 #panel-sentiment-series .strong { padding:28px 20px 20px; }
 #panel-keyword-rank .strong { padding:28px 20px 20px; }
-#panel-cluster .strong { padding:28px 20px 20px; }
+#panel-clusters .strong { padding:28px 20px 20px; }
 #panel-opinion .strong { padding:28px 20px 20px; }
 
 
@@ -235,13 +235,9 @@
 }
 
 #panel-opinion canvas {
-  width: 240px !important;   /* 워드클라우드 크기 확대 */
+  width: 300px !important;   /* 워드클라우드 크기 확대 */
   height: 240px !important;
-}
-
-#panel-opinion img,
-#panel-opinion canvas {
-  margin: 0;
+  padding-left: 60px;
 }
 
 #panel-opinion p {
@@ -252,3 +248,23 @@
   text-align: center;
   margin-top: 12px;
 }
+
+/*  클러스터  */
+#treemap { position: relative; }
+
+#cluster-overlay{
+  position: absolute; inset: 0;
+  z-index: 999;
+  display: none;                 /* ← 이 한 줄만 남김 */
+  background: rgba(255,255,255,.75);
+  align-items: center;           /* flex일 때 적용됨 */
+  justify-content: center;
+  pointer-events: auto; cursor: pointer;
+  font-size: 18px; color: #0d1b2a; text-align: center;
+}
+#cluster-overlay .content{
+  background: rgba(255,255,255,.95);
+  border: 1px solid #ddd; border-radius: 8px;
+  padding: 10px 14px; box-shadow: 0 2px 6px rgba(0,0,0,.08);
+  font-weight: 600;
+}   /*     */

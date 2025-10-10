@@ -10,6 +10,8 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @Controller
 @RequestMapping("/member")
 public class MemberController {
@@ -35,7 +37,7 @@ public class MemberController {
     // 회원 등록 폼
     @GetMapping("/signup")
     public String signupPage(Model model) {
-        model.addAttribute("member", new MemberDoc());
+        model.addAttribute("member", new SignupRequest());
         return "member/signup";
     }
 
@@ -51,5 +53,20 @@ public class MemberController {
         boolean ajax = "XMLHttpRequest".equalsIgnoreCase(request.getHeader("X-Requested-With"));
         // model.addAttribute("me", memberService.current()); // 필요시
         return ajax ? "member/account :: accountPanel" : "member/account";
+    }
+
+    @GetMapping("/admin")
+    public String adminPage(Model model) {
+        return "member/admin";
+    }
+
+    @PostMapping("/interests")
+    @ResponseBody
+    public ResponseEntity<?> saveInterests(
+            @RequestBody List<String> keywords,
+            @SessionAttribute("loginUser") MemberDoc me) {
+
+        memberService.updateInterests(me.getId(), keywords);
+        return ResponseEntity.ok().build();
     }
 }
