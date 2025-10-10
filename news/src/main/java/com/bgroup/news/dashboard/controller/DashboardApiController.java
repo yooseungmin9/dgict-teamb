@@ -1,14 +1,18 @@
 package com.bgroup.news.dashboard.controller;
 
 import com.bgroup.news.dashboard.dto.KeywordRankingResponse;
+import com.bgroup.news.dashboard.dto.NewsCountResponse;
 import com.bgroup.news.dashboard.repository.KeywordRankingRepository;
 import com.bgroup.news.dashboard.service.EmoaService;
+import com.bgroup.news.dashboard.service.NewsCountService;
 import com.bgroup.news.dashboard.service.SentimentService;
 import com.bgroup.news.dashboard.service.TrendService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
 
@@ -21,6 +25,7 @@ public class DashboardApiController {
     private final SentimentService sentimentService;         // 8007 proxy
     private final KeywordRankingRepository keywordRepo;      // Mongo aggregation
     private final EmoaService emoaService;
+    private final NewsCountService newsCountService;
 
     /** 핫토픽(데이터랩 그래프) — FastAPI(8006) 프록시 */
     @GetMapping("/trends/category-trends")
@@ -55,5 +60,17 @@ public class DashboardApiController {
     @GetMapping("/emoa/score")
     public Map<String,Object> score(@RequestParam(name="score_key", defaultValue="sentiment_score") String scoreKey){
         return emoaService.computeScore(scoreKey);
+    }
+
+    @GetMapping("/count")
+    public NewsCountResponse getNewsCount() {
+        long total = newsCountService.total();
+        long today = newsCountService.countTodayKST();
+        long last7 = newsCountService.countLast7DaysKST();
+        return new NewsCountResponse(
+                newsCountService.getCollection(),
+                total, today, last7,
+                OffsetDateTime.now(ZoneId.of("Asia/Seoul"))
+        );
     }
 }

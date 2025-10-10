@@ -91,9 +91,9 @@
 
   /* Typography */
   --font-family-base: "FKGroteskNeue", "Geist", "Inter", -apple-system,
-    BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --font-family-mono: "Berkeley Mono", ui-monospace, SFMono-Regular, Menlo,
-    Monaco, Consolas, monospace;
+  Monaco, Consolas, monospace;
   --font-size-xs: 11px;
   --font-size-sm: 12px;
   --font-size-base: 14px;
@@ -137,11 +137,11 @@
   --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.02);
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02);
   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.04),
-    0 2px 4px -1px rgba(0, 0, 0, 0.02);
+  0 2px 4px -1px rgba(0, 0, 0, 0.02);
   --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.04),
-    0 4px 6px -2px rgba(0, 0, 0, 0.02);
+  0 4px 6px -2px rgba(0, 0, 0, 0.02);
   --shadow-inset-sm: inset 0 1px 0 rgba(255, 255, 255, 0.15),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.03);
+  inset 0 -1px 0 rgba(0, 0, 0, 0.03);
 
   /* Animation */
   --duration-fast: 150ms;
@@ -195,7 +195,7 @@
     --color-card-border: rgba(var(--color-gray-400-rgb), 0.2);
     --color-card-border-inner: rgba(var(--color-gray-400-rgb), 0.15);
     --shadow-inset-sm: inset 0 1px 0 rgba(255, 255, 255, 0.1),
-      inset 0 -1px 0 rgba(0, 0, 0, 0.15);
+    inset 0 -1px 0 rgba(0, 0, 0, 0.15);
     --button-border-secondary: rgba(var(--color-gray-400-rgb), 0.2);
     --color-border-secondary: rgba(var(--color-gray-400-rgb), 0.2);
     --color-select-caret: rgba(var(--color-gray-200-rgb), 0.8);
@@ -255,7 +255,7 @@
   --color-card-border: rgba(var(--color-gray-400-rgb), 0.15);
   --color-card-border-inner: rgba(var(--color-gray-400-rgb), 0.15);
   --shadow-inset-sm: inset 0 1px 0 rgba(255, 255, 255, 0.1),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.15);
+  inset 0 -1px 0 rgba(0, 0, 0, 0.15);
   --color-border-secondary: rgba(var(--color-gray-400-rgb), 0.2);
   --color-select-caret: rgba(var(--color-gray-200-rgb), 0.8);
 
@@ -492,7 +492,7 @@ pre code {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-base);
   transition: border-color var(--duration-fast) var(--ease-standard),
-    box-shadow var(--duration-fast) var(--ease-standard);
+  box-shadow var(--duration-fast) var(--ease-standard);
 }
 
 textarea.form-control {
@@ -580,42 +580,42 @@ select.form-control {
 
 .status--success {
   background-color: rgba(
-    var(--color-success-rgb, 33, 128, 141),
-    var(--status-bg-opacity)
+          var(--color-success-rgb, 33, 128, 141),
+          var(--status-bg-opacity)
   );
   color: var(--color-success);
   border: 1px solid
-    rgba(var(--color-success-rgb, 33, 128, 141), var(--status-border-opacity));
+  rgba(var(--color-success-rgb, 33, 128, 141), var(--status-border-opacity));
 }
 
 .status--error {
   background-color: rgba(
-    var(--color-error-rgb, 192, 21, 47),
-    var(--status-bg-opacity)
+          var(--color-error-rgb, 192, 21, 47),
+          var(--status-bg-opacity)
   );
   color: var(--color-error);
   border: 1px solid
-    rgba(var(--color-error-rgb, 192, 21, 47), var(--status-border-opacity));
+  rgba(var(--color-error-rgb, 192, 21, 47), var(--status-border-opacity));
 }
 
 .status--warning {
   background-color: rgba(
-    var(--color-warning-rgb, 168, 75, 47),
-    var(--status-bg-opacity)
+          var(--color-warning-rgb, 168, 75, 47),
+          var(--status-bg-opacity)
   );
   color: var(--color-warning);
   border: 1px solid
-    rgba(var(--color-warning-rgb, 168, 75, 47), var(--status-border-opacity));
+  rgba(var(--color-warning-rgb, 168, 75, 47), var(--status-border-opacity));
 }
 
 .status--info {
   background-color: rgba(
-    var(--color-info-rgb, 98, 108, 113),
-    var(--status-bg-opacity)
+          var(--color-info-rgb, 98, 108, 113),
+          var(--status-bg-opacity)
   );
   color: var(--color-info);
   border: 1px solid
-    rgba(var(--color-info-rgb, 98, 108, 113), var(--status-border-opacity));
+  rgba(var(--color-info-rgb, 98, 108, 113), var(--status-border-opacity));
 }
 
 /* Container layout */
@@ -664,7 +664,7 @@ select.form-control {
     max-width: var(--container-xl);
   }
   .dash .container {
-        max-width: 75%;
+    max-width: 75%;
   }
 }
 
@@ -765,7 +765,7 @@ select.form-control {
 @font-face {
   font-family: 'FKGroteskNeue';
   src: url('https://r2cdn.perplexity.ai/fonts/FKGroteskNeue.woff2')
-    format('woff2');
+  format('woff2');
 }
 
 /* END PERPLEXITY DESIGN SYSTEM */
@@ -1566,22 +1566,22 @@ select.form-control {
 }
 
 .chat-form.flex-row {
-    display: flex;
-    align-items: flex-end;
-    gap: 10px;
-    margin-bottom: 10px;
-    margin-left: 12px;
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  margin-bottom: 10px;
+  margin-left: 12px;
 }
 
 .chat-input-auto {
-    flex: 1;
-    resize: none;
-    min-height: 44px;
-    max-height: 160px;
-    padding: 10px 12px;
-    border-radius: 8px;
-    border: 1px solid #ccc;
-    font-size: 14px;
+  flex: 1;
+  resize: none;
+  min-height: 44px;
+  max-height: 160px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid #ccc;
+  font-size: 14px;
 }
 
 .chat-input-container .form-control {
@@ -1589,12 +1589,12 @@ select.form-control {
 }
 
 .btn-group {
-    display: flex;              /* flexbox 활성화 */
-    justify-content: center;    /* 가로 중앙 정렬 */
-    gap: 10px;                  /* 버튼 간격 */
-    margin-top: 12px;           /* 위쪽 여백 */
-    margin-bottom: 3px;
-    margin-right: 12px;
+  display: flex;              /* flexbox 활성화 */
+  justify-content: center;    /* 가로 중앙 정렬 */
+  gap: 10px;                  /* 버튼 간격 */
+  margin-top: 12px;           /* 위쪽 여백 */
+  margin-bottom: 3px;
+  margin-right: 12px;
 }
 
 .faq-items {
@@ -1787,7 +1787,7 @@ select.form-control {
   font-weight: var(--font-weight-medium);
 }
 
-  /* 제목 라인: 제목텍스트 + 감성칩을 같은 줄에 */
+/* 제목 라인: 제목텍스트 + 감성칩을 같은 줄에 */
 .news-title{
   margin:0;
   font-size:16px;
@@ -2209,22 +2209,22 @@ select.form-control {
 }
 
 .chat-form.flex-row {
-    display: flex;
-    align-items: flex-end;
-    gap: 10px;
-    margin-bottom: 10px;
-    margin-left: 12px;
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  margin-bottom: 10px;
+  margin-left: 12px;
 }
 
 .chat-input-auto {
-    flex: 1;
-    resize: none;
-    min-height: 44px;
-    max-height: 160px;
-    padding: 10px 12px;
-    border-radius: 8px;
-    border: 1px solid #ccc;
-    font-size: 14px;
+  flex: 1;
+  resize: none;
+  min-height: 44px;
+  max-height: 160px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid #ccc;
+  font-size: 14px;
 }
 
 .chat-input-container .form-control {
@@ -2232,12 +2232,12 @@ select.form-control {
 }
 
 .btn-group {
-    display: flex;              /* flexbox 활성화 */
-    justify-content: center;    /* 가로 중앙 정렬 */
-    gap: 10px;                  /* 버튼 간격 */
-    margin-top: 12px;           /* 위쪽 여백 */
-    margin-bottom: 3px;
-    margin-right: 12px;
+  display: flex;              /* flexbox 활성화 */
+  justify-content: center;    /* 가로 중앙 정렬 */
+  gap: 10px;                  /* 버튼 간격 */
+  margin-top: 12px;           /* 위쪽 여백 */
+  margin-bottom: 3px;
+  margin-right: 12px;
 }
 
 .faq-items {
@@ -2674,10 +2674,10 @@ select.form-control {
   opacity:0; transition:opacity 160ms ease, transform 160ms ease;
 }
 .portal-dialog.show{border-radius:12px;
-                      overflow:hidden;                        /* 핵심: 자식(iframe) 클리핑 */
-                      background: var(--color-surface, #fff); /* 토큰 재사용 */
-                      /* 선택: 사파리 보강 */
-                      -webkit-mask-image: -webkit-radial-gradient(white, black);}
+  overflow:hidden;                        /* 핵심: 자식(iframe) 클리핑 */
+  background: var(--color-surface, #fff); /* 토큰 재사용 */
+  /* 선택: 사파리 보강 */
+  -webkit-mask-image: -webkit-radial-gradient(white, black);}
 
 .portal-header{
   display:flex; align-items:center; justify-content:space-between;

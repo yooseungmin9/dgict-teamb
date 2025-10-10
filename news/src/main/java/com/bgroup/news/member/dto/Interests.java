@@ -1,4 +1,4 @@
-package com.bgroup.news.origin.dto;
+package com.bgroup.news.member.dto;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;

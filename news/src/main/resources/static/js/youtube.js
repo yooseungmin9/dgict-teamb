@@ -1,148 +1,177 @@
-const API = "http://127.0.0.1:8008"; // FastAPI 서버 주소
+// /static/js/youtube.js
+const API = "/api"; // 스프링으로 통합
 
-function byId(id) { return document.getElementById(id); }
-function fmtNum(x) { return x ? x.toLocaleString() : "0"; }
+function byId(id){ return document.getElementById(id); }
+function fmtNum(x){ return x ? x.toLocaleString() : "0"; }
 
-// ====================
-// 워드클라우드
-// ====================
-function renderWordCloud(pairs) {
-  const canvas = byId("wordCloud");
-  if (!canvas) return;
-  const ctx = canvas.getContext("2d");
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
+// ========== 워드클라우드 ==========
+function renderWordCloud(pairs){
+    const canvas = byId("wordCloud");
+    if(!canvas) return;
+    const ctx = canvas.getContext("2d");
+    ctx.clearRect(0,0,canvas.width,canvas.height);
 
-  if (!pairs || pairs.length === 0 || (pairs.length === 1 && pairs[0].text === "댓글없음")) {
-    ctx.font = "16px Arial";
-    ctx.fillStyle = "#666";
-    ctx.fillText("워드클라우드 데이터가 없습니다.", 20, 50);
-    return;
-  }
+    // 유효한 항목만 필터 (text 존재 + count>0)
+    const valid = Array.isArray(pairs) ? pairs.filter(p => p && p.text && Number(p.count) > 0) : [];
 
-  if (typeof WordCloud !== "function") {
-    ctx.font = "16px Arial";
-    ctx.fillStyle = "#c00";
-    ctx.fillText("wordcloud2.js 로드 실패", 20, 50);
-    return;
-  }
-
-  WordCloud(canvas, {
-    list: pairs.map(d => [d.text, d.count]),
-    gridSize: 10,
-    weightFactor: 5,
-    minSize: 12,
-    maxRotation: 0,
-    fontFamily: "Arial",
-    color: "random-dark",
-    backgroundColor: "#fafafa",
-    rotateRatio: 0
-  });
+    if(valid.length < 2){
+        ctx.font="16px Arial"; ctx.fillStyle="#666"; ctx.textAlign="center";
+        ctx.fillText("워드클라우드 데이터가 없습니다.", canvas.width/2, canvas.height/2);
+        return;
+    }
+    if(typeof WordCloud!=="function"){
+        ctx.font="16px Arial"; ctx.fillStyle="#c00"; ctx.textAlign="left";
+        ctx.fillText("wordcloud2.js 로드 실패",20,50); return;
+    }
+    WordCloud(canvas,{
+        list: valid.map(d=>[String(d.text), Number(d.count)]),
+        gridSize:10, weightFactor:5, minSize:12, maxRotation:0,
+        fontFamily:"Arial", color:"random-dark", backgroundColor:"#fafafa", rotateRatio:0
+    });
 }
 
-// ====================
-// 메인 영상 업데이트
-// ====================
-function updateMain(d) {
-  byId("mainTitle").textContent = d.title || "제목 없음";
-  byId("mainDate").textContent = `업로드: ${d.published_at || "-"}`;
-  byId("mainViews").textContent = `조회수: ${fmtNum(d.views)}`;
-  byId("mainComments").textContent = `댓글: ${fmtNum(d.comments)}`;
-  byId("videoFrame").src = d.video_url || "";
+// ========== 메인 ==========
+function updateMain(d){
+    byId("mainTitle").textContent = d.title || "제목 없음";
+    byId("mainDate").textContent  = `업로드: ${d.published_at || "-"}`;
+    byId("mainViews").textContent = `조회수: ${fmtNum(d.views)}`;
+    byId("mainComments").textContent = `댓글: ${fmtNum(d.comments)}`;
+    byId("videoFrame").src = d.video_url || (d.video_id ? `https://www.youtube.com/embed/${encodeURIComponent(d.video_id)}?rel=0` : "");
 }
 
-// ====================
-// 감정 분포 차트
-// ====================
+// ========== 감정 분포 차트 ==========
 let pieChart;
 function renderPieChart(sentiment) {
-  const ctx = byId("pieChart").getContext("2d");
-  if (pieChart) pieChart.destroy();
-  pieChart = new Chart(ctx, {
-    type: "pie",
-    data: {
-      labels: Object.keys(sentiment),
-      datasets: [{
-        data: Object.values(sentiment),
-        backgroundColor: ["#4caf50","#2196f3","#f44336","#ff9800","#9e9e9e","#8bc34a","#9c27b0"],
-      }],
-    },
-    options: { responsive: true, plugins: { legend: { position: "top" } } },
-  });
-}
+    const container = byId("pieChart");
+    if (!container) return;
+    const ctx = container.getContext("2d");
 
-// ====================
-// 분석 데이터 로드
-// ====================
-function loadAnalysis(video_id) {
-  fetch(`${API}/analysis/${encodeURIComponent(video_id)}?topn=100`)
-    .then(res => res.json())
-    .then(data => {
-      renderPieChart(data.sentiment || {});
-      renderWordCloud(data.wordcloud || []);
+    // 백엔드 라벨과 동일한 7클래스 고정 순서
+    const ORDER = [
+        "행복(Happiness)", "중립(Neutral)", "분노(Anger)",
+        "슬픔(Sadness)", "놀람(Surprise)", "공포(Fear)", "혐오(Disgust)"
+    ];
 
-      // 분석 요약
-      byId("analysisText").textContent = data.summary || "분석 결과 없음";
+    const labels = [];
+    const data = [];
+    ORDER.forEach(k => {
+        labels.push(k);
+        data.push(sentiment && sentiment[k] ? Number(sentiment[k]) : 0);
+    });
 
-      // 댓글 샘플
-      const commentsDiv = byId("commentList");
-      commentsDiv.innerHTML = "";
-      (data.comments || []).forEach(c => {
-        const div = document.createElement("div");
-        div.className = "comment";
-        div.textContent = `${c.text} (${c.emotion || "Unknown"})`;
-        commentsDiv.appendChild(div);
-      });
-    })
-    .catch(err => {
-      console.error("분석 데이터 불러오기 실패:", err);
-      byId("analysisText").textContent = "분석 결과 로딩 실패";
+    const total = data.reduce((a, b) => a + b, 0);
+    if (pieChart) {
+        try { pieChart.destroy(); } catch (_) {}
+    }
+    ctx.clearRect(0, 0, container.width, container.height);
+
+    if (total === 0) {
+        ctx.font = "16px Arial";
+        ctx.fillStyle = "#666";
+        ctx.textAlign = "center";
+        ctx.fillText("감정 데이터가 없습니다.", container.width / 2, container.height / 2);
+        return;
+    }
+
+    // 차트 색상 팔레트
+    const colors = [
+        "#4caf50", "#9e9e9e", "#f44336",
+        "#2196f3", "#ff9800", "#9c27b0", "#607d8b"
+    ];
+
+    // ✅ 차트 설정 (왼쪽 파이 + 오른쪽 범례)
+    pieChart = new Chart(ctx, {
+        type: "pie",
+        data: { labels, datasets:[{ data, backgroundColor: colors, borderWidth: 1 }] },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,   // ✅ 원 비율 유지
+            aspectRatio: 1,              // ✅ 정사각형 (1:1)
+            layout: { padding: 10 },
+            plugins: {
+                legend: {
+                    position: "right",
+                    align: "center",
+                    labels: { boxWidth: 20, font: { size: 13 }, padding: 10, color: "#333" }
+                }
+            }
+        }
     });
 }
 
-// ====================
-// 썸네일 리스트 로드
-// ====================
-function loadVideos() {
-  fetch(`${API}/videos`)
-    .then(res => res.json())
-    .then(videos => {
-      const list = byId("thumbnailList");
-      list.innerHTML = "";
+// ========== 분석 조회 ==========
+function loadAnalysis(video_id){
+    // 더 많은 댓글을 사용해 집계 정확도↑
+    const url = `${API}/analysis/${encodeURIComponent(video_id)}?topn=100&limit=1000`;
+    fetch(url)
+        .then(res=>res.json())
+        .then(data=>{
+            // 디버그가 필요하면 아래 주석을 풀어보세요
+            // console.log("analysis", data);
 
-      videos.forEach(v => {
-        const div = document.createElement("div");
-        div.className = "thumbnail-box";
-        div.innerHTML = `
-          <img src="${v.thumbnail || "https://via.placeholder.com/280x160"}" alt="썸네일">
-          <div class="thumbnail-title">${v.title || ""}</div>
-        `;
-        div.addEventListener("click", () => {
-          fetch(`${API}/videos/${encodeURIComponent(v.video_id)}`)
-            .then(r => r.json())
-            .then(detail => {
-              updateMain(detail);
-              loadAnalysis(v.video_id);
+            renderPieChart(data.sentiment||{});
+            renderWordCloud(data.wordcloud||[]);
+            byId("analysisText").textContent = data.summary || "분석 결과 없음";
+
+            const commentsDiv = byId("commentList");
+            commentsDiv.innerHTML = "";
+            (data.comments||[]).forEach(c=>{
+                const div = document.createElement("div");
+                div.className = "comment";
+                div.textContent = `${c.text} (${c.emotion || "Unknown"})`;
+                commentsDiv.appendChild(div);
             });
+        })
+        .catch(err=>{
+            console.error("분석 데이터 불러오기 실패:", err);
+            byId("analysisText").textContent = "분석 결과 로딩 실패";
+            renderPieChart({});
+            renderWordCloud([]);
         });
-        list.appendChild(div);
-      });
-
-      // 첫 번째 영상 자동 로드
-      if (videos.length > 0) {
-        fetch(`${API}/videos/${encodeURIComponent(videos[0].video_id)}`)
-          .then(r => r.json())
-          .then(detail => {
-            updateMain(detail);
-            loadAnalysis(videos[0].video_id);
-          });
-      }
-    })
-    .catch(err => {
-      console.error("영상 목록 불러오기 실패:", err);
-    });
 }
 
-// ====================
-// 초기 실행
-// ====================
+// ========== 목록/상세 ==========
+function loadVideos(){
+    fetch(`${API}/videos`)
+        .then(res=>res.json())
+        .then(videos=>{
+            const list = byId("thumbnailList");
+            if(!list) return;
+            list.innerHTML = "";
+
+            if(!Array.isArray(videos) || videos.length===0){
+                list.innerHTML = "<div class='empty'>영상이 없습니다.</div>";
+                return;
+            }
+
+            videos.forEach(v=>{
+                const div = document.createElement("div");
+                div.className = "thumbnail-box";
+                div.innerHTML = `
+          <img src="${v.thumbnail || "https://via.placeholder.com/280x160"}" alt="썸네일">
+          <div class="thumbnail-title">${v.title || ""}</div>`;
+                div.addEventListener("click", ()=>{
+                    fetch(`${API}/videos/${encodeURIComponent(v.video_id)}`)
+                        .then(r=>r.json())
+                        .then(detail=>{
+                            updateMain(detail);
+                            loadAnalysis(v.video_id);
+                        })
+                        .catch(e=>console.error("상세 로딩 실패:", e));
+                });
+                list.appendChild(div);
+            });
+
+            // 첫 번째 자동 로드
+            fetch(`${API}/videos/${encodeURIComponent(videos[0].video_id)}`)
+                .then(r=>r.json())
+                .then(detail=>{
+                    updateMain(detail);
+                    loadAnalysis(videos[0].video_id);
+                })
+                .catch(e=>console.error("초기 상세 로딩 실패:", e));
+        })
+        .catch(err=> console.error("영상 목록 불러오기 실패:", err));
+}
+
 window.addEventListener("DOMContentLoaded", loadVideos);

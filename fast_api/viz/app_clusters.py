@@ -1,6 +1,6 @@
 from __future__ import annotations
 import os
-from typing import Any, List
+from typing import Any, List, Optional
 from datetime import datetime
 from fastapi import FastAPI, Query, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -29,7 +29,7 @@ def health():
     return {"ok": True, "service": "clusters", "time": datetime.now().isoformat()}
 
 @app.get("/api/clusters/summary")
-def clusters_summary(top:int=60, min_size:int=2, since:str|None=None):
+def clusters_summary(top:int=60, min_size:int=2, since:Optional[str]=None):
     q = {"count": {"$gte": min_size}}
     if since:
         try:

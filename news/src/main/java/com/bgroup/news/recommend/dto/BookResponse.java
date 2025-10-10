@@ -1,4 +1,4 @@
-package com.bgroup.news.origin.dto;
+package com.bgroup.news.recommend.dto;
 
 import lombok.Data;
 import org.springframework.data.annotation.Id;

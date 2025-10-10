@@ -117,10 +117,17 @@ public class WebClientConfig {
     }
 
     @Bean("analysisClient")
-    public WebClient analysisClient(
-            WebClient.Builder baseWebClientBuilder,
-            @Value("${fastapi.analysis}") String baseUrl
-    ) {
-        return baseWebClientBuilder.baseUrl(baseUrl.trim()).build();
+    public WebClient analysisClient(WebClient.Builder b, @Value("${fastapi.analysis}") String baseUrl) {
+        HttpClient http = HttpClient.create()
+                .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 5_000)
+                .responseTimeout(Duration.ofSeconds(15))
+                .doOnConnected(c -> c.addHandlerLast(new ReadTimeoutHandler(15))
+                        .addHandlerLast(new WriteTimeoutHandler(15)));
+        return b.baseUrl(baseUrl.trim())
+                .clientConnector(new ReactorClientHttpConnector(http))
+                .exchangeStrategies(ExchangeStrategies.builder()
+                        .codecs(c -> c.defaultCodecs().maxInMemorySize(10 * 1024 * 1024)) // 10MB
+                        .build())
+                .build();
     }
 }
