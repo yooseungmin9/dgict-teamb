@@ -103,9 +103,9 @@
       data:{
         labels,
         datasets:[
-          {label:"부정(<0)", data:neg, stack:"s", backgroundColor:"rgba(255,99,132,0.7)"},
+          {label:"부정(<0)", data:neg, stack:"s", backgroundColor:"rgba(221,51,51,0.7)"},
           {label:"중립(=0)", data:neu, stack:"s", backgroundColor:"rgba(201,203,207,0.7)"},
-          {label:"긍정(>0)", data:pos, stack:"s", backgroundColor:"rgba(75,192,192,0.7)"},
+          {label:"긍정(>0)", data:pos, stack:"s", backgroundColor:"rgba(30,115,190,0.7)"},
         ]
       },
       options: makeBarOptions(false)

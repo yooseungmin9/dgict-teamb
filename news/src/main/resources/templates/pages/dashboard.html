@@ -19,6 +19,7 @@
     <script defer src="/js/ticker.js"></script>
     <script defer src="/js/emoa.js"></script>
     <script defer src="/js/hot-topic.js"></script>
+    <script defer src="/js/hot-topic-realtime-lite.js"></script>
     <script defer src="/js/count.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
     <script defer src="/js/clusters.js"></script>
@@ -57,13 +58,14 @@
             <!-- 좌열 -->
             <div class="stack" id="col-left">
                 <div class="card" id="panel-sentiment-series">
+                    <strong class="strong">긍·부정추이</strong>
                     <article class="card__body">
                         <div class="feature-card" id="sentiment-card"
                              data-api="http://localhost:8007/sentiment/line">
-                            <strong class="strong">긍·부정추이</strong>
                             <div class="controls" style="display:flex; gap:8px; align-items:center; margin-left:auto;">
                                 <button id="btn-mode-count" class="btn btn--sm">건수</button>
                                 <button id="btn-mode-ratio" class="btn btn--sm">비율</button>
+                                <span style="margin: auto 10px; font-size: 20px;"> | </span>
                                 <button id="btn-g-day"   class="btn btn--sm">일별</button>
                                 <button id="btn-g-week"  class="btn btn--sm">주별</button>
                                 <button id="btn-g-month" class="btn btn--sm">월별</button>
@@ -80,7 +82,7 @@
             <!-- 중앙열 -->
             <div class="stack" id="col-center">
                 <div class="card" id="panel-hot-topic-yesterday">
-                    <strong class="strong">키워드 핫토픽</strong>
+                    <strong class="strong">오늘의 키워드 핫토픽</strong>
                     <!-- ✅ placeholder 클래스 제거, hot-topic.js가 채움 -->
                     <div class="card__body" id="hot-topic-body">
                         <p style="text-align:center; color:#999;">로딩 중...</p>
@@ -93,9 +95,20 @@
                 </div>
 
                 <div class="card" id="panel-today-sentiment">
+                    <strong class="strong">오늘의 감성 요약</strong>
                     <div class="card__body" id="emoa-summary">
                         <p>데이터 수집 중...</p>
                     </div>
+                </div>
+
+                <div class="card" id="panel-ad">
+                    <strong class="strong">광고</strong>
+                    <a class="card__body ad-banner" href="https://www.saramin.co.kr/">
+                        <div class="ad-content">
+                            <h2>배너 광고 모집</h2>
+                            <p>홈페이지 배너 광고 모집중 입니다.</p>
+                        </div>
+                    </a>
                 </div>
 
                 <div class="card" id="panel-clusters">
@@ -112,8 +125,8 @@
             <!-- 우열 -->
             <div class="stack" id="col-right">
                 <div class="card" id="panel-keyword-rank">
+                    <strong class="strong">키워드 랭킹</strong>
                     <div class="card__body">
-                        <strong class="strong">키워드 랭킹</strong>
                         <div class="controls" style="margin-bottom:6px;">
                             <label><input type="radio" name="DB_kwMode" value="category" checked /> 카테고리별</label>
                             <label><input type="radio" name="DB_kwMode" value="global" /> 통합</label>

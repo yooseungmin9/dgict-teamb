@@ -52,10 +52,10 @@
   gap:20px;
   grid-template-areas:
     "topwide  topwide  hotTopic"
-    "today    cluster  hotTopic"
-    "newsCount    cluster  rank"
+    "newsCount   cluster  hotTopic"
+    "today    cluster  rank"
     "chart    cluster  rank"
-    "media    media    void";
+    "media    media    ad";
   /* 자동 배치 간섭 방지 */
   grid-auto-flow: row;
   min-width: 0;
@@ -70,14 +70,18 @@
 #panel-news-count         { grid-area: newsCount; }
 #panel-clusters           { grid-area: cluster; }
 #panel-opinion            { grid-area: media; }
-#panel-void               { grid-area: void; }
+#panel-ad                 { grid-area: ad; }
 
-#panel-news-count .strong { padding:28px 20px 20px; }
-#panel-hot-topic-yesterday .strong { padding:28px 20px 20px; }
-#panel-sentiment-series .strong { padding:28px 20px 20px; }
-#panel-keyword-rank .strong { padding:28px 20px 20px; }
-#panel-clusters .strong { padding:28px 20px 20px; }
-#panel-opinion .strong { padding:28px 20px 20px; }
+#panel-news-count .strong { padding:28px 20px 0px; margin-bottom: 0px;}
+#panel-news-count .card__body { padding-top: 5px; }
+#panel-today-sentiment .strong { padding: 28px 20px 0px; }
+#panel-today-sentiment .card__body { padding-top: 5px; }
+#panel-hot-topic-yesterday .strong { padding:28px 20px 0px; }
+#panel-sentiment-series .strong { padding:28px 20px 0px; }
+#panel-keyword-rank .strong { padding:28px 20px 0px; }
+#panel-clusters .strong { padding:28px 20px 0px; }
+#panel-opinion .strong { padding:28px 20px 0px; }
+#panel-ad .strong { padding: 28px 20px 0px; }
 
 
 /* 3) 이전 컬럼 래퍼가 남아있다면 비활성화(안 쓰도록) */
@@ -126,8 +130,8 @@
 
 .chart-container{ position:relative; height:260px; }
 .controls{ display:flex; gap:12px; margin-top:8px; align-items:center; flex-wrap:wrap; }
-.chip{ padding:6px 10px; border:1px solid #ddd; border-radius:12px; background:#f8f9fb; cursor:pointer; }
-.chip.active{ background:#e8eefc; border-color:#b6c6ff; }
+.chip{ padding:6px 10px; border-radius:999px; background:#fff; color:#000; cursor:pointer; border: 1px solid #3b82f6;}
+.chip.active{ background:#3b82f6; color: #fff }
 .ranking-table{ width:100%; border-collapse:collapse; table-layout:fixed; }
 .ranking-table th,.ranking-table td{ padding:10px 8px; border-bottom:1px solid #eee; text-align:left; }
 .ranking-table .right{ text-align:right; }
@@ -142,13 +146,14 @@
     grid-template-columns: 1fr;
     grid-template-areas:
       "topwide"
-      "rightTop"
-      "chart"
+      "hotTopic"
+      "newsCount"
       "today"
-      "rank"
       "cluster"
+      "chart"
+      "rank"
       "media"
-      "newsCount";
+      "ad";
   }
 }
 
@@ -267,4 +272,96 @@
   border: 1px solid #ddd; border-radius: 8px;
   padding: 10px 14px; box-shadow: 0 2px 6px rgba(0,0,0,.08);
   font-weight: 600;
-}   /*     */
+}
+
+/* ===== 광고 배너 (이미지 그대로 + 무지개 글자) ===== */
+.ad-banner {
+  position: relative;
+  width: 100%;
+  height: 320px;
+  background-image: url("../img/ad-banner.jpg");
+  background-size: cover;
+  background-position: center;
+  border-radius: 12px;
+  overflow: hidden;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+}
+
+/* 중앙 텍스트 */
+.ad-content {
+  padding: 20px;
+}
+
+/* 무지개 그라데이션 텍스트 */
+.ad-content h2 {
+  font-size: 36px;
+  font-weight: 800;
+  background: linear-gradient(
+    90deg,
+    #ff0000,
+    #ff7f00,
+    #ffff00,
+    #00ff00,
+    #0000ff,
+    #4b0082,
+    #8f00ff
+  );
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  text-fill-color: transparent;
+  margin-bottom: 12px;
+  transition: transform 0.3s ease;
+}
+.ad-content h2:hover {
+  transform: scale(1.05);
+}
+
+.ad-content p {
+  font-size: 18px;
+  color: #000;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.4); /* 배경 대비 향상 */
+}
+
+/* 반응형 */
+@media (max-width: 768px) {
+  .ad-banner {
+    height: 220px;
+  }
+  .ad-content h2 {
+    font-size: 26px;
+  }
+  .ad-content p {
+    font-size: 14px;
+  }
+}
+
+@keyframes exitFadeCollapse {
+  0%   { opacity: 1; height: var(--row-h, auto); margin-top: 5px; margin-bottom: 5px; }
+  100% { opacity: 0; height: 0;                 margin-top: 0;   margin-bottom: 0; }
+}
+@keyframes enterFadeRise {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0);   }
+}
+
+/* 제거될 때만 잠깐 사용 */
+.hot-exit {
+  overflow: hidden;
+  animation: exitFadeCollapse .35s ease forwards;
+}
+
+/* 새로 들어올 때만 잠깐 사용 */
+.hot-enter {
+  animation: enterFadeRise .35s ease-out both;
+}
+
+/* FLIP 중 겹침 최소화용 */
+.hot-flipping {
+  position: relative;
+  will-change: transform, opacity;
+  pointer-events: none;
+}
