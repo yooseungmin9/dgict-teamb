@@ -32,7 +32,7 @@ public class RecommendController {
         Mono<YoutubeResponse> ytMono = youtubeClient.get()
                 .uri(uri -> uri.path("/youtube/search")
                         .queryParam("q", q)
-                        .queryParam("max_results", 3)
+                        .queryParam("max_results", 6)
                         .build())
                 .retrieve()
                 .bodyToMono(YoutubeResponse.class);
