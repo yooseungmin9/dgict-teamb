@@ -68,14 +68,41 @@ def health() -> dict:
 
 
 @app.get("/videos")
-def get_videos() -> list[dict]:
-    """유튜브 영상 리스트(썸네일 포함) 반환."""
-    docs = col_video.find({}, {"video_id": 1, "title": 1, "thumbnail_url": 1, "_id": 0})
+def get_videos(
+    category: Optional[str] = Query(None, description="카테고리 필터"),
+    sort_by: Optional[str] = Query("latest", description="정렬 기준: views/comments/latest"),
+) -> list[dict]:
+    """
+    유튜브 영상 리스트 (카테고리+정렬)
+    - ?category=증권&sort_by=views
+    """
+    # 1️⃣ 필터 조건
+    query = {}
+    if category:
+        query["category"] = category
+
+    # 2️⃣ 정렬 기준 매핑
+    sort_map = {
+        "views": ("view_count", -1),       # 조회수순
+        "comments": ("comment_count", -1), # 댓글순
+        "latest": ("published_at", -1),    # 최신순
+    }
+    sort_field, sort_dir = sort_map.get(sort_by, ("published_at", -1))
+
+    # 3️⃣ MongoDB 쿼리
+    docs = (
+        col_video.find(query, {"_id": 0, "video_id": 1, "title": 1, "thumbnail_url": 1, "category": 1})
+        .sort(sort_field, sort_dir)
+        .limit(20)
+    )
+
+    # 4️⃣ 반환 구조
     return [
         {
             "video_id": d.get("video_id"),
             "title": d.get("title", ""),
             "thumbnail": d.get("thumbnail_url", ""),
+            "category": d.get("category", ""),
         }
         for d in docs
     ]
@@ -243,6 +270,7 @@ def get_random_youtube_video() -> dict:
         import traceback
         traceback.print_exc()
         return {"error": f"{type(e).__name__}: {e}"}
+
 
 
 # ✅ 참고: get_analysis 내부 limit 처리(이미 반영되어 있으면 그대로 두세요)

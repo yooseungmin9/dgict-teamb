@@ -1,52 +1,59 @@
 package com.bgroup.news.analysis.controller;
 
-import com.bgroup.news.analysis.dto.AnalysisResponseDto;
-import com.bgroup.news.analysis.dto.VideoDetailDto;
-import com.bgroup.news.analysis.dto.VideoSummaryDto;
-import com.bgroup.news.analysis.service.YoutubeService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
+import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.util.UriComponentsBuilder;
+import reactor.core.publisher.Mono;
 
 @RestController
 @RequestMapping("/api")
 @RequiredArgsConstructor
 public class YoutubeController {
 
-    private final YoutubeService youtubeService;
+    // ✅ FastAPI 서버 포트 (8008)
+    private final WebClient webClient = WebClient.create("http://localhost:8008");
 
-    /**
-     * 🎥 영상 목록 (좌측 썸네일 리스트)
-     */
+    /** 🎥 영상 목록 (FastAPI 프록시 + 정렬/카테고리 전달) */
     @GetMapping("/videos")
-    public ResponseEntity<List<VideoSummaryDto>> listVideos() {
-        List<VideoSummaryDto> list = youtubeService.listVideos();
-        return ResponseEntity.ok(list);
+    public Mono<ResponseEntity<String>> listVideos(
+            @RequestParam(required = false) String category,
+            @RequestParam(name = "sort_by", required = false) String sortBy) {
+
+        return webClient.get()
+                .uri(uriBuilder -> {
+                    var u = uriBuilder.path("/videos");
+                    if (category != null) u.queryParam("category", category);
+                    if (sortBy != null) u.queryParam("sort_by", sortBy);
+                    return u.build();
+                })
+                .retrieve()
+                .toEntity(String.class);
     }
 
-    /**
-     * 🎬 영상 상세 (제목, 조회수, 댓글수 등)
-     */
+    /** 🎬 영상 상세 */
     @GetMapping("/videos/{videoId}")
-    public ResponseEntity<VideoDetailDto> getVideoDetail(@PathVariable String videoId) {
-        VideoDetailDto detail = youtubeService.getVideoDetail(videoId);
-        return ResponseEntity.ok(detail);
+    public Mono<ResponseEntity<String>> getVideoDetail(@PathVariable String videoId) {
+        return webClient.get()
+                .uri("/videos/{id}", videoId)
+                .retrieve()
+                .toEntity(String.class);
     }
 
-    /**
-     * 📊 영상 분석 (FastAPI 연동)
-     * JS: fetch("/api/analysis/{videoId}?topn=100&limit=1000")
-     */
+    /** 📊 분석 결과 */
     @GetMapping("/analysis/{videoId}")
-    public ResponseEntity<AnalysisResponseDto> getAnalysis(
+    public Mono<ResponseEntity<String>> getAnalysis(
             @PathVariable String videoId,
             @RequestParam(required = false) Integer limit,
             @RequestParam(defaultValue = "100") int topn) {
 
-        // limit은 현재 YoutubeService 내부에서 1000으로 고정되어 있으므로 무시 가능
-        AnalysisResponseDto analysis = youtubeService.getAnalysis(videoId);
-        return ResponseEntity.ok(analysis);
+        return webClient.get()
+                .uri(uriBuilder -> uriBuilder.path("/analysis/{id}")
+                        .queryParam("limit", limit)
+                        .queryParam("topn", topn)
+                        .build(videoId))
+                .retrieve()
+                .toEntity(String.class);
     }
 }

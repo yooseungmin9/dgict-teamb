@@ -131,47 +131,54 @@ function loadAnalysis(video_id){
 }
 
 // ========== 목록/상세 ==========
-function loadVideos(){
-    fetch(`${API}/videos`)
-        .then(res=>res.json())
-        .then(videos=>{
-            const list = byId("thumbnailList");
-            if(!list) return;
-            list.innerHTML = "";
+// /static/js/youtube.js
 
-            if(!Array.isArray(videos) || videos.length===0){
-                list.innerHTML = "<div class='empty'>영상이 없습니다.</div>";
-                return;
-            }
+async function loadVideos(category = null, sort_by = "latest") {
+  const params = new URLSearchParams();
+  if (category) params.append("category", category);
+  if (sort_by) params.append("sort_by", sort_by);
 
-            videos.forEach(v=>{
-                const div = document.createElement("div");
-                div.className = "thumbnail-box";
-                div.innerHTML = `
-          <img src="${v.thumbnail || "https://via.placeholder.com/280x160"}" alt="썸네일">
-          <div class="thumbnail-title">${v.title || ""}</div>`;
-                div.addEventListener("click", ()=>{
-                    fetch(`${API}/videos/${encodeURIComponent(v.video_id)}`)
-                        .then(r=>r.json())
-                        .then(detail=>{
-                            updateMain(detail);
-                            loadAnalysis(v.video_id);
-                        })
-                        .catch(e=>console.error("상세 로딩 실패:", e));
-                });
-                list.appendChild(div);
-            });
+  try {
+    const res = await fetch(`${API}/videos?${params.toString()}`);
+    const videos = await res.json();
+    const list = byId("thumbnailList");
+    if (!list) return;
 
-            // 첫 번째 자동 로드
-            fetch(`${API}/videos/${encodeURIComponent(videos[0].video_id)}`)
-                .then(r=>r.json())
-                .then(detail=>{
-                    updateMain(detail);
-                    loadAnalysis(videos[0].video_id);
-                })
-                .catch(e=>console.error("초기 상세 로딩 실패:", e));
-        })
-        .catch(err=> console.error("영상 목록 불러오기 실패:", err));
+    list.innerHTML = "";
+
+    if (!Array.isArray(videos) || videos.length === 0) {
+      list.innerHTML = "<div class='empty'>영상이 없습니다.</div>";
+      return;
+    }
+
+    // 썸네일 목록 렌더링
+    videos.forEach(v => {
+      const div = document.createElement("div");
+      div.className = "thumbnail-box";
+      div.innerHTML = `
+        <img src="${v.thumbnail || "https://via.placeholder.com/280x160"}" alt="썸네일">
+        <div class="thumbnail-title">${v.title || ""}</div>`;
+      div.addEventListener("click", () => {
+        fetch(`${API}/videos/${encodeURIComponent(v.video_id)}`)
+          .then(r => r.json())
+          .then(detail => {
+            updateMain(detail);
+            loadAnalysis(v.video_id);
+          });
+      });
+      list.appendChild(div);
+    });
+
+    // 첫 번째 영상 자동 로드
+    const first = videos[0];
+    if (first) {
+      const detail = await fetch(`${API}/videos/${encodeURIComponent(first.video_id)}`).then(r => r.json());
+      updateMain(detail);
+      loadAnalysis(first.video_id);
+    }
+  } catch (err) {
+    console.error("영상 목록 불러오기 실패:", err);
+  }
 }
 
-window.addEventListener("DOMContentLoaded", loadVideos);
+
