@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <title>Opinion Mining Dashboard</title>
     <link rel="stylesheet" href="/css/style.css"/>
+    <link rel="stylesheet" href="/css/footer.css"/>
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <!-- WordCloud.js (CDN 교체 ✅) -->
@@ -129,5 +130,8 @@
         </div>
     </div>
 </main>
+
+<div th:replace="fragments/footer :: siteFooter"></div>
+
 </body>
 </html>

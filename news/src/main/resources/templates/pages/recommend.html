@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <title>추천</title>
   <link rel="stylesheet" th:href="@{/css/style.css}" />
+  <link rel="stylesheet" href="/css/footer.css"/>
   <style>
     .book-list {
       display: grid;
@@ -128,5 +129,8 @@
     </div>
   </div>
 </main>
+
+<div th:replace="fragments/footer :: siteFooter"></div>
+
 </body>
 </html>

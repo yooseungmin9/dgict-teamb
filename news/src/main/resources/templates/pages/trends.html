@@ -1,334 +1,334 @@
-<!-- templates/trends.html — 카테고리 언급량 + 키워드 랭킹 (필터/통합 모드 지원) -->
-<!DOCTYPE html>
-<html lang="ko" xmlns:th="http://www.thymeleaf.org">
-<head>
-  <meta charset="UTF-8" />
-  <title>경제 트렌드 분석</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <link rel="stylesheet" th:href="@{/css/style.css}" />
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <style>
-    .container { max-width: 1080px; margin: 0 auto; padding: 16px; }
-    .page-title { font-size: 26px; font-weight: 700; margin: 16px 0 12px; }
-    .chart-section, .ranking-section { margin-top: 24px; }
-    .chart-container { position: relative; height: 360px; }
-    .controls { display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
-    .chip { padding:6px 10px; border:1px solid #ddd; border-radius:12px; background:#f8f9fb; cursor:pointer; }
-    .chip.active { background:#e8eefc; border-color:#b6c6ff; }
-    .ranking-table { width:100%; border-collapse: collapse; table-layout: fixed; }
-    .ranking-table th, .ranking-table td { padding:10px 8px; border-bottom:1px solid #eee; text-align:left; }
-    .ranking-table .right { text-align:right; }
-    .muted { color:#888; }
-    /* 모드에 따라 카테고리 열을 숨길 때 사용할 클래스 */
-    .hide-category th.col-category,
-    .hide-category td.col-category { display: none; }
-  </style>
-</head>
-<body>
-<div th:replace="fragments/header :: siteHeader"></div>
+<!--&lt;!&ndash; templates/trends.html — 카테고리 언급량 + 키워드 랭킹 (필터/통합 모드 지원) &ndash;&gt;-->
+<!--<!DOCTYPE html>-->
+<!--<html lang="ko" xmlns:th="http://www.thymeleaf.org">-->
+<!--<head>-->
+<!--  <meta charset="UTF-8" />-->
+<!--  <title>경제 트렌드 분석</title>-->
+<!--  <meta name="viewport" content="width=device-width, initial-scale=1" />-->
+<!--  <link rel="stylesheet" th:href="@{/css/style.css}" />-->
+<!--  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>-->
+<!--  <style>-->
+<!--    .container { max-width: 1080px; margin: 0 auto; padding: 16px; }-->
+<!--    .page-title { font-size: 26px; font-weight: 700; margin: 16px 0 12px; }-->
+<!--    .chart-section, .ranking-section { margin-top: 24px; }-->
+<!--    .chart-container { position: relative; height: 360px; }-->
+<!--    .controls { display:flex; gap:12px; align-items:center; flex-wrap:wrap; }-->
+<!--    .chip { padding:6px 10px; border:1px solid #ddd; border-radius:12px; background:#f8f9fb; cursor:pointer; }-->
+<!--    .chip.active { background:#e8eefc; border-color:#b6c6ff; }-->
+<!--    .ranking-table { width:100%; border-collapse: collapse; table-layout: fixed; }-->
+<!--    .ranking-table th, .ranking-table td { padding:10px 8px; border-bottom:1px solid #eee; text-align:left; }-->
+<!--    .ranking-table .right { text-align:right; }-->
+<!--    .muted { color:#888; }-->
+<!--    /* 모드에 따라 카테고리 열을 숨길 때 사용할 클래스 */-->
+<!--    .hide-category th.col-category,-->
+<!--    .hide-category td.col-category { display: none; }-->
+<!--  </style>-->
+<!--</head>-->
+<!--<body>-->
+<!--<div th:replace="fragments/header :: siteHeader"></div>-->
 
-<main class="main">
-  <div class="container">
-    <div id="trends-page" class="page">
-      <h2 class="page-title">경제 트렌드 분석</h2>
+<!--<main class="main">-->
+<!--  <div class="container">-->
+<!--    <div id="trends-page" class="page">-->
+<!--      <h2 class="page-title">경제 트렌드 분석</h2>-->
 
-      <!-- 카테고리별 언급량 -->
-      <div class="chart-section">
-        <div class="controls" style="margin-bottom:8px;">
-          <h3 style="margin-right:auto;">카테고리별 언급량 추이</h3>
-          <label class="muted">표시 기간(일)
-            <select id="trendDays">
-              <option value="30" selected>30</option>
-              <option value="60">60</option>
-              <option value="90">90</option>
-            </select>
-          </label>
-        </div>
-        <div class="chart-container">
-          <canvas id="categoryTrendChart"></canvas>
-        </div>
-      </div>
+<!--      &lt;!&ndash; 카테고리별 언급량 &ndash;&gt;-->
+<!--      <div class="chart-section">-->
+<!--        <div class="controls" style="margin-bottom:8px;">-->
+<!--          <h3 style="margin-right:auto;">카테고리별 언급량 추이</h3>-->
+<!--          <label class="muted">표시 기간(일)-->
+<!--            <select id="trendDays">-->
+<!--              <option value="30" selected>30</option>-->
+<!--              <option value="60">60</option>-->
+<!--              <option value="90">90</option>-->
+<!--            </select>-->
+<!--          </label>-->
+<!--        </div>-->
+<!--        <div class="chart-container">-->
+<!--          <canvas id="categoryTrendChart"></canvas>-->
+<!--        </div>-->
+<!--      </div>-->
 
-      <!-- 키워드 랭킹 -->
-      <div class="ranking-section">
-        <div class="controls" style="margin-bottom:6px;">
-          <h3 style="margin-right:auto;">카테고리별 키워드 랭킹</h3>
+<!--      &lt;!&ndash; 키워드 랭킹 &ndash;&gt;-->
+<!--      <div class="ranking-section">-->
+<!--        <div class="controls" style="margin-bottom:6px;">-->
+<!--          <h3 style="margin-right:auto;">카테고리별 키워드 랭킹</h3>-->
 
-          <!-- 보기 모드: 카테고리/통합 -->
-          <label><input type="radio" name="kwMode" value="category" checked /> 카테고리별</label>
-          <label><input type="radio" name="kwMode" value="global" /> 통합</label>
+<!--          &lt;!&ndash; 보기 모드: 카테고리/통합 &ndash;&gt;-->
+<!--          <label><input type="radio" name="kwMode" value="category" checked /> 카테고리별</label>-->
+<!--          <label><input type="radio" name="kwMode" value="global" /> 통합</label>-->
 
-          <!-- 카테고리 선택 (카테고리별 모드에서만 표시) -->
-          <select id="kwCategorySelect" style="min-width:140px; display:none;"></select>
+<!--          &lt;!&ndash; 카테고리 선택 (카테고리별 모드에서만 표시) &ndash;&gt;-->
+<!--          <select id="kwCategorySelect" style="min-width:140px; display:none;"></select>-->
 
-          <!-- TopN -->
-          <label class="muted">Top
-            <select id="kwTopN">
-              <option value="10" selected>10</option>
-              <option value="20">20</option>
-              <option value="30">30</option>
-            </select>
-          </label>
-          <!-- 기간(일) — 컨트롤러 days 쿼리 지원 시 사용 -->
-          <label class="muted">기간(일)
-            <select id="kwDays">
-              <option value="30" selected>30</option>
-              <option value="60">60</option>
-              <option value="90">90</option>
-            </select>
-          </label>
-        </div>
+<!--          &lt;!&ndash; TopN &ndash;&gt;-->
+<!--          <label class="muted">Top-->
+<!--            <select id="kwTopN">-->
+<!--              <option value="10" selected>10</option>-->
+<!--              <option value="20">20</option>-->
+<!--              <option value="30">30</option>-->
+<!--            </select>-->
+<!--          </label>-->
+<!--          &lt;!&ndash; 기간(일) — 컨트롤러 days 쿼리 지원 시 사용 &ndash;&gt;-->
+<!--          <label class="muted">기간(일)-->
+<!--            <select id="kwDays">-->
+<!--              <option value="30" selected>30</option>-->
+<!--              <option value="60">60</option>-->
+<!--              <option value="90">90</option>-->
+<!--            </select>-->
+<!--          </label>-->
+<!--        </div>-->
 
-        <!-- 탭 버튼 (선택 카테고리 빠르게 전환) -->
-        <div id="kwTabs" style="margin:6px 0; display:flex; gap:6px; flex-wrap:wrap;"></div>
+<!--        &lt;!&ndash; 탭 버튼 (선택 카테고리 빠르게 전환) &ndash;&gt;-->
+<!--        <div id="kwTabs" style="margin:6px 0; display:flex; gap:6px; flex-wrap:wrap;"></div>-->
 
-        <table id="kwTable" class="ranking-table">
-          <thead>
-          <tr>
-            <th style="width:64px;">순위</th>
-            <th>키워드</th>
-            <th id="kwHeaderCategory" class="col-category" style="width:140px;">카테고리</th>
-            <th class="right" style="width:100px;">언급량</th>
-          </tr>
-          </thead>
-          <tbody id="keywordRankingBody"></tbody>
-        </table>
-      </div>
-    </div>
-  </div>
-</main>
+<!--        <table id="kwTable" class="ranking-table">-->
+<!--          <thead>-->
+<!--          <tr>-->
+<!--            <th style="width:64px;">순위</th>-->
+<!--            <th>키워드</th>-->
+<!--            <th id="kwHeaderCategory" class="col-category" style="width:140px;">카테고리</th>-->
+<!--            <th class="right" style="width:100px;">언급량</th>-->
+<!--          </tr>-->
+<!--          </thead>-->
+<!--          <tbody id="keywordRankingBody"></tbody>-->
+<!--        </table>-->
+<!--      </div>-->
+<!--    </div>-->
+<!--  </div>-->
+<!--</main>-->
 
-<script>
-  // ===== 공통 fetch 유틸 (1차 URL 실패 시 폴백) =====
-  async function fetchJSON(primaryUrl, fallbackUrl, params={}) {
-    const urlWithParams = (u) => {
-      if (!params || Object.keys(params).length === 0) return u;
-      const q = new URLSearchParams(params).toString();
-      return u + (u.includes('?') ? '&' : '?') + q;
-    };
-    try {
-      const r = await fetch(urlWithParams(primaryUrl));
-      if (!r.ok) throw new Error(r.statusText);
-      return await r.json();
-    } catch (_) {
-      if (!fallbackUrl) throw _;
-      const r2 = await fetch(urlWithParams(fallbackUrl));
-      if (!r2.ok) throw new Error(r2.statusText);
-      return await r2.json();
-    }
-  }
+<!--<script>-->
+<!--  // ===== 공통 fetch 유틸 (1차 URL 실패 시 폴백) =====-->
+<!--  async function fetchJSON(primaryUrl, fallbackUrl, params={}) {-->
+<!--    const urlWithParams = (u) => {-->
+<!--      if (!params || Object.keys(params).length === 0) return u;-->
+<!--      const q = new URLSearchParams(params).toString();-->
+<!--      return u + (u.includes('?') ? '&' : '?') + q;-->
+<!--    };-->
+<!--    try {-->
+<!--      const r = await fetch(urlWithParams(primaryUrl));-->
+<!--      if (!r.ok) throw new Error(r.statusText);-->
+<!--      return await r.json();-->
+<!--    } catch (_) {-->
+<!--      if (!fallbackUrl) throw _;-->
+<!--      const r2 = await fetch(urlWithParams(fallbackUrl));-->
+<!--      if (!r2.ok) throw new Error(r2.statusText);-->
+<!--      return await r2.json();-->
+<!--    }-->
+<!--  }-->
 
-  // ====== 1) 카테고리별 언급량 차트 ======
-  let trendChart;
-  async function initCategoryTrends() {
-    const days = document.getElementById("trendDays").value;
-    const data = await fetchJSON(
-      "/api/trends/category-trends",
-      "/api/category-trends",
-      { days }
-    );
+<!--  // ====== 1) 카테고리별 언급량 차트 ======-->
+<!--  let trendChart;-->
+<!--  async function initCategoryTrends() {-->
+<!--    const days = document.getElementById("trendDays").value;-->
+<!--    const data = await fetchJSON(-->
+<!--      "/api/trends/category-trends",-->
+<!--      "/api/category-trends",-->
+<!--      { days }-->
+<!--    );-->
 
-    const ctx = document.getElementById("categoryTrendChart");
-    if (!ctx) return;
+<!--    const ctx = document.getElementById("categoryTrendChart");-->
+<!--    if (!ctx) return;-->
 
-    const colorMap = {
-      "증권": "#1f77b4",
-      "금융": "#ff7f0e",
-      "부동산": "#2ca02c",
-      "산업": "#d62728",
-      "글로벌경제": "#9467bd",
-      "기타": "#8c564b",
-      "일반": "#8c564b"
-    };
+<!--    const colorMap = {-->
+<!--      "증권": "#1f77b4",-->
+<!--      "금융": "#ff7f0e",-->
+<!--      "부동산": "#2ca02c",-->
+<!--      "산업": "#d62728",-->
+<!--      "글로벌경제": "#9467bd",-->
+<!--      "기타": "#8c564b",-->
+<!--      "일반": "#8c564b"-->
+<!--    };-->
 
-    const labels = data.dates;
-    const datasets = Object.keys(data.categories).map(cat => {
-      const key = (cat === "일반" ? "기타" : cat);
-      const color = colorMap[key] || "gray";
-      return {
-        label: key,
-        data: data.categories[cat],
-        borderColor: color,
-        backgroundColor: color + "55",
-        fill: false,
-        tension: 0.3,
-        borderWidth: 2,
-        pointRadius: 2
-      };
-    });
+<!--    const labels = data.dates;-->
+<!--    const datasets = Object.keys(data.categories).map(cat => {-->
+<!--      const key = (cat === "일반" ? "기타" : cat);-->
+<!--      const color = colorMap[key] || "gray";-->
+<!--      return {-->
+<!--        label: key,-->
+<!--        data: data.categories[cat],-->
+<!--        borderColor: color,-->
+<!--        backgroundColor: color + "55",-->
+<!--        fill: false,-->
+<!--        tension: 0.3,-->
+<!--        borderWidth: 2,-->
+<!--        pointRadius: 2-->
+<!--      };-->
+<!--    });-->
 
-    if (trendChart) trendChart.destroy();
-    trendChart = new Chart(ctx, {
-      type: "line",
-      data: { labels, datasets },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: { position: "top" },
-          tooltip: {
-            mode: "index",
-            intersect: false,
-            callbacks: {
-              title: (items) => (items.length > 0 ? items[0].label : "")
-            }
-          }
-        },
-        interaction: { mode: "nearest", axis: "x", intersect: false },
-        scales: {
-          x: { ticks: { autoSkip: true, maxTicksLimit: 8 } },
-          y: { beginAtZero: true, title: { display: true, text: "언급량(건)" } }
-        }
-      }
-    });
-  }
+<!--    if (trendChart) trendChart.destroy();-->
+<!--    trendChart = new Chart(ctx, {-->
+<!--      type: "line",-->
+<!--      data: { labels, datasets },-->
+<!--      options: {-->
+<!--        responsive: true,-->
+<!--        maintainAspectRatio: false,-->
+<!--        plugins: {-->
+<!--          legend: { position: "top" },-->
+<!--          tooltip: {-->
+<!--            mode: "index",-->
+<!--            intersect: false,-->
+<!--            callbacks: {-->
+<!--              title: (items) => (items.length > 0 ? items[0].label : "")-->
+<!--            }-->
+<!--          }-->
+<!--        },-->
+<!--        interaction: { mode: "nearest", axis: "x", intersect: false },-->
+<!--        scales: {-->
+<!--          x: { ticks: { autoSkip: true, maxTicksLimit: 8 } },-->
+<!--          y: { beginAtZero: true, title: { display: true, text: "언급량(건)" } }-->
+<!--        }-->
+<!--      }-->
+<!--    });-->
+<!--  }-->
 
-  // ====== 2) 키워드 랭킹 (카테고리/통합 모드) ======
-  const groupBy = (arr, key) =>
-    arr.reduce((m, x) => ((m[x[key]] ??= []).push(x), m), {});
+<!--  // ====== 2) 키워드 랭킹 (카테고리/통합 모드) ======-->
+<!--  const groupBy = (arr, key) =>-->
+<!--    arr.reduce((m, x) => ((m[x[key]] ??= []).push(x), m), {});-->
 
-  let KW_RAW = [];           // [{rank, keyword, category, count}]
-  let KW_BY_CAT = {};        // {cat: [rows...]}
-  let KW_CATEGORIES = [];    // 카테고리 목록
-  let KW_MODE = "category";  // "category" | "global"
-  let KW_CURRENT_CAT = "";   // 현재 표시 카테고리
+<!--  let KW_RAW = [];           // [{rank, keyword, category, count}]-->
+<!--  let KW_BY_CAT = {};        // {cat: [rows...]}-->
+<!--  let KW_CATEGORIES = [];    // 카테고리 목록-->
+<!--  let KW_MODE = "category";  // "category" | "global"-->
+<!--  let KW_CURRENT_CAT = "";   // 현재 표시 카테고리-->
 
-  async function loadKeywordRanking() {
-    const days = document.getElementById("kwDays").value;
-    try {
-      const url = "/api/trends/keyword-ranking";
-      const res = await fetch(url + "?days=" + encodeURIComponent(days));
-      KW_RAW = await res.json();
-    } catch {
-      // 컨트롤러가 days를 안 받을 수도 있으니 폴백
-      const res = await fetch("/api/trends/keyword-ranking");
-      KW_RAW = await res.json();
-    }
-    KW_BY_CAT = groupBy(KW_RAW, "category");
-    KW_CATEGORIES = Object.keys(KW_BY_CAT).sort();
-    if (!KW_CURRENT_CAT) KW_CURRENT_CAT = KW_CATEGORIES[0] || "";
-    buildKwTabs();
-    buildKwSelect();
-    renderKwTable();
-  }
+<!--  async function loadKeywordRanking() {-->
+<!--    const days = document.getElementById("kwDays").value;-->
+<!--    try {-->
+<!--      const url = "/api/trends/keyword-ranking";-->
+<!--      const res = await fetch(url + "?days=" + encodeURIComponent(days));-->
+<!--      KW_RAW = await res.json();-->
+<!--    } catch {-->
+<!--      // 컨트롤러가 days를 안 받을 수도 있으니 폴백-->
+<!--      const res = await fetch("/api/trends/keyword-ranking");-->
+<!--      KW_RAW = await res.json();-->
+<!--    }-->
+<!--    KW_BY_CAT = groupBy(KW_RAW, "category");-->
+<!--    KW_CATEGORIES = Object.keys(KW_BY_CAT).sort();-->
+<!--    if (!KW_CURRENT_CAT) KW_CURRENT_CAT = KW_CATEGORIES[0] || "";-->
+<!--    buildKwTabs();-->
+<!--    buildKwSelect();-->
+<!--    renderKwTable();-->
+<!--  }-->
 
-  function buildKwTabs() {
-    const wrap = document.getElementById("kwTabs");
-    wrap.style.display = (KW_MODE === "category") ? "flex" : "none";
-    wrap.innerHTML = "";
-    KW_CATEGORIES.forEach(cat => {
-      const btn = document.createElement("button");
-      btn.textContent = cat;
-      btn.className = "chip" + (cat === KW_CURRENT_CAT ? " active" : "");
-      btn.addEventListener("click", () => {
-        KW_CURRENT_CAT = cat;
-        document.getElementById("kwCategorySelect").value = cat;
-        buildKwTabs(); // 활성 표시 갱신
-        renderKwTable();
-      });
-      wrap.appendChild(btn);
-    });
-  }
+<!--  function buildKwTabs() {-->
+<!--    const wrap = document.getElementById("kwTabs");-->
+<!--    wrap.style.display = (KW_MODE === "category") ? "flex" : "none";-->
+<!--    wrap.innerHTML = "";-->
+<!--    KW_CATEGORIES.forEach(cat => {-->
+<!--      const btn = document.createElement("button");-->
+<!--      btn.textContent = cat;-->
+<!--      btn.className = "chip" + (cat === KW_CURRENT_CAT ? " active" : "");-->
+<!--      btn.addEventListener("click", () => {-->
+<!--        KW_CURRENT_CAT = cat;-->
+<!--        document.getElementById("kwCategorySelect").value = cat;-->
+<!--        buildKwTabs(); // 활성 표시 갱신-->
+<!--        renderKwTable();-->
+<!--      });-->
+<!--      wrap.appendChild(btn);-->
+<!--    });-->
+<!--  }-->
 
-  function buildKwSelect() {
-    const sel = document.getElementById("kwCategorySelect");
-    sel.style.display = (KW_MODE === "category") ? "inline-block" : "none";
-    sel.innerHTML = "";
-    KW_CATEGORIES.forEach(cat => {
-      const opt = document.createElement("option");
-      opt.value = cat;
-      opt.textContent = cat;
-      sel.appendChild(opt);
-    });
-    sel.value = KW_CURRENT_CAT || KW_CATEGORIES[0] || "";
-  }
+<!--  function buildKwSelect() {-->
+<!--    const sel = document.getElementById("kwCategorySelect");-->
+<!--    sel.style.display = (KW_MODE === "category") ? "inline-block" : "none";-->
+<!--    sel.innerHTML = "";-->
+<!--    KW_CATEGORIES.forEach(cat => {-->
+<!--      const opt = document.createElement("option");-->
+<!--      opt.value = cat;-->
+<!--      opt.textContent = cat;-->
+<!--      sel.appendChild(opt);-->
+<!--    });-->
+<!--    sel.value = KW_CURRENT_CAT || KW_CATEGORIES[0] || "";-->
+<!--  }-->
 
-  function toggleCategoryColumn(show) {
-    const table = document.getElementById("kwTable");
-    if (show) {
-      table.classList.remove("hide-category");
-    } else {
-      table.classList.add("hide-category");
-    }
-  }
+<!--  function toggleCategoryColumn(show) {-->
+<!--    const table = document.getElementById("kwTable");-->
+<!--    if (show) {-->
+<!--      table.classList.remove("hide-category");-->
+<!--    } else {-->
+<!--      table.classList.add("hide-category");-->
+<!--    }-->
+<!--  }-->
 
-  function setKwMode(mode) {
-    KW_MODE = mode;
-    const showCategoryCol = (mode === "global"); // 통합 모드에서만 카테고리 열 표시
-    toggleCategoryColumn(showCategoryCol);
-    document.getElementById("kwCategorySelect").style.display = (mode === "category") ? "inline-block" : "none";
-    document.getElementById("kwTabs").style.display = (mode === "category") ? "flex" : "none";
-    if (!KW_CURRENT_CAT && KW_CATEGORIES.length) KW_CURRENT_CAT = KW_CATEGORIES[0];
-    buildKwTabs();
-    buildKwSelect();
-    renderKwTable();
-  }
+<!--  function setKwMode(mode) {-->
+<!--    KW_MODE = mode;-->
+<!--    const showCategoryCol = (mode === "global"); // 통합 모드에서만 카테고리 열 표시-->
+<!--    toggleCategoryColumn(showCategoryCol);-->
+<!--    document.getElementById("kwCategorySelect").style.display = (mode === "category") ? "inline-block" : "none";-->
+<!--    document.getElementById("kwTabs").style.display = (mode === "category") ? "flex" : "none";-->
+<!--    if (!KW_CURRENT_CAT && KW_CATEGORIES.length) KW_CURRENT_CAT = KW_CATEGORIES[0];-->
+<!--    buildKwTabs();-->
+<!--    buildKwSelect();-->
+<!--    renderKwTable();-->
+<!--  }-->
 
-  function renderKwTable() {
-    const tbody = document.getElementById("keywordRankingBody");
-    tbody.innerHTML = "";
+<!--  function renderKwTable() {-->
+<!--    const tbody = document.getElementById("keywordRankingBody");-->
+<!--    tbody.innerHTML = "";-->
 
-    const topN = parseInt(document.getElementById("kwTopN").value || "10", 10);
-    let rows = [];
+<!--    const topN = parseInt(document.getElementById("kwTopN").value || "10", 10);-->
+<!--    let rows = [];-->
 
-    if (KW_MODE === "category") {
-      const src = (KW_BY_CAT[KW_CURRENT_CAT] || []).slice(0, topN);
-      rows = src.map((r, idx) => ({
-        rank: idx + 1,
-        keyword: r.keyword,
-        category: r.category || "",   // 셀은 유지(숨김은 CSS로 처리)
-        count: r.count || 0
-      }));
-    } else {
-      // 통합 모드: keyword별 count 합산 후 TopN
-      const byWord = new Map();
-      for (const r of KW_RAW) {
-        const k = r.keyword;
-        byWord.set(k, (byWord.get(k) || 0) + (r.count || 0));
-      }
-      const merged = [...byWord.entries()]
-        .map(([keyword, count]) => ({ keyword, count }))
-        .sort((a, b) => b.count - a.count)
-        .slice(0, topN);
+<!--    if (KW_MODE === "category") {-->
+<!--      const src = (KW_BY_CAT[KW_CURRENT_CAT] || []).slice(0, topN);-->
+<!--      rows = src.map((r, idx) => ({-->
+<!--        rank: idx + 1,-->
+<!--        keyword: r.keyword,-->
+<!--        category: r.category || "",   // 셀은 유지(숨김은 CSS로 처리)-->
+<!--        count: r.count || 0-->
+<!--      }));-->
+<!--    } else {-->
+<!--      // 통합 모드: keyword별 count 합산 후 TopN-->
+<!--      const byWord = new Map();-->
+<!--      for (const r of KW_RAW) {-->
+<!--        const k = r.keyword;-->
+<!--        byWord.set(k, (byWord.get(k) || 0) + (r.count || 0));-->
+<!--      }-->
+<!--      const merged = [...byWord.entries()]-->
+<!--        .map(([keyword, count]) => ({ keyword, count }))-->
+<!--        .sort((a, b) => b.count - a.count)-->
+<!--        .slice(0, topN);-->
 
-      rows = merged.map((r, idx) => ({
-        rank: idx + 1,
-        keyword: r.keyword,
-        category: "-", // 통합 모드에서는 구분 없음
-        count: r.count
-      }));
-    }
+<!--      rows = merged.map((r, idx) => ({-->
+<!--        rank: idx + 1,-->
+<!--        keyword: r.keyword,-->
+<!--        category: "-", // 통합 모드에서는 구분 없음-->
+<!--        count: r.count-->
+<!--      }));-->
+<!--    }-->
 
-    for (const r of rows) {
-      const tr = document.createElement("tr");
-      tr.innerHTML = `
-        <td>${r.rank}</td>
-        <td>${r.keyword}</td>
-        <td class="col-category">${r.category}</td>
-        <td class="right">${(r.count ?? 0).toLocaleString()}</td>
-      `;
-      tbody.appendChild(tr);
-    }
-  }
+<!--    for (const r of rows) {-->
+<!--      const tr = document.createElement("tr");-->
+<!--      tr.innerHTML = `-->
+<!--        <td>${r.rank}</td>-->
+<!--        <td>${r.keyword}</td>-->
+<!--        <td class="col-category">${r.category}</td>-->
+<!--        <td class="right">${(r.count ?? 0).toLocaleString()}</td>-->
+<!--      `;-->
+<!--      tbody.appendChild(tr);-->
+<!--    }-->
+<!--  }-->
 
-  // ==== 초기화 ====
-  document.getElementById("trendDays").addEventListener("change", initCategoryTrends);
-  document.getElementById("kwTopN").addEventListener("change", renderKwTable);
-  document.getElementById("kwDays").addEventListener("change", loadKeywordRanking);
-  document.getElementById("kwCategorySelect").addEventListener("change", (e) => {
-    KW_CURRENT_CAT = e.target.value;
-    buildKwTabs(); // 탭 활성 표시 동기화
-    renderKwTable();
-  });
-  document.querySelectorAll('input[name="kwMode"]').forEach(r =>
-    r.addEventListener("change", (e) => setKwMode(e.target.value))
-  );
+<!--  // ==== 초기화 ====-->
+<!--  document.getElementById("trendDays").addEventListener("change", initCategoryTrends);-->
+<!--  document.getElementById("kwTopN").addEventListener("change", renderKwTable);-->
+<!--  document.getElementById("kwDays").addEventListener("change", loadKeywordRanking);-->
+<!--  document.getElementById("kwCategorySelect").addEventListener("change", (e) => {-->
+<!--    KW_CURRENT_CAT = e.target.value;-->
+<!--    buildKwTabs(); // 탭 활성 표시 동기화-->
+<!--    renderKwTable();-->
+<!--  });-->
+<!--  document.querySelectorAll('input[name="kwMode"]').forEach(r =>-->
+<!--    r.addEventListener("change", (e) => setKwMode(e.target.value))-->
+<!--  );-->
 
-  (async function bootstrap() {
-    await initCategoryTrends();
-    await loadKeywordRanking();
-    setKwMode("category"); // 초기 모드
-  })();
-</script>
-</body>
-</html>
+<!--  (async function bootstrap() {-->
+<!--    await initCategoryTrends();-->
+<!--    await loadKeywordRanking();-->
+<!--    setKwMode("category"); // 초기 모드-->
+<!--  })();-->
+<!--</script>-->
+<!--</body>-->
+<!--</html>-->
