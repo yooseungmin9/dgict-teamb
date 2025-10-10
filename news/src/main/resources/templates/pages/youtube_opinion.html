@@ -92,35 +92,46 @@
         }
         .comments { margin-top:15px; }
         .comment { margin-bottom:10px; font-size:14px; }
-        /* ✅ 카테고리 / 정렬 필터 영역 */
+        /* ✅ 필터 전체 박스 */
         .filter-bar {
           display: flex;
           flex-direction: column;
           align-items: center;
-          gap: 8px;
-          padding: 10px 0 14px;
+          justify-content: center;
+          gap: 6px;
+          padding: 10px;
           background: #f9fafb;
-          border-radius: 10px;
-          box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+          border-radius: 14px;
+          box-shadow: inset 0 0 0 1px rgba(0,0,0,0.05);
+          box-sizing: border-box;
+          width: 100%;
+          max-width: 260px; /* ✅ 사이드바 안에서 고정 폭 제한 */
+          margin: 0 auto;
         }
 
         /* ✅ 카테고리 버튼 그룹 */
         .category-group {
-          display: flex;
-          flex-wrap: wrap;
-          justify-content: center;
+          display: grid;
+          grid-template-columns: repeat(4, 1fr); /* ✅ 4등분 균등폭 */
           gap: 6px;
+          width: 100%;
+          box-sizing: border-box;
         }
 
+        /* ✅ 버튼 (디자인 유지) */
         .category-group button {
+          width: 100%; /* ✅ 각 칸 가득 채우기 */
           background: #fff;
           border: 1px solid #d1d5db;
           border-radius: 20px;
-          padding: 5px 14px;
+          padding: 5px 0;
           font-size: 13px;
           color: #374151;
           cursor: pointer;
+          white-space: nowrap;
+          text-align: center;
           transition: all 0.15s ease;
+          box-sizing: border-box;
         }
 
         .category-group button:hover {
@@ -136,10 +147,10 @@
           border-color: #2563eb;
         }
 
-        /* ✅ 정렬 셀렉트 */
+        /* ✅ 정렬 드롭다운 */
         #sortSelect {
-          width: 90%;
-          padding: 6px 10px;
+          width: 95%;
+          padding: 5px 10px;
           border-radius: 8px;
           border: 1px solid #d1d5db;
           font-size: 13px;
@@ -147,10 +158,13 @@
           background: #fff;
           cursor: pointer;
           transition: border 0.2s ease;
+          box-sizing: border-box;
         }
         #sortSelect:hover {
           border-color: #2563eb;
         }
+
+
 
     </style>
 </head>
