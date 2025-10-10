@@ -13,16 +13,16 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     // 카드 HTML 구성
     target.innerHTML = `
-      <div style="text-align:center;">
-        <h4 style="font-weight:600; font-size:15px; margin-bottom:8px;">${data.title}</h4>
+      <h4 style="font-weight:600; font-size:15px; margin-bottom:8px;">${data.title}</h4>
+      <div style="display:flex; justify-content:center; align-items:center; gap:24px;">
         <a href="https://www.youtube.com/watch?v=${data.video_id}" target="_blank">
           <img src="${data.thumbnail_url}" width="240" style="border-radius:8px;">
         </a>
         <div style="display:flex;justify-content:center;align-items:center;">
           <canvas id="wcCanvas" width="260" height="260" style="margin-top:12px;"></canvas>
         </div>
-        <p style="font-size:13px;color:#555;margin-top:8px;">${data.summary}</p>
       </div>
+      <p style="font-size:13px;color:#555;margin-top:8px; text-align:center;">${data.summary}</p>
     `;
 
     // --- ✅ DOM이 갱신된 후 실행되도록 보장 ---

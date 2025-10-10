@@ -1,267 +1,213 @@
-// /static/js/news.js — 좌측 썸네일 카드 + 모달(본문 전체 노출)
+// /static/js/news.js — 뉴스 카드 디자인 유지 + 전일 브리핑 기능 추가
 (function () {
-  // ----- 0) 설정값 -----
-  const pageEl   = document.getElementById("news-page");
-  const API_BASE = (pageEl && pageEl.dataset.apiBase) ? pageEl.dataset.apiBase : "http://127.0.0.1:8000";
-  const NEWS_API = `${API_BASE}/news?limit=10`;
-  const BRIEFING_API = `${API_BASE}/briefing/yesterday`;
+  const list = document.getElementById("news-list");
 
-  // ----- 1) DOM 캐시 -----
-  const $list    = document.getElementById("news-list");
-  const $loading = document.getElementById("news-loading");
-  const $error   = document.getElementById("news-error");
+  // --- 카드 "더 보기" 토글 ---
+  list.addEventListener("click", (e) => {
+    const btn = e.target.closest(".more-toggle");
+    if (!btn) return;
+    e.stopPropagation();
+    e.preventDefault();
+    const card = btn.closest(".news-card");
+    const expanded = card.getAttribute("data-expanded") === "true";
+    card.setAttribute("data-expanded", expanded ? "false" : "true");
+    btn.textContent = expanded ? "더 보기" : "접기";
+  });
 
-  // 모달 요소
-  const $modal      = document.getElementById("news-modal");
-  const $modalClose = $modal?.querySelector(".modal-close");
-  const $modalBack  = $modal?.querySelector(".modal-backdrop");
-  const $mTitle   = document.getElementById("modal-title");
-  const $mUpdated = document.getElementById("modal-updated");
-  const $mImg     = document.getElementById("modal-image");
-  const $mContent = document.getElementById("modal-content");
-  const $mToggle  = document.getElementById("modal-toggle");
-  const $mLink    = document.getElementById("modal-link");
-  const $mPress  = document.getElementById("modal-press");
+  // --- 뉴스 클릭 → 모달 열기 ---
+  const modal = document.getElementById("news-modal");
+  if (modal) {
+    const closeBtn = modal.querySelector(".modal-close");
+    const backdrop = modal.querySelector(".modal-backdrop");
+    const $mTitle = document.getElementById("modal-title");
+    const $mUpdated = document.getElementById("modal-updated");
+    const $mImg = document.getElementById("modal-image");
+    const $mContent = document.getElementById("modal-content");
+    const $mLink = document.getElementById("modal-link");
+    const $mPress = document.getElementById("modal-press");
 
-  // ----- 2) 유틸 -----
-  const PLACEHOLDER =
-    'data:image/svg+xml;utf8,' +
-    encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="120" height="80"><rect width="100%" height="100%" fill="#f3f4f6"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="#9ca3af" font-size="12">no image</text></svg>');
-
-  function el(tag, cls, text) {
-    const e = document.createElement(tag);
-    if (cls) e.className = cls;
-    if (text !== undefined && text !== null) e.textContent = text;
-    return e;
-  }
-  function ellipsis(t, n = 150) {
-    if (!t) return "";
-    t = String(t).trim();
-    return t.length > n ? t.slice(0, n) + "…" : t;
-  }
-  // ----- 안정형 fetchJson (AbortSignal 제거 버전) -----
-  async function fetchJson(url) {
-    try {
-      const res = await fetch(url);
-      if (!res.ok) throw new Error("HTTP " + res.status);
-      const data = await res.json();
-      console.log("[DEBUG] fetchJson ok:", url, data);
-      return data;
-    } catch (err) {
-      console.error("[fetchJson] error:", err);
-      throw err;
-    }
-  }
-
-  function formatDate(iso) {
-    if (!iso) return "";
-    const s = String(iso);
-    return s.includes("T") ? s.split("T")[0] : s.substring(0, 10);
-  }
-  function lockScroll(lock) {
-    document.documentElement.style.overflow = lock ? "hidden" : "";
-    document.body.style.overflow = lock ? "hidden" : "";
-  }
-
-  // ----- 3) 카드 렌더러 (좌측 썸네일 + 우측 텍스트) -----
-  function renderCard(item) {
-    const card = el("div", "news-card");
-    card.dataset.id = item._id || "";
-    card.tabIndex = 0;
-
-    const wrap = el("div", "news-wrap");
-
-    // 썸네일
-    const img = el("img", "news-thumb");
-    img.src = item.image || PLACEHOLDER;
-    img.alt = item.title || "thumbnail";
-    img.onerror = () => { img.src = PLACEHOLDER; };
-    wrap.appendChild(img);
-
-    // 텍스트
-    const body   = el("div", "news-body");
-    const title  = el("span", "news-title", item.title || "(제목 없음)");
-    const meta   = el("div", "news-meta", formatDate(item.published_at || ""));
-    const p      = el("p", "news-summary", ellipsis(item.summary || "", 150));
-
-    body.appendChild(title);
-    if (meta.textContent) body.appendChild(meta);
-    body.appendChild(p);
-
-    wrap.appendChild(body);
-    card.appendChild(wrap);            // ⚠️ 중요: 카드에 wrap을 붙여야 화면에 보입니다.
-
-    // 카드/Enter → 모달 열기
-    const openIfId = () => {
-      const id = card.dataset.id;
-      if (id) openModal(id);
+    const lockScroll = (lock) => {
+      document.documentElement.style.overflow = lock ? "hidden" : "";
+      document.body.style.overflow = lock ? "hidden" : "";
     };
-    card.addEventListener("click", openIfId);
-    card.addEventListener("keydown", (e) => { if (e.key === "Enter") openIfId(); });
+    const showModal = () => {
+      modal.classList.add("open");
+      modal.setAttribute("aria-hidden", "false");
+      lockScroll(true);
+    };
+    const hideModal = () => {
+      modal.classList.remove("open");
+      modal.setAttribute("aria-hidden", "true");
+      lockScroll(false);
+    };
 
-    return card;
-  }
+    closeBtn.addEventListener("click", hideModal);
+    backdrop.addEventListener("click", hideModal);
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") hideModal();
+    });
 
-  // ----- 4) 뉴스 목록 로드 -----
-// ----- 4) 뉴스 목록 로드 (페이지네이션 포함) -----
-let currentPage = 1;    // 현재 페이지
-const limit = 10;       // 페이지당 기사 수
+    async function openModalById(id) {
+      try {
+        const res = await fetch(`/pages/news/${encodeURIComponent(id)}`);
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        const data = await res.json();
 
-async function loadNews(page = 1) {
-  currentPage = page;
-  const skip = (page - 1) * limit;
-  const apiUrl = `${API_BASE}/news?limit=${limit}&skip=${skip}`;
+        $mTitle.textContent = data.title || "(제목 없음)";
+        const updated = data.updated_at || data.publishedAt || data.published_at;
+        $mUpdated.textContent = updated ? String(updated).substring(0, 10) : "";
 
-  $loading.style.display = "block";
-  $error.style.display   = "none";
-  $list.innerHTML = "";
+        if (data.image) {
+          $mImg.src = data.image;
+          $mImg.alt = data.title || "article image";
+          $mImg.style.display = "block";
+          $mImg.onerror = () => {
+            $mImg.style.display = "none";
+          };
+        } else {
+          $mImg.removeAttribute("src");
+          $mImg.style.display = "none";
+        }
 
-  try {
-    const items = await fetchJson(apiUrl, 8000);
-    $loading.style.display = "none";
+        $mContent.textContent = data.content || data.summary || "";
+        if (data.url) {
+          $mLink.href = data.url;
+          $mLink.style.display = "inline-block";
+        } else {
+          $mLink.removeAttribute("href");
+          $mLink.style.display = "none";
+        }
 
-    if (!Array.isArray(items) || items.length === 0) {
-      $list.appendChild(el("p", "muted", "표시할 뉴스가 없습니다."));
-      return;
-    }
-    items.forEach(it => $list.appendChild(renderCard(it)));
-
-    // 페이지 네비게이션 표시
-    renderPagination();
-  } catch (e) {
-    console.error("[news] load error:", e);
-    $loading.style.display = "none";
-    $error.style.display = "block";
-    $error.textContent = "뉴스를 불러오지 못했습니다.";
-  }
-}
-
-// ----- 페이지 버튼 렌더링 -----
-function renderPagination() {
-  const $pagination = document.getElementById("pagination");
-  if (!$pagination) return;
-  $pagination.innerHTML = "";
-
-  const prevBtn = el("button", "page-btn", "이전");
-  const nextBtn = el("button", "page-btn", "다음");
-
-  prevBtn.disabled = currentPage === 1;
-  prevBtn.onclick = () => loadNews(currentPage - 1);
-  nextBtn.onclick = () => loadNews(currentPage + 1);
-
-  $pagination.appendChild(prevBtn);
-  $pagination.appendChild(el("span", "page-info", `${currentPage} 페이지`));
-  $pagination.appendChild(nextBtn);
-}
-// ----- 5) 전일 브리핑 로드 (카테고리별 표시) -----
-async function loadBriefing() {
-  const card = document.querySelector(".briefing-card");
-  if (!card) return;
-
-  const container = card.querySelector(".briefing-content");
-  if (!container) return;
-
-  try {
-    const data = await fetchJson(BRIEFING_API, 8000);
-    console.log("[DEBUG] briefing data:", data); // ✅ 실제 데이터 확인용
-
-    // 기존 내용 초기화
-    container.innerHTML = "";
-
-    // 날짜 표시
-    const datePrefix = data.date ? `(${data.date})` : "";
-    const dateEl = el("p", "briefing-date", `${datePrefix} 전일 카테고리별 요약`);
-    container.appendChild(dateEl);
-
-    // 카테고리 검증
-    if (!data.categories || !Array.isArray(data.categories) || data.categories.length === 0) {
-      container.appendChild(el("p", "muted", "전일 기사 요약이 없습니다."));
-      return;
+        $mPress.textContent = data.press ? "출처: " + data.press : "";
+        showModal();
+      } catch (e) {
+        console.error(e);
+        alert("상세를 불러오지 못했습니다.");
+      }
     }
 
-    // ✅ 카테고리별 박스 렌더링
-    for (const cat of data.categories) {
-      const box = el("div", "briefing-box");
+    // 카드 클릭 시 모달 열기
+    list.addEventListener("click", (e) => {
+      const card = e.target.closest(".news-card");
+      if (!card || e.target.closest(".more-toggle")) return;
+      const id = card.getAttribute("data-id");
+      if (id) openModalById(id);
+    });
+  }
 
-      const title = el("h5", "briefing-title", `📌 ${cat.category || "분류 없음"}`);
-      box.appendChild(title);
+  // ✅ 전일 브리핑 요약 로드
+  async function loadBriefing() {
+    const wrap = document.querySelector(".briefing-content");
+    if (!wrap) return;
 
-      const summary = el("p", "briefing-summary", cat.summary || "요약 없음");
-      box.appendChild(summary);
+    // 1) 우선 스프링 경로 시도 → 실패하면 FastAPI 경로(API_BASE)로 폴백
+    const pageEl   = document.getElementById("news-page");
+    const API_BASE = (pageEl && pageEl.dataset.apiBase) ? pageEl.dataset.apiBase : "";
+    const candidates = [
+      "/pages/news/api/briefing/yesterday",              // Spring(DB 직결) 우선:contentReference[oaicite:3]{index=3}
+      API_BASE ? `${API_BASE}/briefing/yesterday` : null // FastAPI 폴백:contentReference[oaicite:4]{index=4}
+    ].filter(Boolean);
 
-      // 하이라이트(태그)
-      const tagWrap = el("div", "briefing-highlights");
-      if (Array.isArray(cat.highlights) && cat.highlights.length > 0) {
-        for (const tag of cat.highlights) {
-          const span = el("span", "highlight", tag);
-          tagWrap.appendChild(span);
+    // 관대한 파서: 다양한 필드명을 지원
+    const parseBriefing = (data) => {
+      if (!data || typeof data !== "object") return { date: "", categories: [] };
+
+      // date 후보
+      const date = data.date || data.yesterday || data.briefingDate || data.dt || "";
+
+      // categories 후보
+      let cats = data.categories || data.cats || data.items || data.data || [];
+      if (!Array.isArray(cats) && typeof cats === "object") {
+        // 객체 맵 형태면 값 배열로
+        cats = Object.values(cats);
+      }
+      // 각 항목 키 보정
+      cats = Array.isArray(cats) ? cats.map(c => ({
+        category: c.category || c.cat || c.name || c.title || "분류 없음",
+        summary:  c.summary  || c.desc || c.text  || c.overview || "",
+        highlights: Array.isArray(c.highlights) ? c.highlights :
+            Array.isArray(c.tags)       ? c.tags :
+                typeof c.keywords === "string" ? c.keywords.split(/[,|]/).map(s=>s.trim()).filter(Boolean) :
+                    Array.isArray(c.keywords) ? c.keywords : []
+      })) : [];
+
+      return { date, categories: cats };
+    };
+
+    // 실제 호출
+    try {
+      let ok = false, payload = null, lastErr = null;
+
+      for (const url of candidates) {
+        try {
+          const res = await fetch(url, { headers: { "Accept": "application/json" }});
+          console.debug("[briefing] try:", url, "→", res.status);
+          if (!res.ok) { lastErr = new Error("HTTP " + res.status); continue; }
+
+          // JSON만 받도록 (HTML 응답 대비)
+          const ct = res.headers.get("content-type") || "";
+          if (!ct.includes("application/json")) {
+            lastErr = new Error("Not JSON: " + ct);
+            continue;
+          }
+          const raw = await res.json();
+          const parsed = parseBriefing(raw);
+          payload = parsed;
+          ok = true;
+          break;
+        } catch (e) {
+          lastErr = e;
         }
       }
-      box.appendChild(tagWrap);
 
-      // box → container
-      container.appendChild(box);
-    }
-
-  } catch (e) {
-    console.warn("[briefing] load error:", e);
-    container.innerHTML = `<p class="error">요약 데이터를 불러오지 못했습니다.</p>`;
-  }
-}
-
-
-  // ----- 6) 모달 동작 -----
-  function showModal() {
-    if (!$modal) return;
-    $modal.classList.add("open");
-    $modal.setAttribute("aria-hidden", "false");
-    lockScroll(true);
-  }
-  function hideModal() {
-    if (!$modal) return;
-    $modal.classList.remove("open");
-    $modal.setAttribute("aria-hidden", "true");
-    lockScroll(false);
-  }
-  $modalClose?.addEventListener("click", hideModal);
-  $modalBack?.addEventListener("click", hideModal);
-  document.addEventListener("keydown", (e) => { if (e.key === "Escape") hideModal(); });
-
-  // ----- 7) 상세 열기 -----
-  async function openModal(id) {
-    try {
-      const data = await fetchJson(`${API_BASE}/news/${encodeURIComponent(id)}`, 8000);
-
-      $mTitle.textContent   = data.title || "(제목 없음)";
-      $mUpdated.textContent = formatDate(data.updated_at) || "";
-
-      if (data.image) {
-        $mImg.src = data.image;
-        $mImg.alt = data.title || "article image";
-        $mImg.style.display = "block";
-        $mImg.onerror = () => { $mImg.style.display = "none"; };
-      } else {
-        $mImg.removeAttribute("src");
-        $mImg.style.display = "none";
+      // 렌더링
+      wrap.innerHTML = "";
+      if (!ok || !payload) {
+        console.warn("[briefing] load failed:", lastErr);
+        wrap.innerHTML = `<p class="error">요약 데이터를 불러오지 못했습니다.</p>`;
+        return;
       }
 
-      $mContent.textContent = data.content || "";
-      if ($mToggle) $mToggle.style.display = "none";
+      const datePrefix = payload.date ? `(${payload.date}) ` : "";
+      const dateEl = document.createElement("p");
+      dateEl.className = "briefing-date";
+      dateEl.textContent = `${datePrefix}전일 카테고리별 요약`;
+      wrap.appendChild(dateEl);
 
-      if (data.url) { $mLink.href = data.url; $mLink.style.display = "inline-block"; }
-      else { $mLink.removeAttribute("href"); $mLink.style.display = "none"; }
+      if (!Array.isArray(payload.categories) || payload.categories.length === 0) {
+        wrap.innerHTML += `<p class="muted">전일 기사 요약이 없습니다.</p>`;
+        return;
+      }
 
-      $mPress.textContent = data.press ? `출처: ${data.press}` : "";
-      showModal();
+      for (const cat of payload.categories) {
+        const box = document.createElement("div");
+        box.className = "briefing-box";
+
+        const h5 = document.createElement("h5");
+        h5.className = "briefing-title";
+        h5.textContent = `📌 ${cat.category || "분류 없음"}`;
+
+        const p = document.createElement("p");
+        p.className = "briefing-summary";
+        p.textContent = cat.summary || "요약 없음";
+
+        const tags = document.createElement("div");
+        tags.className = "briefing-highlights";
+        if (Array.isArray(cat.highlights)) {
+          for (const t of cat.highlights) {
+            const span = document.createElement("span");
+            span.className = "highlight";
+            span.textContent = t;
+            tags.appendChild(span);
+          }
+        }
+
+        box.append(h5, p, tags);
+        wrap.appendChild(box);
+      }
     } catch (e) {
-      console.error("[modal] load detail error:", e);
-      alert("상세를 불러오지 못했습니다.");
+      console.warn("[briefing] unexpected error:", e);
+      wrap.innerHTML = `<p class="error">요약 데이터를 불러오지 못했습니다.</p>`;
     }
   }
-
-  // ----- 8) 시작 -----
-  document.addEventListener("DOMContentLoaded", async () => {
-    await loadNews();
-    await loadBriefing();
-  });
 })();
