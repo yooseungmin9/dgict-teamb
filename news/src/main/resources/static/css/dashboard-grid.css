@@ -51,13 +51,37 @@
   grid-template-columns: 1fr 1fr 1fr;
   gap:20px;
   grid-template-areas:
-    "left center right"
-    "wide wide  right";
+    "topwide topwide rightTop"
+    "today   chart   rightTop"
+    "cluster chart   rightTop"
+    "cluster chart   rank"
+    "media  media    rank"
+    "media  media    newsCount";
   /* 자동 배치 간섭 방지 */
   grid-auto-flow: row;
   min-width: 0;
   margin-bottom: 20px;
 }
+
+#panel-hot-datalab        { grid-area: topwide; }
+#panel-hot-topic-yesterday{ grid-area: rightTop; }
+#panel-today-sentiment    { grid-area: today; }
+#panel-sentiment-series   { grid-area: chart; }
+#panel-keyword-rank       { grid-area: rank; }
+#panel-news-count         { grid-area: newsCount; }
+#panel-cluster            { grid-area: cluster; }
+#panel-opinion            { grid-area: media; }
+
+#panel-news-count .strong { padding:28px 20px 20px; }
+#panel-hot-topic-yesterday .strong { padding:28px 20px 20px; }
+#panel-sentiment-series .strong { padding:28px 20px 20px; }
+#panel-keyword-rank .strong { padding:28px 20px 20px; }
+#panel-cluster .strong { padding:28px 20px 20px; }
+#panel-opinion .strong { padding:28px 20px 20px; }
+
+
+/* 3) 이전 컬럼 래퍼가 남아있다면 비활성화(안 쓰도록) */
+#col-left, #col-center, #col-right, .row-2 { display: contents !important; }
 
 .card
 .dashboard-card {
@@ -112,22 +136,19 @@
 .hide-category th.col-category,
 .hide-category td.col-category{ display:none; }
 
-/* 유틸리티 클래스 추가 */
-/* 영역 매핑 */
-#col-left{   grid-area:left; }
-#col-center{ grid-area:center; }
-#col-right{  grid-area:right; }
-#panel-hot-datalab{ grid-area:wide; }
-
 /* 반응형: 1열 전개 시 자동 복귀 */
-@media (max-width: 1200px){
+@media (max-width:1280px){
   .dash__grid{
-      grid-template-columns: 1fr;
-      grid-template-areas:
-        "left"
-        "center"
-        "right"
-        "wide";
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "topwide"
+      "rightTop"
+      "chart"
+      "today"
+      "rank"
+      "cluster"
+      "media"
+      "newsCount";
   }
 }
 
@@ -177,7 +198,7 @@
 .ticker-wrap{
   position:relative; overflow:hidden;
   background: #3b82f6; color:#fff;
-  border-radius:10px; height:42px;
+  border-radius:10px; height:42px;``
   margin: 10px 0;
 }
 /* 키프레임 삭제! (JS가 직접 이동 제어) */
@@ -200,18 +221,6 @@
   justify-content: space-between;
   margin-bottom: 8px;
 }
-#panel-opinion {
-  grid-column: span 2;         /* 가로 2칸 확장 (right 영역 넓힘) */
-  width: 100%;
-  text-align: center;
-}
-
-#panel-opinion .card__title {
-  font-size: 18px;
-  font-weight: 600;
-  margin-bottom: 10px;
-  color: #222;
-}
 
 #panel-opinion .card__body {
   display: flex;
@@ -223,22 +232,25 @@
 #panel-opinion img {
   width: 260px;
   border-radius: 8px;
-  margin-top: 6px;
-  margin-bottom: 10px;
 }
 
 #panel-opinion canvas {
-  width: 320px !important;   /* 워드클라우드 크기 확대 */
-  height: 320px !important;
-  margin-top: 12px;
+  width: 240px !important;   /* 워드클라우드 크기 확대 */
+  height: 240px !important;
+}
+
+#panel-opinion img,
+#panel-opinion canvas {
+  margin: 0;
 }
 
 #panel-opinion p {
-  max-width: 360px;
+  max-width: 500px;
   font-size: 13px;
   color: #555;
   line-height: 1.5;
   text-align: center;
+  margin-top: 12px;
 }
 
 /*  클러스터  */

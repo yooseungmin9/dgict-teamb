@@ -16,6 +16,8 @@ async function loadSummary() {
 }
 
 function cleanLabel(s) {
+  if (!s) return s;
+    s = String(s).replace(/^요약[:：]?\s*/i, "");
   return s
     ? s.replace(/(?:^|[\s\-\|,;])(?:이슈\s*요약|대표\s*이슈명|이슈명)\s*[:：]?\s*/gi, " ")
         .replace(/["“”‘’]+/g, "")
@@ -62,7 +64,7 @@ async function renderTreemapECharts() {
   };
 
   const data = arr.map(d => ({
-    name: d.name,
+    name: cleanLabel(d.name),
     value: d.value,
     id: d.id,
     itemStyle: { color: colorOf(d.value), borderColor: '#fff', borderWidth: 1 }
