@@ -107,9 +107,11 @@
         /* ✅ 카테고리 버튼 그룹 */
         .category-group {
           display: flex;
-          flex-wrap: wrap;
           justify-content: center;
-          gap: 6px;
+          align-items: center;
+          gap: 8px;
+          flex-wrap: nowrap; /* ✅ 한 줄 고정 */
+          flex-shrink: 0;
         }
 
         .category-group button {
