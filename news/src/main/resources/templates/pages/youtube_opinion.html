@@ -92,38 +92,44 @@
         }
         .comments { margin-top:15px; }
         .comment { margin-bottom:10px; font-size:14px; }
-        /* ✅ 카테고리 / 정렬 필터 영역 */
+        /* ✅ 필터 전체 박스 (패딩 줄임) */
         .filter-bar {
           display: flex;
           flex-direction: column;
           align-items: center;
-          gap: 8px;
-          padding: 10px 0 14px;
+          justify-content: center;
+          gap: 6px; /* 🔹 간격 축소 */
+          padding: 8px 6px; /* 🔹 위아래 여백 줄이기 */
           background: #f9fafb;
-          border-radius: 10px;
-          box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+          border-radius: 14px;
+          box-shadow: inset 0 0 0 1px rgba(0,0,0,0.05);
+          box-sizing: border-box;
         }
 
-        /* ✅ 카테고리 버튼 그룹 */
+        /* ✅ 카테고리 버튼 그룹 (한 줄 중앙 고정) */
         .category-group {
           display: flex;
           justify-content: center;
           align-items: center;
-          gap: 8px;
-          flex-wrap: nowrap; /* ✅ 한 줄 고정 */
-          flex-shrink: 0;
+          gap: 6px; /* 🔹 버튼 사이 간격 줄이기 */
+          flex-wrap: nowrap;
+          margin: 0;
+          width: 100%;
+          box-sizing: border-box;
         }
 
+        /* ✅ 버튼 디자인 (색상 유지) */
         .category-group button {
           background: #fff;
           border: 1px solid #d1d5db;
           border-radius: 20px;
-          padding: 5px 14px;
+          padding: 4px 13px; /* 🔹 버튼 크기 약간 축소 */
           font-size: 13px;
           color: #374151;
           cursor: pointer;
-          white-space: nowrap; /* ✅ 줄바꿈 방지 */
+          white-space: nowrap;
           transition: all 0.15s ease;
+          box-sizing: border-box;
         }
 
         .category-group button:hover {
@@ -139,10 +145,10 @@
           border-color: #2563eb;
         }
 
-        /* ✅ 정렬 셀렉트 */
+        /* ✅ 정렬 셀렉트 (살짝 위로 올림) */
         #sortSelect {
           width: 90%;
-          padding: 6px 10px;
+          padding: 5px 10px;
           border-radius: 8px;
           border: 1px solid #d1d5db;
           font-size: 13px;
@@ -150,10 +156,14 @@
           background: #fff;
           cursor: pointer;
           transition: border 0.2s ease;
+          box-sizing: border-box;
+          margin-top: 4px; /* 🔹 위 버튼과 간격 최소화 */
         }
         #sortSelect:hover {
           border-color: #2563eb;
         }
+
+
 
     </style>
 </head>
