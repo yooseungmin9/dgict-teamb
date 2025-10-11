@@ -28,7 +28,7 @@ import java.util.stream.Collectors;
 public class RecommendController {
 
     private final BookRepository bookRepo;    // MongoRepository<BookResponse, String>
-    private final WebClient youtubeClient;    // @Bean("youtubeClient") 로 주입
+    private final WebClient youtubeClient;    // @Bean("youtubeClient")
     private final PreferenceKeywords pref;    // seed 생성 유틸
 
     @GetMapping(value = "/recommend", produces = MediaType.TEXT_HTML_VALUE)
@@ -40,8 +40,11 @@ public class RecommendController {
         model.addAttribute("loggedIn", loggedIn);
 
         // ===== 기본(비로그인) 목록 =====
-        List<BookResponse> defaultBooks  = getTrendingBooks(5);      // ★ 트렌디 정렬(판매+신간)
-        List<Item>         defaultVideos = getYoutubeForDefault(6);  // ★ 타임아웃↑ + 폴백 쿼리
+        final int BOOK_SIZE_DEFAULT   = 5; // ★ 서적 5개
+        final int YOUTUBE_SIZE_DEFAULT= 6; // ★ 유튜브 6개
+
+        List<BookResponse> defaultBooks  = getTrendingBooks(BOOK_SIZE_DEFAULT);      // 판매 + 신간 가중
+        List<Item>         defaultVideos = getYoutubeForDefault(YOUTUBE_SIZE_DEFAULT); // 타임아웃↑ + 폴백 쿼리
 
         model.addAttribute("defaultBooks", defaultBooks);
         model.addAttribute("defaultVideos", defaultVideos);
@@ -49,10 +52,9 @@ public class RecommendController {
         // ===== 개인화(로그인) 목록 =====
         if (loggedIn) {
             List<String> seeds = pref.buildSeeds(me, 3, 8); // 상위 3개 서브카테고리 → 키워드 최대 8개
-            List<String> seedsForYoutube = seeds.size() > 2 ? seeds.subList(0, 2) : seeds; // 호출 수 제한
-
-            List<BookResponse> personalBooks  = safeGet(() -> getPersonalBooks(seeds, 5, defaultBooks), defaultBooks);
-            List<Item>         personalVideos = safeGet(() -> getYoutubePersonal(seedsForYoutube, 6, defaultVideos), defaultVideos);
+            // 유튜브는 1차로 2개 seed만, 부족하면 5개까지 확장 (함수 내부 로직)
+            List<BookResponse> personalBooks  = safeGet(() -> getPersonalBooks(seeds, BOOK_SIZE_DEFAULT, defaultBooks), defaultBooks);
+            List<Item>         personalVideos = safeGet(() -> getYoutubePersonal(seeds, YOUTUBE_SIZE_DEFAULT, defaultVideos), defaultVideos);
 
             model.addAttribute("personalBooks", personalBooks);
             model.addAttribute("personalVideos", personalVideos);
@@ -71,7 +73,7 @@ public class RecommendController {
      * score = 0.65 * normalizeSales + 0.35 * freshness(0~1, 365일 선형감쇠)
      */
     private List<BookResponse> getTrendingBooks(int size) {
-        // 넉넉한 풀: 판매지수 내림차순 위주로 많이 가져오고(상위 200), 신간도 섞기 위해 신간 기준 풀도 합침
+        // 넉넉한 풀: 판매지수/신간 각각 상위 200개씩
         Pageable bySales = PageRequest.of(0, 200, Sort.by(Sort.Order.desc("salesPoint")));
         Pageable byDate  = PageRequest.of(0, 200, Sort.by(Sort.Order.desc("pubDate")));
 
@@ -110,7 +112,7 @@ public class RecommendController {
             if (b != null) result.add(b);
         }
 
-        // 혹시 부족하면 판매지수 상위로 채우기
+        // 부족하면 판매지수 상위로 채우기
         if (result.size() < size) {
             List<BookResponse> best = bookRepo.findAll(bySales).getContent();
             for (BookResponse b : best) {
@@ -159,7 +161,7 @@ public class RecommendController {
         }
 
         if (ranked.size() < size) {
-            List<BookResponse> best = getTrendingBooks(size); // 기본과 동일 기준으로 채움
+            List<BookResponse> best = getTrendingBooks(size); // 기본 기준으로 채움
             for (BookResponse b : best) {
                 if (ranked.size() >= size) break;
                 if (ranked.stream().noneMatch(x -> Objects.equals(x.getId(), b.getId()))) {
@@ -182,9 +184,9 @@ public class RecommendController {
     }
 
     private static double freshnessScore(Instant pubDate, Instant now) {
-        if (pubDate == null) return 0.2; // 정보 없으면 낮게
+        if (pubDate == null) return 0.2;
         long days = Math.max(1, (now.toEpochMilli() - pubDate.toEpochMilli()) / (1000L * 60 * 60 * 24));
-        double v = 1.0 - Math.min(1.0, days / 365.0); // 0일(1.0) → 365일(0.0)
+        double v = 1.0 - Math.min(1.0, days / 365.0);
         return Math.max(0.0, v);
     }
 
@@ -209,23 +211,47 @@ public class RecommendController {
         return getYoutubeByQuerySortedWithTimeout("재테크 강의", max, 8);
     }
 
-    /** 개인화 유튜브: seed별(최대 2개) 검색 합치고 videoId 중복 제거 → 조회수순 */
+    /**
+     * 개인화 유튜브: 점진적 확장 + 타임아웃 완화 + 폴백
+     * - 1차: 상위 2개 seed, per-seed 5개, timeout 5s
+     * - 부족하면 2차: 상위 5개 seed, per-seed 4개, timeout 6s
+     * - 그래도 부족하면 기본 추천으로 폴백
+     */
     private List<Item> getYoutubePersonal(List<String> seeds, int max, List<Item> fallback) {
         if (seeds == null || seeds.isEmpty()) return fallback;
 
-        List<Item> merged = new ArrayList<>();
-        for (String s : seeds) {
-            merged.addAll(getYoutubeByQuerySortedWithTimeout(s, Math.min(6, max), 4)); // 개인화는 4초
-            if (merged.size() >= max) break;
+        // 1) 1차: 상위 2개 seed
+        List<String> s1 = seeds.size() > 2 ? seeds.subList(0, 2) : seeds;
+        List<Item> list = mergeYoutubeBySeeds(s1, max, 5 /*perSeedMax*/, 5 /*timeoutSec*/);
+
+        // 2) 결과가 너무 적으면: 상위 5개까지 확장
+        if (list.size() < Math.max(2, max / 2) && seeds.size() > s1.size()) {
+            int to = Math.min(5, seeds.size()); // 최대 5개 seed
+            List<String> s2 = seeds.subList(0, to);
+            list = mergeYoutubeBySeeds(s2, max, 4 /*perSeedMax*/, 6 /*timeoutSec*/);
         }
 
+        // 3) 그래도 부족하면: 기본 추천으로 폴백
+        if (list.isEmpty()) {
+            List<Item> def = getYoutubeForDefault(max);
+            return def.isEmpty() ? fallback : def;
+        }
+        return list;
+    }
+
+    /** 여러 seed를 합쳐서 videoId 중복 제거 후 조회수순 정렬 */
+    private List<Item> mergeYoutubeBySeeds(List<String> seeds, int max, int perSeedMax, int timeoutSec) {
+        List<Item> merged = new ArrayList<>();
+        for (String s : seeds) {
+            merged.addAll(getYoutubeByQuerySortedWithTimeout(s, Math.min(perSeedMax, max), timeoutSec));
+            if (merged.size() >= max) break;
+        }
+        // videoId 기준 중복 제거
         LinkedHashMap<String, Item> uniq = new LinkedHashMap<>();
         for (Item v : merged) {
             if (v.getVideoId() != null) uniq.putIfAbsent(v.getVideoId(), v);
         }
         List<Item> list = new ArrayList<>(uniq.values());
-        if (list.isEmpty()) return fallback;
-
         list.sort(Comparator.comparingLong((Item v) -> -viewCount(v)));
         if (list.size() > max) list = list.subList(0, max);
         return list;
