@@ -20,10 +20,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     const delta = (typeof d?.delta === "number") ? d.delta : null;
 
     box.innerHTML = `
-      <div class="sentiment-header" style="margin-bottom:8px;">
-        <strong class="strong">오늘의 감성 요약</strong>
-        <p style="margin:4px 0 0 0;">${date} (${weekday})</p>
-      </div>
       <p style="margin:6px 0;">평균 감성점수: <strong>${fmt(avg)}</strong></p>
       <p style="margin:6px 0;">전일 대비: <strong>${delta == null ? "-" : fmt(delta)}</strong></p>
       <div style="height:220px; margin-top:8px;">

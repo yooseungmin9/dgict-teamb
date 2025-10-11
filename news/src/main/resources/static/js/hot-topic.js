@@ -83,5 +83,5 @@
   }
 
   loadHotTopics();
-  setInterval(loadHotTopics, 5 * 60 * 1000);
+//  setInterval(loadHotTopics, 5 * 60 * 1000);
 })();

@@ -9,8 +9,8 @@
 
   function render(data) {
     panel.innerHTML = `
-      <div style="text-align:center;font-size:36px;font-weight:600;">
-        ${fmt(data.total)}
+      <div style="text-align:center;font-size:36px;font-weight:600;color:#000">
+        ${fmt(data.total)}개
       </div>
       <div class="muted" style="margin-top:4px;font-size:12px;">
         업데이트: ${new Date(data.updated_at).toLocaleString("ko-KR")}

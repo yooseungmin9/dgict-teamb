@@ -81,10 +81,10 @@
         .video-player { display:flex; justify-content:center; margin-bottom:40px; }
         .charts { display:flex; justify-content:space-between; width:100%; max-width:900px; margin-bottom:30px; gap:20px; }
         .chart-box {
-          flex:1; background:#fafafa; padding:15px;
+          flex:1; background:#fafafa; padding:5px;
           border-radius:8px; box-shadow:0 2px 5px rgba(0,0,0,0.1); text-align:center;
         }
-        #pieChart { max-width:240px; max-height:240px; margin:auto; }
+        #pieChart { max-width:none; max-height:none; margin:auto; }
         #wordCloud { width:100%; height:300px; border:1px solid #ddd; }
         .analysis {
           background:#fff; padding:20px; border-radius:8px;
@@ -162,6 +162,64 @@
         }
         #sortSelect:hover {
           border-color: #2563eb;
+        }
+        :root {
+          --main-blue: #2563eb;
+          --text-dark: #1e293b;
+          --text-gray: #4b5563;
+          --bg-white: #ffffff;
+        }
+
+        /* 영상 제목 */
+        .video-info h2 {
+          color: #222;
+          font-weight: 700;
+          font-size: 22px;
+          margin-bottom: 12px;
+          letter-spacing: -0.3px;
+        }
+
+        /* 감정 분포 / 워드클라우드 제목 */
+        .chart-box h4 {
+          color: #222;
+          font-weight: 600;
+          font-size: 16px;
+          margin-bottom: 10px;
+        }
+
+        /* 분석 요약 박스 디자인 */
+        .analysis {
+          background: var(--bg-white);
+          border-left: 4px solid var(--main-blue);
+          padding: 24px 26px;                    /* ✅ 여백 조금만 더 넓혀 안정감 */
+          border-radius: 10px;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.1); /* ✅ 살짝 진하게 (입체감 강화) */
+          width: 100%;
+          max-width: 900px;
+          color: #374151;                        /* ✅ var(--text-gray) 대신 직접 톤다운 */
+          font-size: 14.5px;                     /* ✅ 살짝 키워 가독성 개선 */
+          line-height: 1.7;
+          text-align: left;
+        }
+
+        .analysis h4 {
+          color: var(--main-blue);
+          font-size: 16px;
+          font-weight: 700;
+          margin-bottom: 8px;
+        }
+
+        .analysis p {
+          margin: 0;
+          color: var(--text-dark);
+        }
+
+        /* 범례·그래프 색상 대비 조정용 (옵션) */
+        .chart-box {
+          background: #ffffff;
+          border-radius: 10px;
+          box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+          padding: 12px;
         }
 
 

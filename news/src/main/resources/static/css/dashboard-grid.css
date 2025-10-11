@@ -203,7 +203,7 @@
 .ticker-wrap{
   position:relative; overflow:hidden;
   background: #3b82f6; color:#fff;
-  border-radius:10px; height:42px;``
+  border-radius:10px; height:42px;
   margin: 10px 0;
 }
 /* 키프레임 삭제! (JS가 직접 이동 제어) */
