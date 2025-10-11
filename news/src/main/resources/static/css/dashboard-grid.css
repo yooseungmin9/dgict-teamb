@@ -274,6 +274,22 @@
   font-weight: 600;
 }
 
+#panel-clusters {
+  overflow: visible !important;   /* 카드 자체는 숨기지 않음 */
+  z-index: 2;                     /* 다른 카드 위로 나오도록 */
+}
+
+/* 내부 treemap과 overlay도 부모의 흐름을 따르게 */
+#panel-clusters .card__body {
+  overflow: visible !important;
+  position: relative;
+}
+
+/* 트리맵 오버레이가 부모 카드 밖으로 나와도 보이게 */
+#treemap {
+  overflow: visible !important;
+}
+
 /* ===== 광고 배너 (이미지 그대로 + 무지개 글자) ===== */
 .ad-banner {
   position: relative;
@@ -339,29 +355,87 @@
   }
 }
 
-@keyframes exitFadeCollapse {
-  0%   { opacity: 1; height: var(--row-h, auto); margin-top: 5px; margin-bottom: 5px; }
-  100% { opacity: 0; height: 0;                 margin-top: 0;   margin-bottom: 0; }
+/* 오늘의 핫토픽을 위한 style */
+/* 행 기본 모양 */
+.hot-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px;
+  background: #f8f9fa;
+  border-radius: 6px;
+  border-left: 4px solid #95a5a6; /* 기본색, JS에서 상태별로 변경 */
+  transform-origin: 0 0;
 }
-@keyframes enterFadeRise {
-  from { opacity: 0; transform: translateY(8px); }
-  to   { opacity: 1; transform: translateY(0);   }
+.hot-rank {
+  font-size: 20px;
+  font-weight: 700;
+  min-width: 30px;
+}
+.hot-main {
+  flex: 1;
+}
+.hot-key {
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.hot-meta {
+  font-size: 12px;
+  color: #666;
+}
+.hot-delta {
+  margin-left: 8px;
 }
 
-/* 제거될 때만 잠깐 사용 */
+/* ENTER: 등장 */
+@keyframes hot-enter-anim {
+  from { transform: translateY(8px); opacity: 0; }
+  to   { transform: translateY(0);   opacity: 1; }
+}
+.hot-enter {
+  animation: hot-enter-anim 320ms cubic-bezier(.2,.8,.2,1);
+}
+
+/* EXIT: 접힘 후 숨김 */
+@keyframes hot-exit-anim {
+  0%   { height: var(--row-h, 44px); margin-top: 6px; margin-bottom: 6px; opacity: 1; }
+  99%  { height: 0; margin-top: 0; margin-bottom: 0; opacity: 0; }
+  100% { height: 0; margin: 0; opacity: 0; }
+}
 .hot-exit {
   overflow: hidden;
-  animation: exitFadeCollapse .35s ease forwards;
+  animation: hot-exit-anim 260ms ease-in forwards;
 }
 
-/* 새로 들어올 때만 잠깐 사용 */
-.hot-enter {
-  animation: enterFadeRise .35s ease-out both;
-}
-
-/* FLIP 중 겹침 최소화용 */
+/* FLIP 중 시각적 힌트(선택사항) */
 .hot-flipping {
-  position: relative;
   will-change: transform, opacity;
-  pointer-events: none;
+}
+
+/* 숨김 처리: 6위 이후 보존용 */
+.hot-hidden {
+  display: none !important; /* DOM은 유지, 레이아웃만 제외 */
+}
+
+/* 분석된 기사 개수 */
+.count__value {
+  text-align: center;
+  font-size: 36px;
+  font-weight: 700;
+  color: #000;
+}
+.count__meta {
+  margin-top: 4px;
+  font-size: 12px;
+  color: #666;
+  text-align: center;
+}
+.count__error {
+  text-align: center;
+  color: #c0392b;
+}
+.count__loading {
+  text-align: center;
+  color: #555;
 }
