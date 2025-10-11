@@ -257,14 +257,12 @@ from random import randint
 
 @app.get("/youtube/results")
 def get_random_youtube_video() -> dict:
-    """대시보드용: 랜덤 1개 영상 + 경량 분석 포함."""
+    """대시보드용: 랜덤 1개 영상 + 요약 축약 포함."""
     try:
-        # 1) 영상 개수 확인
         count = col_video.count_documents({})
         if count == 0:
             return {"error": "no_data"}
 
-        # 2) 랜덤 1건 조회 (_id 제외, 필요한 필드만)
         v = (
             col_video.find(
                 {}, {"_id": 0, "video_id": 1, "title": 1, "thumbnail_url": 1}
@@ -276,27 +274,40 @@ def get_random_youtube_video() -> dict:
         if not vid:
             return {"error": "missing_video_id"}
 
-        # 3) 경량 분석 호출: 무한 조회 방지 (속도 안정)
-        #    get_analysis는 이미 'if limit is not None: cursor.limit(int(limit))' 로 안전
+        # 기존: full_summary → highlight + first_line 조합
         result = get_analysis(vid, limit=200, topn=80)
 
-        # 4) 합쳐서 반환
+        # ✅ 교체: 중복 제거 + 첫 내용 줄 선택
+        full_summary = result.get("summary", "").strip()
+        lines = [l.strip() for l in full_summary.splitlines() if l.strip()]
+
+        head = lines[0] if lines else ""  # "이 영상 댓글 N개 중 … 가장 많음"
+
+        def is_header(s: str) -> bool:
+            # 감정 헤더 "(중립…)" 같은 줄은 제외
+            return s.startswith("(") and s.endswith(")")
+
+        # 첫 내용 줄(감정 헤더/요약문 제외)
+        body = next((l for l in lines[1:] if not is_header(l) and "감정이" not in l), "")
+
+        short_summary = head if not body else f"{head}\n\n{body}"
+        if len(short_summary) > 180:
+            short_summary = short_summary[:180].rstrip() + " ..."
+
         return {
             "video_id": vid,
             "title": v.get("title", ""),
             "thumbnail_url": v.get("thumbnail_url", ""),
-            "summary": result.get("summary"),
+            "summary": short_summary,  # ✅ 중복 없는 축약본
             "wordcloud": result.get("wordcloud"),
             "sentiment": result.get("sentiment"),
         }
 
+
     except Exception as e:
-        # 디버깅 편의용 로그 + 에러 메시지 반환(대시보드에서 처리)
         import traceback
         traceback.print_exc()
         return {"error": f"{type(e).__name__}: {e}"}
-
-
 
 # ✅ 참고: get_analysis 내부 limit 처리(이미 반영되어 있으면 그대로 두세요)
 # cursor = col_comments.find(q, {"_id": 0, "text": 1, "emotion": 1})
