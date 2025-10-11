@@ -254,6 +254,27 @@
     </div>
 </div>
 
+<div id="toast" class="toast"></div>
+
+<style>
+    .toast {
+        position: fixed;
+        bottom: 30px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(20,20,20,0.9);
+        color: #fff;
+        padding: 12px 20px;
+        border-radius: 8px;
+        font-size: 14px;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.3s ease;
+        z-index: 9999;
+    }
+    .toast.show { opacity: 1; pointer-events: auto; }
+</style>
+
 <script th:inline="javascript">
     (function(){
         // ===== 0) 환경 값 =====
@@ -411,25 +432,30 @@
         function close(){ modal.classList.remove('open'); modal.setAttribute('aria-hidden','true'); }
 
         // ===== 7) 저장 =====
+        function showToast(msg, ms=2000){
+            const t = document.getElementById('toast');
+            t.textContent = msg;
+            t.classList.add('show');
+            setTimeout(()=>t.classList.remove('show'), ms);
+        }
+
         async function save(){
             const kws = Array.from(root.querySelectorAll('.kw.active')).map(el=>el.dataset.kw);
-
             const headers = { 'Content-Type':'application/json' };
             if(CSRF_HEADER && CSRF_TOKEN){ headers[CSRF_HEADER] = CSRF_TOKEN; }
 
             try{
                 const res = await fetch('/member/interests', {
-                    method: 'POST',
+                    method:'POST',
                     headers,
                     body: JSON.stringify(kws)
                 });
                 if(!res.ok) throw new Error('save failed: ' + res.status);
+                showToast('✅ 관심사가 저장되었습니다!');
                 close();
-                // TODO: 토스트/리로드 등 후처리
-                // alert('관심 설정이 저장되었습니다.');
             }catch(err){
                 console.error(err);
-                // alert('저장에 실패했습니다. 잠시 후 다시 시도해주세요.');
+                showToast('❌ 저장에 실패했습니다.', 3000);
             }
         }
 

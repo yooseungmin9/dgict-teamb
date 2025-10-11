@@ -1,48 +1,72 @@
 package com.bgroup.news.recommend.service;
 
 import com.bgroup.news.member.domain.MemberDoc;
+import org.springframework.stereotype.Service;
 
 import java.util.*;
-import java.util.stream.Collectors;
 
+@Service
 public class PreferenceKeywords {
 
-    // 대표 키워드(간단 세트)
-    private static final Map<String, List<String>> CATEGORY_KEYWORDS = new LinkedHashMap<>() {{
-        put("증권", List.of("주식","코스피","ETF","공모주","배당","리츠","거래량"));
-        put("금융", List.of("금리","대출","예금","보험","환율","금융감독원","비트코인"));
-        put("부동산", List.of("부동산","아파트","전세","청약","재건축","공시지가","집값"));
-        put("산업", List.of("산업","자동차","반도체","전기차","배터리","로봇","AI"));
-        put("글로벌경제", List.of("미국","중국","달러","무역","유가","나스닥","IMF"));
-        put("일반", List.of("물가","소비","고용","임금","GDP","경기침체","가계부채"));
-    }};
+    private static final Map<String, List<String>> GLOSS = Map.ofEntries(
+            // industry
+            Map.entry("industry/semiconductor", List.of("AI 반도체","HBM","파운드리","TSMC","삼성전자")),
+            Map.entry("industry/auto_ev",       List.of("전기차","배터리","자율주행","충전 인프라")),
+            Map.entry("industry/robotics",      List.of("로봇","물류자동화","AMR","협동로봇")),
+            Map.entry("industry/_misc",         List.of("산업","성장산업","신산업")),
+            // finance
+            Map.entry("finance/monetary",       List.of("금리","연준","기준금리","점도표")),
+            Map.entry("finance/_misc",          List.of("금융","금리동향")),
+            // stock
+            Map.entry("stock/etf",              List.of("ETF","인덱스 투자","테마 ETF")),
+            Map.entry("stock/_misc",            List.of("주식","시장전망")),
+            // global
+            Map.entry("global/fx_commodities",  List.of("달러","유가","구리","금")),
+            Map.entry("global/_misc",           List.of("글로벌 경제","세계 경기"))
+    );
 
-    public static List<String> build(MemberDoc.Interests it) {
-        if (it == null) return List.of();
+    /** explicit*2 + implicit*1 → 상위 N 서브카테고리에서 대표 키워드 최대 M개 */
+    public List<String> buildSeeds(MemberDoc me, int topSubcats, int maxKeywords) {
+        Map<String, Integer> subScore = new HashMap<>();
 
-        Map<String, Integer> score = Map.of(
-                "글로벌경제", nz(it.getGlobal()),
-                "금융", nz(it.getFinance()),
-                "부동산", nz(it.getEstate()),
-                "산업", nz(it.getIndustry()),
-                "증권", nz(it.getStock()),
-                "일반", nz(it.getGeneral())
-        );
+        if (me != null && me.getPreferences() != null) {
+            var ex = Optional.ofNullable(me.getPreferences().getExplicit()).orElse(Map.of());
+            var im = Optional.ofNullable(me.getPreferences().getImplicit()).orElse(Map.of());
 
-        // 상위 3개 카테고리 → 카테고리당 2개 키워드씩
-        List<String> topCats = score.entrySet().stream()
-                .sorted((a,b) -> Integer.compare(b.getValue(), a.getValue()))
-                .limit(3)
-                .map(Map.Entry::getKey)
-                .collect(Collectors.toList());
-
-        List<String> kws = new ArrayList<>();
-        for (String c : topCats) {
-            List<String> list = CATEGORY_KEYWORDS.getOrDefault(c, List.of());
-            kws.addAll(list.stream().limit(2).toList());
+            ex.forEach((parent, submap) ->
+                    submap.forEach((sub, v) -> subScore.merge(key(parent, sub), safeInt(v) * 2, Integer::sum)));
+            im.forEach((parent, submap) ->
+                    submap.forEach((sub, v) -> subScore.merge(key(parent, sub), safeInt(v), Integer::sum)));
+        } else if (me != null && me.getInterests() != null) {
+            addIfPositive(subScore, "industry/_misc", me.getInterests().getIndustry());
+            addIfPositive(subScore, "stock/_misc",    me.getInterests().getStock());
+            addIfPositive(subScore, "finance/_misc",  me.getInterests().getFinance());
+            addIfPositive(subScore, "global/_misc",   me.getInterests().getGlobal());
         }
-        return kws.stream().distinct().limit(10).toList();
+
+        if (subScore.isEmpty()) return List.of();
+
+        List<String> top = subScore.entrySet().stream()
+                .sorted(Map.Entry.<String,Integer>comparingByValue().reversed())
+                .limit(topSubcats)
+                .map(Map.Entry::getKey)
+                .toList();
+
+        List<String> seeds = new ArrayList<>();
+        for (String k : top) {
+            List<String> kws = GLOSS.getOrDefault(k, List.of(k.substring(k.indexOf('/') + 1)));
+            for (String w : kws) {
+                if (!seeds.contains(w)) seeds.add(w);
+                if (seeds.size() >= maxKeywords) break;
+            }
+            if (seeds.size() >= maxKeywords) break;
+        }
+        return seeds;
     }
 
-    private static int nz(Integer v){ return v == null ? 0 : v; }
+    private static String key(String parent, String sub) { return parent + "/" + sub; }
+    private static void addIfPositive(Map<String,Integer> m, String k, Integer v) {
+        if (v != null && v > 0) m.put(k, v);
+    }
+    private static int safeInt(Integer x) { return x == null ? 0 : x; }
 }
