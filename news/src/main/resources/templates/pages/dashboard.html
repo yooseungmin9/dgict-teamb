@@ -6,6 +6,7 @@
     <link rel="stylesheet" href="/css/style.css"/>
     <link rel="stylesheet" href="/css/dashboard-grid.css"/>
     <link rel="stylesheet" href="/css/footer.css"/>
+    <link rel="stylesheet" href="/css/header.css"/>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     <!-- 반드시 opinion-widget.js보다 먼저 -->
@@ -14,7 +15,7 @@
 
     <!-- 나머지는 그대로 -->
     <script defer src="/js/sentiment.js"></script>
-    <script defer src="/js/trands.js"></script>
+    <script defer src="/js/trends.js"></script>
     <script defer src="/js/app.js"></script>
     <script defer src="/js/headline.js"></script>
     <script defer src="/js/emoa.js"></script>
@@ -208,30 +209,205 @@
 
 <!-- ===== 관심 키워드 온보딩 모달 ===== -->
 <style>
+    /* ===== SUMMARIX Interest-Modal — Drop-in CSS (replace your modal+toast styles) ===== */
+    :root {
+        --brand: #2563eb;
+        --ink: #111827;
+        --muted: #6b7280;
+        --panel: rgba(255,255,255,0.92);
+        --line: #e5e7eb;
+        --ring: rgba(37,99,235,.35);
+        --shadow-strong: 0 24px 80px rgba(0,0,0,.28);
+        --shadow-soft: 0 10px 30px rgba(0,0,0,.12);
+        --radius-lg: 14px;
+        --radius-md: 12px;
+        --radius-sm: 10px;
+    }
+
+    /* Backdrop */
     .modal-backdrop{
-        position:fixed; inset:0; background:rgba(0,0,0,.5);
-        display:none; align-items:center; justify-content:center; z-index:9999;
+        position:fixed; inset:0;
+        display:none; align-items:center; justify-content:center;
+        background: rgba(10,12,16,.38);
+        -webkit-backdrop-filter: blur(6px);
+        backdrop-filter: blur(6px);
+        z-index: 9999;
+        opacity: 0;
+        transition: opacity .22s ease;
     }
-    .modal-backdrop.open{display:flex;}
+    .modal-backdrop.open{ display:flex; opacity: 1; }
+
+    /* Card */
     .modal-card{
-        width:min(960px, 92vw); max-height:90vh; overflow:auto;
-        background:#fff; border:1px solid #e5e7eb; border-radius:14px; padding:20px 20px 16px;
-        box-shadow:0 20px 60px rgba(0,0,0,.2);
+        width: min(700px, 92vw);
+        max-height: 88vh; overflow:auto;
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: var(--radius-lg);
+        box-shadow: var(--shadow-strong);
+        padding: 18px 18px 14px;
+        color: var(--ink);
+        transform: translateY(6px);
+        animation: modal-enter .22s ease forwards;
     }
-    .modal-head{display:flex; align-items:center; gap:10px; margin-bottom:10px}
-    .modal-head h3{margin:0; font-size:18px}
-    .modal-body{display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px}
-    .cat-card{border:1px solid #e5e7eb; border-radius:12px; padding:12px}
-    .cat-title{font-weight:700; margin:0 0 6px}
-    .kw-grid{display:flex; flex-wrap:wrap; gap:8px}
-    .kw{border:1px solid #e5e7eb; border-radius:999px; padding:6px 10px; font-size:13px; cursor:pointer; user-select:none}
-    .kw.active{background:#111827; color:#fff; border-color:#111827}
-    .modal-foot{display:flex; justify-content:space-between; align-items:center; margin-top:12px}
-    .muted{color:#6b7280; font-size:12px}
-    .btn{border:1px solid #e5e7eb; background:#111827; color:#fff; padding:10px 14px; border-radius:10px; cursor:pointer}
-    .btn.secondary{background:#fff; color:#111827}
-    @media (max-width: 900px){ .modal-body{grid-template-columns:1fr 1fr} }
-    @media (max-width: 640px){ .modal-body{grid-template-columns:1fr} }
+    @keyframes modal-enter { to { transform: translateY(0); } }
+    @media (prefers-reduced-motion: reduce){
+        .modal-backdrop, .modal-card { transition: none; animation: none; }
+    }
+
+    /* Head */
+    .modal-head{
+        display:flex; align-items:center; gap:12px;
+        padding: 2px 4px 8px 4px;
+        border-bottom: 1px solid var(--line);
+        margin-bottom: 12px;
+    }
+    .modal-head h3{
+        margin:0; font-size: 18px; font-weight: 800; letter-spacing:.2px;
+    }
+    .muted{ color: var(--muted); font-size:12px; }
+
+    /* Body grid */
+    .modal-body{
+        display:grid; gap: 12px;
+        grid-template-columns: repeat(2, minmax(0,1fr));
+    }
+    @media (max-width: 900px){ .modal-body{ grid-template-columns: 1fr 1fr; } }
+    @media (max-width: 640px){ .modal-body{ grid-template-columns: 1fr; } }
+
+    /* Category card */
+    .cat-card{
+        background: #fff;
+        border: 1px solid var(--line);
+        border-radius: var(--radius-md);
+        padding: 12px;
+        box-shadow: var(--shadow-soft);
+        transition: border-color .18s ease, box-shadow .18s ease;
+    }
+    .cat-card:hover{
+        border-color: color-mix(in oklab, var(--brand) 30%, var(--line));
+        box-shadow: 0 8px 20px rgba(0,0,0,.08);
+    }
+    .cat-card:focus-within{
+        outline: 2px solid var(--ring);
+        outline-offset: 2px;
+    }
+
+    /* Category header */
+    .cat-title{
+        margin: 0 0 6px;
+        font-weight: 800; font-size: 14px;
+    }
+    .cat-head{ display:flex; align-items:center; justify-content:space-between; gap:8px; }
+    .cat-cap{ font-size:12px; color: var(--muted); }
+    .cat-tools{
+        display:flex; justify-content:flex-start; gap:8px; margin-top:10px;
+    }
+    .cat-reset{
+        appearance:none; border:none; background:transparent; color:var(--muted);
+        font-size:12px; padding:6px 8px; border-radius: 8px; cursor:pointer;
+    }
+    .cat-reset:hover{ background:#f5f7fb; color: var(--brand); }
+    .cat-reset:focus-visible{ outline:2px solid var(--ring); outline-offset:2px; }
+
+    /* Keyword chips */
+    .kw-grid{ display:flex; flex-wrap: wrap; gap: 8px; }
+    .kw{
+        appearance:none;
+        border: 1px solid var(--line);
+        background: #fff;
+        color: var(--ink);
+        padding: 7px 12px;
+        border-radius: 999px;
+        font-size: 13px;
+        line-height: 1;
+        cursor: pointer;
+        transition: transform .06s ease, background-color .16s ease, border-color .16s ease, color .16s ease, box-shadow .16s ease;
+        will-change: transform;
+    }
+    .kw:hover{
+        border-color: color-mix(in oklab, var(--brand) 35%, var(--line));
+        background: #f7faff;
+    }
+    .kw:active{ transform: scale(0.98); }
+    .kw:focus-visible{ outline: 2px solid var(--ring); outline-offset: 2px; }
+
+    .kw.active{
+        background: var(--brand);
+        color: #fff;
+        border-color: var(--brand);
+        box-shadow: 0 6px 16px rgba(37,99,235,.25);
+    }
+    .kw[disabled]{
+        cursor: not-allowed;
+        opacity: .5;
+    }
+
+    /* Footer */
+    .modal-foot{
+        display:flex; justify-content:space-between; align-items:center;
+        gap: 10px; margin-top: 14px; padding-top: 12px;
+        border-top: 1px solid var(--line);
+    }
+
+    /* Buttons */
+    .btn{
+        appearance:none;
+        border: 1px solid transparent;
+        background: var(--brand);
+        color: #fff;
+        padding: 10px 16px;
+        border-radius: var(--radius-sm);
+        font-weight: 700; font-size: 14px;
+        letter-spacing:.2px;
+        cursor: pointer;
+        transition: transform .06s ease, background-color .16s ease, box-shadow .16s ease;
+        box-shadow: 0 8px 18px rgba(37,99,235,.25);
+    }
+    .btn:hover{ background: #1f4fd6; }
+    .btn:active{ transform: translateY(1px); }
+    .btn:focus-visible{ outline: 2px solid var(--ring); outline-offset: 2px; }
+
+    .btn.secondary{
+        background:#fff; color: var(--brand);
+        border-color: color-mix(in oklab, var(--brand) 45%, var(--line));
+        box-shadow: none;
+    }
+    .btn.secondary:hover{
+        background: #f7faff;
+        border-color: var(--brand);
+    }
+    .btn[disabled]{
+        opacity:.5; cursor:not-allowed; box-shadow:none;
+    }
+
+    /* Toast (brand tone) */
+    .toast{
+        position: fixed;
+        left: 50%; bottom: 28px; transform: translateX(-50%);
+        background: #0f1a33;
+        color: #fff;
+        padding: 12px 18px;
+        border-radius: 10px;
+        font-size: 14px;
+        line-height: 1.2;
+        box-shadow: 0 12px 30px rgba(0,0,0,.25);
+        opacity: 0; pointer-events: none;
+        transition: opacity .22s ease, transform .22s ease;
+        z-index: 10000;
+    }
+    .toast.show{
+        opacity: 1; pointer-events: auto;
+        transform: translateX(-50%) translateY(-2px);
+    }
+
+    /* Small polish for table/radio in the side panel (optional; safe no-op if not present) */
+    .ranking-table th, .ranking-table td{ border-color: var(--line); }
+    label input[type="radio"]{ accent-color: var(--brand); }
+
+    /* Make sure modal fonts inherit the page font */
+    .modal-card, .modal-card *{ font-family: inherit; }
+
 </style>
 
 <div id="interestModal" class="modal-backdrop" aria-hidden="true">
@@ -254,25 +430,6 @@
 </div>
 
 <div id="toast" class="toast"></div>
-
-<style>
-    .toast {
-        position: fixed;
-        bottom: 30px;
-        left: 50%;
-        transform: translateX(-50%);
-        background: rgba(20,20,20,0.9);
-        color: #fff;
-        padding: 12px 20px;
-        border-radius: 8px;
-        font-size: 14px;
-        opacity: 0;
-        pointer-events: none;
-        transition: opacity 0.3s ease;
-        z-index: 9999;
-    }
-    .toast.show { opacity: 1; pointer-events: auto; }
-</style>
 
 <script th:inline="javascript">
     (function(){

@@ -18,7 +18,8 @@ app.add_middleware(
 )
 
 # 🔐 환경변수 우선
-_YT_FALLBACK = "AIzaSyDtsdmz204NoNAFBam4S3Fe_gNR4Sy_7Ko"
+#_YT_FALLBACK = "AIzaSyDtsdmz204NoNAFBam4S3Fe_gNR4Sy_7Ko"
+_YT_FALLBACK = "AIzaSyAvBT58ksxCS_E0nehgiy5fMJbtXnePghk"
 YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY", _YT_FALLBACK).strip()
 
 Y_SEARCH = "https://www.googleapis.com/youtube/v3/search"

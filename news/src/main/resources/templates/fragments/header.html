@@ -27,6 +27,50 @@
       </button>
     </div>
 
+    <script>
+      (function () {
+        // 버튼과 같은 영역(헤더) 안의 검색 입력을 찾아요.
+        // 우선 버튼의 data-target을 찾고, 없으면 .search__input을 검색
+        const btn = document.getElementById('searchBtn');
+        if (!btn) return;
+
+        let input = null;
+        // 버튼에 data-target을 달아 쓰고 싶으면 활성화 (예: data-target="#headerSearch")
+        if (btn.dataset.target) {
+          input = document.querySelector(btn.dataset.target);
+        }
+        if (!input) {
+          // 가장 가까운 컨테이너 내에서 먼저 찾고, 없으면 문서 전체에서 찾기
+          const container = btn.closest('.search') || document;
+          input = container.querySelector('.search__input') || document.querySelector('.search__input');
+        }
+
+        function goSearch() {
+          const q = (input && input.value ? input.value : '').trim();
+          if (!q) {
+            input && input.focus();
+            return;
+          }
+          // 통합검색 페이지로 이동
+          const url = '/pages/search?q=' + encodeURIComponent(q);
+          window.location.assign(url);
+        }
+
+        // 클릭으로 실행
+        btn.addEventListener('click', goSearch);
+
+        // Enter 키로도 실행 (UX)
+        if (input) {
+          input.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              goSearch();
+            }
+          });
+        }
+      })();
+    </script>
+
     <!-- 로그인 상태 -->
     <div th:if="${session.loginUser != null}">
       <button id="accountBtn" class="account-btn" type="button" title="계정정보">

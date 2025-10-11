@@ -1,4 +1,4 @@
-// /js/trands.js — 핫토픽/랭킹 모두 스프링 BFF 경유
+// /js/trends.js — 핫토픽/랭킹 모두 스프링 BFF 경유
 (function DB_trendsWidgets(){
   // ===== 공통 fetch 유틸 =====
   const fetchJSON = async (url, params = {}) => {

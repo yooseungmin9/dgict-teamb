@@ -1554,7 +1554,7 @@ select.form-control {
 
 .bot-message .message-content {
   background: var(--color-bg-1);
-  color: #2e75b6;
+  color: #3b82f6;
   padding: var(--space-12) var(--space-16);
   border-radius: var(--radius-md) var(--radius-md) var(--radius-md) var(--space-4);
   max-width: 80%;
@@ -1565,7 +1565,7 @@ select.form-control {
 }
 
 .user-message .message-content {
-  background: #2e75b6;
+  background: #3b82f6;
   color: var(--color-white);
   padding: var(--space-12) var(--space-16);
   border-radius: var(--radius-md) var(--radius-md) var(--space-4) var(--radius-md);
@@ -1653,7 +1653,7 @@ select.form-control {
 .book-title {
   font-size: var(--font-size-lg);
   font-weight: var(--font-weight-semibold);
-  color: #1f4e79;
+  color: #13343B;
   margin-bottom: var(--space-8);
 }
 
@@ -1716,7 +1716,7 @@ select.form-control {
 .video-title {
   font-size: var(--font-size-lg);
   font-weight: var(--font-weight-semibold);
-  color: #1f4e79;
+  color: #13343B;
   margin-bottom: var(--space-8);
 }
 

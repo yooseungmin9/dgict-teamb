@@ -1,7 +1,7 @@
 // ③ (선택) CORS 회피용 Spring 프록시 — 같은 오리진으로 호출하고 싶을 때
 // 경로: src/main/java/.../controller/NewsProxyController.java
 // 포인트: 프런트에선 data-api-base="/api" 로 바꾸고 "/api/naver/econ" 호출
-package com.bgroup.news.controller;
+package com.bgroup.news.dashboard.controller;
 
 import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;

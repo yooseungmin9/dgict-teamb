@@ -6,9 +6,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="stylesheet" th:href="@{/css/style.css}" />
   <link rel="stylesheet" href="/css/footer.css"/>
+  <link rel="stylesheet" href="/css/header.css"/>
 
   <style>
-    /* ===== 뉴스 카드(기존 디자인 유지) ===== */
+    /* ===== 뉴스 카드 ===== */
     #news-page .news-list{max-width:980px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
     #news-page .news-card{border:1px solid #e5e7eb;border-radius:14px;background:#fff;padding:16px;display:flex;gap:16px;align-items:flex-start;transition:box-shadow .18s}
     #news-page .news-card:hover{box-shadow:0 8px 24px rgba(0,0,0,.06)}
@@ -27,16 +28,14 @@
     #news-page .page-info{font-size:14px;color:#6b7280}
     @media (max-width:640px){#news-page .news-thumb{width:140px;height:100px}#news-page .news-title{font-size:16px}}
 
-    /* ===== 전일 브리핑: 뉴스 카드처럼 "가로로 긴" 단일열 리스트 ===== */
+    /* ===== 전일 브리핑 ===== */
     .news-section h3{margin:28px auto 14px;max-width:980px;font-weight:800;color:#1f3a69;letter-spacing:-.2px}
     .briefing-wrap{max-width:980px;margin:0 auto 28px}
     .briefing-date{margin:0 0 12px;font-size:13px;color:#6b7a91;padding-left:6px;border-left:3px solid #cfe2ff}
     .briefing-list{display:flex;flex-direction:column;gap:14px}
-
-    /* 브리핑 카드 = 뉴스 카드와 동일한 폭/여백감 */
     .briefing-item{display:flex;gap:14px;align-items:flex-start;background:#fff;border:1px solid #e6eef8;border-radius:14px;padding:16px;box-shadow:0 6px 16px rgba(31,58,105,.06);transition:box-shadow .15s,transform .15s}
     .briefing-item:hover{transform:translateY(-1px);box-shadow:0 10px 22px rgba(31,58,105,.08)}
-    .briefing-bar{width:6px;align-self:stretch;border-radius:8px;background:#9cc0ff}
+    .briefing-bar{width:6px;align-self:stretch;border-radius:8px;background:#6ea8fe}
     .briefing-body{flex:1;min-width:0;display:flex;flex-direction:column;gap:8px}
     .briefing-title{display:flex;align-items:center;gap:8px;margin:0;font-weight:800;color:#16325c}
     .cat-chip{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;background:#eef5ff;color:#1f4fb7;border:1px solid #d7e6ff;font-size:13px}
@@ -44,233 +43,79 @@
     .briefing-summary{margin:0;color:#233549;line-height:1.7}
     .briefing-tags{display:flex;flex-wrap:wrap;gap:8px}
     .briefing-tags .tag{font-size:12px;color:#1f3a69;background:#f4f8ff;border:1px solid #dfe9ff;padding:6px 10px;border-radius:999px}
-
-    /* 카테고리별 바/칩 색상 톤(선택) */
-    /*.C금융 .briefing-bar{background:#6ea8fe}.C부동산 .briefing-bar{background:#74c69d}*/
-    /*.C산업 .briefing-bar{background:#f0ad4e}.C글로벌경제 .briefing-bar{background:#b197fc}*/
-    /*.C일반 .briefing-bar{background:#adb5bd}*/
-    /*.C부동산 .cat-chip{background:#eef9f3;color:#1b7a4a;border-color:#cfeadf}*/
-    /*.C산업 .cat-chip{background:#fff6e8;color:#8a5b0a;border-color:#ffe2b8}*/
-    /*.C글로벌경제 .cat-chip{background:#f3edff;color:#5b3fa6;border-color:#e2d5ff}*/
-    /*.C일반 .cat-chip{background:#f5f6f8;color:#485460;border-color:#e6e8ec}*/
-    .briefing-item .briefing-bar { background:#6ea8fe; }
   </style>
+
+  <!-- 순서 중요: 봉인 → 페이지 스크립트 -->
+  <script defer src="/js/briefing-once.js"></script>
+  <script defer src="/js/news.js"></script>
 </head>
 
 <body>
-<div th:replace="fragments/header :: siteHeader"></div>
+  <div th:replace="fragments/header :: siteHeader"></div>
 
-<main class="main">
-  <div class="container">
-    <!-- 🔧 FastAPI 주소는 data-api-base로 지정 -->
-    <div id="news-page" class="page" data-api-base="http://127.0.0.1:8005">
-      <h2 class="page-title" style="text-align:center">오늘의 경제 뉴스</h2>
+  <main class="main">
+    <div class="container">
+      <!-- 🔧 전일 브리핑 API 서버 주소 -->
+      <div id="news-page" class="page" data-api-base="http://127.0.0.1:8005">
+        <h2 class="page-title" style="text-align:center">오늘의 경제 뉴스</h2>
 
-      <!-- 뉴스 리스트 -->
-      <div class="news-section">
-        <h3>금일 주요 뉴스</h3>
-
-        <div id="news-list" class="news-list">
-          <div class="news-card" th:each="it : ${items}" th:attr="data-id=${it.id}" tabindex="0">
-            <img class="news-thumb" th:src="${it.image} ?: @{/img/placeholder-120x80.png}" th:alt="${it.title}" />
-            <div class="news-body">
-              <span class="news-title" th:text="${it.title}">제목</span>
-              <div class="news-meta" th:text="${it.publishedAt != null} ? ${#temporals.format(it.publishedAt, 'yyyy-MM-dd HH:mm')} : ''"></div>
-              <div class="summary-wrap">
-                <p class="news-summary" th:text="${it.summary}">요약</p>
-                <button type="button" class="more-toggle">더 보기</button>
+        <!-- 뉴스 리스트 -->
+        <div class="news-section">
+          <h3>금일 주요 뉴스</h3>
+          <div id="news-list" class="news-list">
+            <div class="news-card" th:each="it : ${items}" th:attr="data-id=${it.id}" tabindex="0">
+              <img class="news-thumb" th:src="${it.image} ?: @{/img/placeholder-120x80.png}" th:alt="${it.title}" />
+              <div class="news-body">
+                <span class="news-title" th:text="${it.title}">제목</span>
+                <div class="news-meta" th:text="${it.publishedAt != null} ? ${#temporals.format(it.publishedAt, 'yyyy-MM-dd HH:mm')} : ''"></div>
+                <div class="summary-wrap">
+                  <p class="news-summary" th:text="${it.summary}">요약</p>
+                  <button type="button" class="more-toggle">더 보기</button>
+                </div>
               </div>
             </div>
+            <p class="muted" th:if="${#lists.isEmpty(items)}">표시할 뉴스가 없습니다.</p>
           </div>
-          <p class="muted" th:if="${#lists.isEmpty(items)}">표시할 뉴스가 없습니다.</p>
+
+          <div id="pagination" class="pagination">
+            <a class="page-btn" th:if="${hasPrev}" th:href="@{/pages/news(page=${page - 1}, size=${size})}">이전</a>
+            <span class="page-info" th:text="${page} + ' 페이지'">1 페이지</span>
+            <a class="page-btn" th:if="${hasNext}" th:href="@{/pages/news(page=${page + 1}, size=${size})}">다음</a>
+          </div>
         </div>
 
-        <div id="pagination" class="pagination">
-          <a class="page-btn" th:if="${hasPrev}" th:href="@{/pages/news(page=${page - 1}, size=${size})}">이전</a>
-          <span class="page-info" th:text="${page} + ' 페이지'">1 페이지</span>
-          <a class="page-btn" th:if="${hasNext}" th:href="@{/pages/news(page=${page + 1}, size=${size})}">다음</a>
-        </div>
-      </div>
-
-      <!-- 전일 브리핑: 가로 긴 카드 단일열로 나열 -->
-      <div class="news-section">
-        <h3>전일 브리핑 요약</h3>
-        <div class="briefing-wrap">
-          <p class="briefing-date">불러오는 중…</p>
-          <div class="briefing-list" id="briefing-list">
-            <!-- JS가 5개 카테고리를 순서대로 삽입 -->
+        <!-- 전일 브리핑 -->
+        <div class="news-section">
+          <h3>전일 브리핑 요약</h3>
+          <div class="briefing-wrap">
+            <p class="briefing-date">불러오는 중…</p>
+            <div class="briefing-list" id="briefing-list"></div>
           </div>
         </div>
       </div>
     </div>
+  </main>
+
+  <!-- 상세 모달 -->
+  <div id="news-modal" class="modal" aria-hidden="true">
+    <div class="modal-backdrop"></div>
+    <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <button type="button" class="modal-close" aria-label="닫기">×</button>
+      <div class="modal-header">
+        <h3 id="modal-title" class="modal-title"></h3>
+        <div class="modal-meta"><span id="modal-updated" class="meta-date"></span></div>
+      </div>
+      <div class="modal-body">
+        <img id="modal-image" class="modal-image" alt="article image" style="display:none;" />
+        <div class="modal-content"><p id="modal-content"></p></div>
+      </div>
+      <div class="modal-footer">
+        <a id="modal-link" class="btn" href="#" target="_blank" rel="noopener noreferrer">원문 링크</a>
+        <span id="modal-press" class="meta-press"></span>
+      </div>
+    </div>
   </div>
-</main>
 
-<!-- 상세 모달 (기존) -->
-<div id="news-modal" class="modal" aria-hidden="true">
-  <div class="modal-backdrop"></div>
-  <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="modal-title">
-    <button type="button" class="modal-close" aria-label="닫기">×</button>
-    <div class="modal-header">
-      <h3 id="modal-title" class="modal-title"></h3>
-      <div class="modal-meta"><span id="modal-updated" class="meta-date"></span></div>
-    </div>
-    <div class="modal-body">
-      <img id="modal-image" class="modal-image" alt="article image" style="display:none;" />
-      <div class="modal-content"><p id="modal-content"></p></div>
-    </div>
-    <div class="modal-footer">
-      <a id="modal-link" class="btn" href="#" target="_blank" rel="noopener noreferrer">원문 링크</a>
-      <span id="modal-press" class="meta-press"></span>
-    </div>
-  </div>
-</div>
-
-<div th:replace="fragments/footer :: siteFooter"></div>
-
-<script th:src="@{/js/app.js}" defer></script>
-
-<script>
-  /* ====================== 뉴스 카드 UX ====================== */
-  (function(){
-    const list = document.getElementById('news-list');
-
-    // 더보기/접기
-    list.addEventListener('click', (e)=>{
-      const btn = e.target.closest('.more-toggle'); if(!btn) return;
-      e.stopPropagation(); e.preventDefault();
-      const card = btn.closest('.news-card');
-      const expanded = card.getAttribute('data-expanded') === 'true';
-      card.setAttribute('data-expanded', expanded ? 'false' : 'true');
-      btn.textContent = expanded ? '더 보기' : '접기';
-    });
-
-    // 요약 짧으면 더보기 숨김
-    function applyMoreToggleVisibility(){
-      document.querySelectorAll('#news-list .news-card').forEach(card=>{
-        const p = card.querySelector('.news-summary');
-        const btn = card.querySelector('.more-toggle');
-        if(!p || !btn) return;
-        const needsMore = p.scrollHeight > p.clientHeight + 1;
-        btn.style.display = needsMore ? 'inline' : 'none';
-      });
-    }
-    window.addEventListener('load', applyMoreToggleVisibility);
-    window.addEventListener('resize', ()=>{ clearTimeout(window.__moreTo); window.__moreTo=setTimeout(applyMoreToggleVisibility,120); });
-
-    // 카드 클릭 → 모달
-    const modal = document.getElementById('news-modal');
-    const closeBtn = modal.querySelector('.modal-close');
-    const backdrop = modal.querySelector('.modal-backdrop');
-    const $mTitle=document.getElementById('modal-title');
-    const $mUpdated=document.getElementById('modal-updated');
-    const $mImg=document.getElementById('modal-image');
-    const $mContent=document.getElementById('modal-content');
-    const $mLink=document.getElementById('modal-link');
-    const $mPress=document.getElementById('modal-press');
-
-    const lockScroll = (lock)=>{ document.documentElement.style.overflow=document.body.style.overflow=lock?'hidden':''; };
-    const showModal = ()=>{ modal.classList.add('open'); modal.setAttribute('aria-hidden','false'); lockScroll(true); };
-    const hideModal = ()=>{ modal.classList.remove('open'); modal.setAttribute('aria-hidden','true'); lockScroll(false); };
-    closeBtn.addEventListener('click', hideModal); backdrop.addEventListener('click', hideModal);
-    document.addEventListener('keydown', (e)=>{ if(e.key==='Escape') hideModal(); });
-
-    async function openModalById(id){
-      try{
-        const res = await fetch(`/pages/news/${encodeURIComponent(id)}`);
-        if(!res.ok) throw new Error('HTTP '+res.status);
-        const data = await res.json();
-        $mTitle.textContent = data.title || '(제목 없음)';
-        const updated = data.updated_at || data.publishedAt || data.published_at;
-        $mUpdated.textContent = updated ? String(updated).substring(0,10) : '';
-        if(data.image){ $mImg.src=data.image; $mImg.alt=data.title||'image'; $mImg.style.display='block'; $mImg.onerror=()=>{$mImg.style.display='none';}; }
-        else { $mImg.removeAttribute('src'); $mImg.style.display='none'; }
-        $mContent.textContent = data.content || data.summary || '';
-        if(data.url){ $mLink.href=data.url; $mLink.style.display='inline-block'; } else { $mLink.removeAttribute('href'); $mLink.style.display='none'; }
-        $mPress.textContent = data.press ? ('출처: '+data.press) : '';
-        showModal();
-      }catch(e){ console.error(e); alert('상세를 불러오지 못했습니다.'); }
-    }
-    list.addEventListener('click', (e)=>{ if(e.target.closest('.more-toggle')) return; const card=e.target.closest('.news-card'); if(!card) return; const id=card.getAttribute('data-id'); if(id) openModalById(id); });
-    list.addEventListener('keydown', (e)=>{ if(e.key!=='Enter') return; const card=e.target.closest('.news-card'); if(!card) return; const id=card.getAttribute('data-id'); if(id) openModalById(id); });
-  })();
-
-  /* ====================== 전일 브리핑: 5개 카테고리, 가로 긴 카드로 세로 나열 ====================== */
-  (function(){
-    const API_BASE = document.getElementById('news-page')?.dataset?.apiBase || '';
-    const dateEl = document.querySelector('.briefing-date');
-    const listEl = document.getElementById('briefing-list');
-
-    const ORDER = ['금융','부동산','산업','글로벌경제','일반'];
-
-    function mapCategory(name){
-      if(!name) return '일반';
-      if(name === '증권') return '금융'; // ★ 증권 → 금융 병합
-      return name;
-    }
-
-    function normalizeCategories(arr){
-      const byCat = new Map();
-      (arr||[]).forEach(src=>{
-        const cat = mapCategory(src.category || '일반');
-        if(!byCat.has(cat)) byCat.set(cat, { category:cat, summary:'', highlights:[] });
-        const dst = byCat.get(cat);
-        const s = (src.summary||'').trim();
-        if(s && !dst.summary.includes(s)) dst.summary = (dst.summary ? dst.summary+' ' : '') + s;
-        const hs = Array.isArray(src.highlights) ? src.highlights : [];
-        const set = new Set(dst.highlights.concat(hs));
-        dst.highlights = Array.from(set).slice(0,12);
-      });
-      const out = [];
-      ORDER.forEach(cat=>{
-        if(byCat.has(cat)) out.push(byCat.get(cat));
-        else out.push({ category:cat, summary:'해당 카테고리의 전일 기사가 없습니다.', highlights:[] });
-      });
-      return out;
-    }
-
-    function makeItem(cat){
-      const wrap = document.createElement('div');
-      wrap.className = `briefing-item C${cat.category}`;
-      const bar = document.createElement('div'); bar.className='briefing-bar';
-      const body = document.createElement('div'); body.className='briefing-body';
-
-      const h = document.createElement('h5'); h.className='briefing-title';
-      const chip = document.createElement('span'); chip.className='cat-chip';
-      const dot = document.createElement('span'); dot.className='dot';
-      const lbl = document.createElement('span'); lbl.textContent = cat.category;
-      chip.append(dot,lbl); h.append(chip);
-
-      const p = document.createElement('p'); p.className='briefing-summary'; p.textContent = cat.summary || '요약 없음';
-
-      const tags = document.createElement('div'); tags.className='briefing-tags';
-      (cat.highlights || []).forEach(t=>{ const s=document.createElement('span'); s.className='tag'; s.textContent=t; tags.appendChild(s); });
-
-      body.append(h,p,tags);
-      wrap.append(bar,body);
-      return wrap;
-    }
-
-    async function load(){
-      try{
-        dateEl.textContent = '불러오는 중…';
-        listEl.innerHTML = '';
-        const res = await fetch(`${API_BASE}/briefing/yesterday`, { headers:{'Accept':'application/json'} });
-        if(!res.ok){ dateEl.textContent = '전일 기사 요약이 없습니다.'; return; }
-        const raw = await res.json();
-        const cats = normalizeCategories(raw?.categories || []);
-        dateEl.textContent = (raw?.date ? `(${raw.date}) ` : '') + '전일 카테고리별 요약';
-        cats.forEach(c => listEl.appendChild(makeItem(c)));
-      }catch(e){
-        console.warn(e);
-        dateEl.textContent = '요약 데이터를 불러오지 못했습니다.';
-      }
-    }
-
-    load();
-  })();
-</script>
-
-<noscript>이 페이지를 보려면 자바스크립트를 활성화하세요.</noscript>
+  <div th:replace="fragments/footer :: siteFooter"></div>
 </body>
 </html>

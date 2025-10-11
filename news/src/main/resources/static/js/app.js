@@ -14,7 +14,7 @@ let sentimentChart = null;             // 감성 차트 핸들
 document.addEventListener('DOMContentLoaded', function () {
   initializeApp();          // 네비/뉴스/추천/챗봇/모달 등 공통 초기화
   setActiveNavByLocation(); // URL과 내비 active 동기화  :contentReference[oaicite:5]{index=5}
-  createSentimentChart();   // 감성차트만 여기서 렌더 (트렌드는 trands.js 위임)
+  createSentimentChart();   // 감성차트만 여기서 렌더 (트렌드는 trends.js 위임)
 
   // [테스트] 초기 로딩 후 대시보드/감성/트렌드 탭 전환 테스트:
   // 1) 상단 네비에서 "감성" 클릭 → 원형차트 보이면 OK

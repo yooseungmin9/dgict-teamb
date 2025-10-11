@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8">
+  <title>통합검색</title>
+  <link rel="stylesheet" th:href="@{/css/style.css}" />
+  <link rel="stylesheet" href="/css/footer.css"/>
+  <link rel="stylesheet" href="/css/header.css"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+
+  <style>
+    /* ===== Scoped styles (search page only) ===== */
+    #search-page .s-head{display:flex;justify-content:space-between;align-items:center;margin:8px 0 16px}
+    #search-page .s-hint{font-size:12px;color:#64748b}
+    #search-page .empty{color:#666}
+
+    /* Books */
+    #search-page .s-books{display:grid;grid-template-columns:repeat(5,1fr);gap:16px}
+    #search-page .s-book{border:1px solid #e5e7eb;border-radius:8px;padding:10px;text-align:center;background:#fff}
+    #search-page .s-book img{width:120px;height:auto;border-radius:4px}
+    #search-page .s-book-title{font-weight:600;margin:8px 0 4px}
+    #search-page .s-book-author{font-size:.9em;color:#666}
+    #search-page .s-book-meta{font-size:.85em;color:#888}
+    #search-page .s-book-date{font-size:.8em;color:#999}
+
+    /* Videos */
+    #search-page .s-videos{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+    #search-page .s-video{border:1px solid #eee;border-radius:12px;overflow:hidden;display:block;background:#fff;color:inherit;text-decoration:none;transition:box-shadow .18s}
+    #search-page .s-video:hover{box-shadow:0 8px 24px rgba(0,0,0,.06)}
+    #search-page .s-video img{width:100%;display:block}
+    #search-page .s-video-body{padding:10px}
+    #search-page .s-video-title{font-weight:600;margin-bottom:6px}
+    #search-page .s-video-meta{font-size:12px;color:#666}
+
+    /* News (list) */
+    #search-page .s-news{display:grid;grid-template-columns:1fr;gap:12px}
+    #search-page .s-article{border:1px solid #e5e7eb;border-radius:14px;padding:14px;outline:none;cursor:pointer;background:#fff;transition:box-shadow .18s}
+    #search-page .s-article:hover{box-shadow:0 8px 24px rgba(0,0,0,.06);background:#fff}
+    #search-page .s-article a.news-link{font-weight:800;text-decoration:none;color:#111;font-size:18px;line-height:1.4}
+    #search-page .s-article .meta{font-size:12px;color:#6b7280;margin-top:6px}
+    #search-page .s-article .summary{font-size:14px;color:#374151;margin-top:8px;line-height:1.7}
+
+    /* Buttons */
+    #search-page .more-btn{margin-top:10px;display:inline-block;padding:8px 14px;border:1px solid #e5e7eb;border-radius:8px;background:#fff;cursor:pointer}
+    #search-page .more-btn:disabled{opacity:.6;cursor:not-allowed}
+
+    /* ===== Modal (레퍼런스 스타일 기반) ===== */
+    #news-modal{position:fixed;inset:0;z-index:6000;display:none}
+    #news-modal.open{display:block}
+    #news-modal .modal-backdrop{position:absolute;inset:0;background:rgba(17,24,39,.55);opacity:0;transition:opacity .18s}
+    #news-modal.open .modal-backdrop{opacity:1}
+    #news-modal .modal-panel{
+      position:absolute;left:50%;top:50%;transform:translate(-50%,-46%) scale(.98);
+      width:min(920px,92vw);max-height:88vh;background:#fff;border-radius:16px;
+      box-shadow:0 20px 60px rgba(0,0,0,.25);overflow:auto;opacity:0;transition:transform .2s,opacity .2s
+    }
+    #news-modal.open .modal-panel{transform:translate(-50%,-50%) scale(1);opacity:1}
+    #news-modal .modal-close{position:absolute;right:10px;top:8px;border:none;background:transparent;font-size:26px;line-height:1;cursor:pointer;color:#374151}
+    #news-modal .modal-header{position:sticky;top:0;background:#fff;border-bottom:1px solid #e5e7eb;padding:14px 18px;display:flex;gap:8px;align-items:center;justify-content:space-between}
+    #news-modal .modal-title{font-size:18px;font-weight:800;line-height:1.4;margin:0}
+    #news-modal .modal-meta{font-size:12px;color:#6b7280}
+    #news-modal .modal-body{padding:18px}
+    #news-modal .modal-image{max-width:100%;border-radius:10px;display:block;margin:0 0 12px}
+    #news-modal .modal-content{white-space:pre-wrap;line-height:1.7;color:#111827}
+    #news-modal .modal-footer{display:flex;gap:8px;align-items:center;justify-content:space-between;border-top:1px solid #e5e7eb;padding:12px 18px}
+    #news-modal .btn{padding:6px 10px;border:1px solid #e5e7eb;border-radius:8px;background:#2563eb;color:#fff;text-decoration:none;display:inline-block}
+    #news-modal .meta-press{font-size:12px;color:#6b7280}
+  </style>
+</head>
+<body th:with="isLogin=${loggedIn}">
+<div th:replace="~{fragments/header :: siteHeader}"></div>
+
+<main class="main">
+  <div class="container">
+    <div id="search-page" class="page">
+      <h2 class="page-title">통합검색</h2>
+
+      <div class="s-head">
+        <div>
+          <span th:if="${!emptyQuery}">“<strong th:text="${q}">query</strong>” 검색 결과</span>
+          <span class="s-hint" th:if="${emptyQuery}">검색어를 입력해 주세요.</span>
+        </div>
+      </div>
+
+      <!-- ===== News ===== -->
+      <section style="margin-top:24px">
+        <div class="s-head">
+          <h3>뉴스</h3>
+          <div class="s-hint">최신순</div>
+        </div>
+
+        <div th:if="${#lists.isEmpty(news)}" class="empty">뉴스 결과가 없습니다.</div>
+
+        <div id="news-list" class="s-news" th:if="${!#lists.isEmpty(news)}">
+          <div class="s-article"
+               th:each="n : ${news}"
+               th:attr="data-id=${n.id}"
+               tabindex="0" role="button">
+            <div class="news-title" th:text="${n.title}">기사 제목</div>
+            <div class="meta">
+              <span th:text="${n.press}">언론사</span> ·
+              <span th:text="${#strings.substring(n.publishedAt,0,16)}">2025-01-01 18:13</span>
+              <span th:if="${n.category != null}"> · <span th:text="${n.category}">카테고리</span></span>
+            </div>
+            <div class="summary" th:if="${n.summary != null}" th:text="${n.summary}">요약</div>
+          </div>
+        </div>
+
+        <div th:if="${!#lists.isEmpty(news)}" style="text-align:center">
+          <button id="btnMoreNews" class="more-btn">뉴스 더보기</button>
+        </div>
+      </section>
+
+      <!-- ===== Books ===== -->
+      <section style="margin-top:24px">
+        <div class="s-head">
+          <h3>서적</h3>
+          <div class="s-hint">제목/저자 매칭 + 판매지/신간 보정</div>
+        </div>
+
+        <div th:if="${#lists.isEmpty(books)}" class="empty">서적 결과가 없습니다.</div>
+
+        <div id="book-list" class="s-books" th:if="${!#lists.isEmpty(books)}">
+          <div class="s-book" th:each="b : ${books}">
+            <a th:href="${b.link}" target="_blank" rel="noopener">
+              <img th:src="${b.cover}" alt="cover"/>
+            </a>
+            <div class="s-book-title" th:text="${b.title}">제목</div>
+            <div class="s-book-author" th:text="${b.author}">저자</div>
+            <div class="s-book-meta">
+              <span th:if="${b.bestseller != null && b.bestseller.rank != null}"
+                    th:text="'#' + ${b.bestseller.rank} + ' 베스트셀러'">#1 베스트셀러</span>
+              <span th:if="${b.salesPoint != null}"
+                    th:text="' · 판매지수 ' + ${#numbers.formatInteger(b.salesPoint,0,'COMMA')}"> · 판매지수</span>
+            </div>
+            <div class="s-book-date" th:text="${#temporals.format(b.pubDate,'yyyy-MM-dd')}">2025-01-01</div>
+          </div>
+        </div>
+
+        <div th:if="${!#lists.isEmpty(books)}" style="text-align:center">
+          <button id="btnMoreBooks" class="more-btn">서적 더보기</button>
+        </div>
+      </section>
+
+      <!-- ===== Videos ===== -->
+      <section style="margin-top:24px">
+        <div class="s-head">
+          <h3>영상</h3>
+          <div class="s-hint">조회수 내림차순</div>
+        </div>
+
+        <div th:if="${#lists.isEmpty(videos)}" class="empty">영상 결과가 없습니다.</div>
+
+        <div id="video-list" class="s-videos" th:if="${!#lists.isEmpty(videos)}">
+          <a class="s-video"
+             th:each="v : ${videos}"
+             th:href="${v.url}" target="_blank" rel="noopener"
+             th:attr="data-vid=${v.videoId}">
+            <img th:src="${v.thumbnail}" alt="thumb"/>
+            <div class="s-video-body">
+              <div class="s-video-title" th:text="${v.title}">제목</div>
+              <div class="s-video-meta">
+                <span th:text="${v.channelTitle}">채널명</span> ·
+                <span th:text="${#strings.substring(v.publishedAt,0,10)}">2025-01-01</span>
+              </div>
+              <div class="s-video-meta" th:if="${v.statistics != null}">
+                조회수 <span th:text="${v.statistics['viewCount']}">0</span> ·
+                좋아요 <span th:text="${v.statistics['likeCount']}">0</span> ·
+                댓글 <span th:text="${v.statistics['commentCount']}">0</span>
+              </div>
+            </div>
+          </a>
+        </div>
+
+        <div th:if="${!#lists.isEmpty(videos)}" style="text-align:center">
+          <button id="btnMoreVideos" class="more-btn">영상 더보기</button>
+        </div>
+      </section>
+    </div>
+  </div>
+</main>
+
+<div th:replace="~{fragments/footer :: siteFooter}"></div>
+
+<!-- ===== News Modal (레퍼런스 구조 적용) ===== -->
+<div id="news-modal" class="modal" aria-hidden="true">
+  <div class="modal-backdrop"></div>
+  <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <button type="button" class="modal-close" aria-label="닫기">×</button>
+    <div class="modal-header">
+      <h3 id="modal-title" class="modal-title"></h3>
+      <div class="modal-meta"><span id="modal-date" class="meta-date"></span></div>
+    </div>
+    <div class="modal-body">
+      <img id="modal-image" class="modal-image" alt="article image" style="display:none;" />
+      <div class="modal-content">
+        <p id="modal-summary" style="margin-bottom:12px"></p>
+        <p id="modal-content"></p>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <a id="modal-link" class="btn" href="#" target="_blank" rel="noopener noreferrer">원문 링크</a>
+      <span id="modal-press" class="meta-press"></span>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Scripts: AJAX 더보기 + 모달 ===== -->
+<script th:inline="javascript">
+  (function(){
+    const q = /*[[${q}]]*/ '';
+
+    let newsPage=1, booksPage=1, videoToken='';
+    const $news=document.getElementById('news-list');
+    const $books=document.getElementById('book-list');
+    const $videos=document.getElementById('video-list');
+    const $btnNews=document.getElementById('btnMoreNews');
+    const $btnBooks=document.getElementById('btnMoreBooks');
+    const $btnVideos=document.getElementById('btnMoreVideos');
+
+    // 초기 렌더된 비디오 중복 방지셋
+    const seenVideos=new Set();
+    if($videos){
+      $videos.querySelectorAll('.s-video[data-vid]').forEach(a=>{
+        const vid=a.getAttribute('data-vid'); if(vid) seenVideos.add(vid);
+      });
+    }
+
+    // 공통 유틸
+    async function fetchJson(url){ const r=await fetch(url,{headers:{'Accept':'application/json'}}); if(!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); }
+    function enc(s){return encodeURIComponent(s??'');}
+    function numfmt(n){try{return Number(n).toLocaleString();}catch(_){return n}}
+    function escapeHtml(str){return (str||'').replace(/[&<>"']/g,s=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s]));}
+    async function withBtnState(btn, loading, work, done){ const t=btn.textContent; btn.disabled=true; btn.textContent=loading; try{await work();}catch(e){console.error(e); btn.textContent='다시 시도'; return;} finally{ if(document.body.contains(btn)){btn.disabled=false; btn.textContent=done||t;} } }
+    function removeBtn(btn){ if(btn && btn.parentElement) btn.parentElement.removeChild(btn); }
+
+    // ==== 뉴스 더보기 ====
+    $btnNews && $btnNews.addEventListener('click', async ()=>{
+      await withBtnState($btnNews,'로딩...', async ()=>{
+        const data=await fetchJson(`/api/search/news?q=${enc(q)}&page=${newsPage}&size=5`);
+        appendNews(data.items||[]);
+        newsPage=(data.page??newsPage-1)+1;
+        if(!data.hasNext) removeBtn($btnNews);
+      }, '뉴스 더보기');
+    });
+    function appendNews(items){
+      if(!$news || !Array.isArray(items)||!items.length) return;
+      const frag=document.createDocumentFragment();
+      for(const n of items){
+        const el=document.createElement('div');
+        el.className='s-article';
+        el.setAttribute('data-id', n.id || '');
+        el.setAttribute('tabindex','0');
+        el.setAttribute('role','button');
+        el.innerHTML=`
+          <div class="news-title">${escapeHtml(n.title||'')}</div>
+          <div class="meta">
+            <span>${escapeHtml(n.press||'')}</span> ·
+            <span>${escapeHtml((n.publishedAt||'').slice(0,16))}</span>
+            ${n.category ? ' · <span>'+escapeHtml(n.category)+'</span>' : ''}
+          </div>
+          ${n.summary ? '<div class="summary">'+escapeHtml(n.summary)+'</div>' : ''}`;
+        frag.appendChild(el);
+      }
+      $news.appendChild(frag);
+    }
+
+    // ==== 서적 더보기 ====
+    $btnBooks && $btnBooks.addEventListener('click', async ()=>{
+      await withBtnState($btnBooks,'로딩...', async ()=>{
+        const data=await fetchJson(`/api/search/books?q=${enc(q)}&page=${booksPage}&size=5`);
+        appendBooks(data.items||[]);
+        booksPage=(data.page??booksPage-1)+1;
+        if(!data.hasNext) removeBtn($btnBooks);
+      }, '서적 더보기');
+    });
+    function appendBooks(items){
+      if(!$books || !Array.isArray(items)||!items.length) return;
+      const frag=document.createDocumentFragment();
+      for(const b of items){
+        const el=document.createElement('div');
+        el.className='s-book';
+        el.innerHTML=`
+          <a href="${b.link ?? '#'}" target="_blank" rel="noopener">
+            <img src="${b.cover || ''}" alt="cover"/>
+          </a>
+          <div class="s-book-title">${escapeHtml(b.title||'')}</div>
+          <div class="s-book-author">${escapeHtml(b.author||'')}</div>
+          <div class="s-book-meta">
+            ${(b.bestseller && b.bestseller.rank!=null)?('#'+b.bestseller.rank+' 베스트셀러'):''}
+            ${(b.salesPoint!=null)?(' · 판매지수 '+numfmt(b.salesPoint)):''}
+          </div>
+          <div class="s-book-date">${(b.pubDate||'').slice(0,10)}</div>`;
+        frag.appendChild(el);
+      }
+      $books.appendChild(frag);
+    }
+
+    // ==== 영상 더보기(중복 제거) ====
+    $btnVideos && $btnVideos.addEventListener('click', async ()=>{
+      await withBtnState($btnVideos,'로딩...', async ()=>{
+        const data=await fetchJson(`/api/search/videos?q=${enc(q)}&pageToken=${enc(videoToken)}&size=6`);
+        appendVideos(data.items||[]);
+        videoToken=data.nextPageToken||'';
+        if(!data.hasNext) removeBtn($btnVideos);
+      }, '영상 더보기');
+    });
+    function appendVideos(items){
+      if(!$videos || !Array.isArray(items)||!items.length) return;
+      const frag=document.createDocumentFragment();
+      for(const v of items){
+        const vid=(v && v.videoId)?String(v.videoId):'';
+        if(!vid || seenVideos.has(vid)) continue;
+        seenVideos.add(vid);
+
+        const a=document.createElement('a');
+        a.className='s-video';
+        a.setAttribute('data-vid', vid);
+        a.href=v.url||'#'; a.target='_blank'; a.rel='noopener';
+        a.innerHTML=`
+          <img src="${v.thumbnail||''}" alt="thumb"/>
+          <div class="s-video-body">
+            <div class="s-video-title">${escapeHtml(v.title||'')}</div>
+            <div class="s-video-meta">
+              <span>${escapeHtml(v.channelTitle||'')}</span> ·
+              <span>${escapeHtml((v.publishedAt||'').slice(0,10))}</span>
+            </div>
+            ${v.statistics?`
+            <div class="s-video-meta">
+              조회수 <span>${escapeHtml(v.statistics.viewCount||'0')}</span> ·
+              좋아요 <span>${escapeHtml(v.statistics.likeCount||'0')}</span> ·
+              댓글 <span>${escapeHtml(v.statistics.commentCount||'0')}</span>
+            </div>`:''}
+          </div>`;
+        frag.appendChild(a);
+      }
+      $videos.appendChild(frag);
+    }
+
+    /* ===== 모달 (레퍼런스 UX) ===== */
+    const modal=document.getElementById('news-modal');
+    const $mTitle = document.getElementById('modal-title');
+    const $mDate  = document.getElementById('modal-date');
+    const $mImg   = document.getElementById('modal-image');
+    const $mSum   = document.getElementById('modal-summary');
+    const $mCont  = document.getElementById('modal-content');
+    const $mLink  = document.getElementById('modal-link');
+    const $mPress = document.getElementById('modal-press');
+
+    const lockScroll = (lock)=>{ document.documentElement.style.overflow=document.body.style.overflow=lock?'hidden':''; };
+    const showModal  = ()=>{ modal.classList.add('open'); modal.setAttribute('aria-hidden','false'); lockScroll(true); };
+    const hideModal  = ()=>{ modal.classList.remove('open'); modal.setAttribute('aria-hidden','true'); lockScroll(false); };
+
+    modal.querySelector('.modal-close')?.addEventListener('click', hideModal);
+    modal.querySelector('.modal-backdrop')?.addEventListener('click', hideModal);
+    window.addEventListener('keydown', (e)=>{ if(e.key==='Escape' && modal.classList.contains('open')) hideModal(); });
+
+    function fillModal(n){
+      $mTitle.textContent = n?.title || '';
+      $mDate.textContent  = (n?.publishedAt || '').slice(0,16);
+      $mPress.textContent = n?.press ? ('출처: ' + n.press) : '';
+
+      if(n?.image){ $mImg.src=n.image; $mImg.style.display='block'; $mImg.onerror=()=>{ $mImg.style.display='none'; }; }
+      else { $mImg.removeAttribute('src'); $mImg.style.display='none'; }
+
+      $mSum.textContent  = n?.summary || '';
+      $mCont.textContent = n?.content || '';
+
+      if(n?.url){ $mLink.href=n.url; $mLink.style.display='inline-block'; }
+      else { $mLink.removeAttribute('href'); $mLink.style.display='none'; }
+    }
+
+    async function openFromCard(card){
+      const id=card.getAttribute('data-id'); if(!id) return;
+      try{
+        const data=await fetchJson(`/api/search/news/${enc(id)}`);
+        fillModal(data);
+        showModal();
+      }catch(e){
+        console.error(e);
+        alert('상세를 불러오지 못했습니다.');
+      }
+    }
+
+    // 카드 클릭(제목 링크 제외)은 모달 오픈
+    $news && $news.addEventListener('click', (e)=>{
+      const isLink = e.target.closest('.news-link');
+      if(isLink) return; // 제목 클릭은 원문 이동
+      const card = e.target.closest('.s-article');
+      if(card){ e.preventDefault(); openFromCard(card); }
+    });
+    $news && $news.addEventListener('keydown', (e)=>{
+      if(e.key!=='Enter') return;
+      const card=e.target.closest('.s-article'); if(!card) return;
+      e.preventDefault(); openFromCard(card);
+    });
+  })();
+</script>
+</body>
+</html>

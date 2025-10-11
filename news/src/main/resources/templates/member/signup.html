@@ -3,119 +3,221 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SUMMARIX · 회원가입</title>
+
+  <!-- 전역 CSS는 그대로 두어도 됩니다 (아래 su-* 네임스페이스로 충돌 완전 차단) -->
   <link rel="stylesheet" href="/css/style.css"/>
   <link rel="stylesheet" href="/css/footer.css"/>
-  <title>회원가입</title>
+
   <style>
-    :root{
-      --gap:16px; --line:#e5e7eb; --ink:#0f172a; --muted:#6b7280;
-      --bg:#f8fafc; --card:#ffffff; --primary:#2563eb; --primary-ink:#ffffff;
-      --accent:#111827;
+    /* ====== 회원가입 전용 토큰 (전역과 분리) ====== */
+    body.su-page {
+      --su-brand: #2563eb;
+      --su-ink: #111827;
+      --su-muted: #6b7280;
+      --su-line: #e5e7eb;
+      --su-bg: #f8fafc;
+      --su-card: #ffffff;
+      --su-radius: 12px;
+      --su-radius-lg: 14px;
+      --su-shadow: 0 8px 28px rgba(0,0,0,.08);
+      --su-gap: 16px;
+      margin: 0;
+      background: var(--su-bg);
+      color: var(--su-ink);
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Apple SD Gothic Neo, Noto Sans KR, sans-serif;
     }
-    html,body{height:100%}
-    body{
-      margin:0; background:var(--bg);
-      font-family:system-ui,-apple-system,Segoe UI,Roboto,Apple SD Gothic Neo,Noto Sans KR,sans-serif;
-      color:var(--ink);
+
+    /* ====== 회원가입 레이아웃(전역 .container, .card 등 사용 안 함) ====== */
+    .su-wrap{
+      max-width: 760px;
+      margin: 56px auto 40px;
+      padding: 0 20px;
     }
-    .container{max-width:640px;margin:40px auto;padding:0 20px}
-    .card{
-      background:var(--card); border:1px solid var(--line); border-radius:14px;
-      padding:28px 28px 22px; box-shadow:0 1px 2px rgba(0,0,0,.03);
+    .su-card{
+      background: var(--su-card);
+      border: 1px solid var(--su-line);
+      border-radius: var(--su-radius-lg);
+      box-shadow: var(--su-shadow);
+      padding: 28px 26px 22px;
     }
-    h1{margin:0 0 22px;font-size:24px;letter-spacing:-.2px}
-    .grid{
-      display:grid; grid-template-columns:220px 1fr; gap:var(--gap) var(--gap);
-      align-items:center;
+    .su-title{
+      margin: 0 0 6px;
+      font-size: 24px;
+      font-weight: 800;
+      letter-spacing: -.2px;
     }
-    /* label column */
-    .grid label.title{font-weight:600;color:#0b1324}
-    /* inputs */
-    .input, select{
-      height:44px; padding:0 12px; border:1px solid var(--line); border-radius:10px;
-      font-size:14px; width:100%; background:#fff; outline:none;
+    .su-sub{ margin: 0 0 18px; color: var(--su-muted); font-size: 13px; }
+
+    /* ====== 그리드 ====== */
+    .su-grid{
+      display: grid;
+      grid-template-columns: 220px 1fr;
+      gap: var(--su-gap);
+      align-items: center;
     }
-    .input:focus{border-color:#c7d2fe; box-shadow:0 0 0 3px rgba(37,99,235,.12)}
-    .help{grid-column:2/3; color:var(--muted); font-size:12px; margin-top:-6px}
-    .hr{height:1px;background:var(--line);margin:22px 0}
-    /* input group (region + button) */
-    .input-group{display:flex; gap:10px; align-items:center}
-    .input-group .input{flex:1}
-    .btn{
-      border:1px solid var(--line); background:var(--accent); color:#fff;
-      padding:10px 14px; height:44px; border-radius:10px; cursor:pointer;
-      font-weight:600;
+    @media (max-width: 760px){
+      .su-grid{ grid-template-columns: 1fr; }
+      .su-label{ margin-top: 8px; }
+      .su-help{ grid-column: auto; }
     }
-    .btn.secondary{background:#fff; color:#0f172a}
-    .btn.primary{background:var(--accent);}
-    .actions{display:flex; gap:10px; justify-content:flex-end; margin-top:18px}
-    /* radio group */
-    .radio-group{display:flex; gap:18px; align-items:center}
-    .radio{display:flex; align-items:center; gap:8px}
-    /* error box */
-    .err{
-      grid-column:1/3; background:#fff3f3; color:#b00020; border:1px solid #ffd6d6;
-      padding:10px 12px; border-radius:10px; margin-top:6px;
+
+    .su-label{
+      font-weight: 700;
+      color: #0b1324;
+      font-size: 14px;
     }
-    /* responsive */
-    @media (max-width: 720px){
-      .grid{grid-template-columns:1fr; align-items:stretch}
-      .grid label.title{margin-top:10px}
+
+    /* ====== 인풋/셀렉트 ====== */
+    .su-input, .su-select{
+      width: 100%;
+      height: 44px;
+      padding: 0 12px;
+      border: 1px solid var(--su-line);
+      border-radius: 10px;
+      background: #fff;
+      font-size: 14px;
+      color: var(--su-ink);
+      outline: none;
+      transition: border-color .15s ease, box-shadow .15s ease;
     }
+    .su-input::placeholder{ color:#9aa4b2; }
+    .su-input:focus, .su-select:focus{
+      border-color: var(--su-brand);
+      box-shadow: 0 0 0 3px rgba(37,99,235,.15);
+      background: #fff;
+    }
+
+    .su-help{
+      grid-column: 2/3;
+      color: var(--su-muted);
+      font-size: 12px;
+      margin-top: -6px;
+    }
+
+    .su-hr{ height:1px; background: var(--su-line); margin: 22px 0; }
+
+    /* ====== 묶음(지역 + 버튼) ====== */
+    .su-inline{ display:flex; gap:10px; align-items:center; }
+    .su-inline .su-input{ flex:1; }
+
+    /* ====== 버튼 ====== */
+    .su-actions{ display:flex; gap:10px; justify-content:flex-end; margin-top:18px; }
+    .su-btn{
+      height: 44px;
+      padding: 10px 14px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-weight: 700;
+      border: 1px solid transparent;
+      transition: background-color .15s ease, transform .06s ease, box-shadow .15s ease, border-color .15s ease;
+    }
+    .su-btn--primary{
+      background: var(--su-brand);
+      color: #fff;
+      box-shadow: 0 10px 22px rgba(37,99,235,.20);
+    }
+    .su-btn--primary:hover{ background:#1f4fd6; }
+    .su-btn--primary:active{ transform: translateY(1px); box-shadow: 0 8px 18px rgba(37,99,235,.18); }
+
+    .su-btn--ghost{
+      background: #fff;
+      color: var(--su-brand);
+      border-color: color-mix(in oklab, var(--su-brand) 45%, var(--su-line));
+    }
+    .su-btn--ghost:hover{
+      background: #f7faff;
+      border-color: var(--su-brand);
+    }
+
+    /* ====== 라디오 ====== */
+    .su-radios{ display:flex; gap:18px; align-items:center; }
+    .su-radio { display:flex; align-items:center; gap:8px; }
+
+    /* ====== 오류 박스 ====== */
+    .su-err{
+      grid-column: 1/-1;
+      background: #fff3f3;
+      color: #b00020;
+      border: 1px solid #ffd6d6;
+      padding: 10px 12px;
+      border-radius: 10px;
+      margin-top: 6px;
+    }
+
+    /* ====== 뒤로가기 링크(선택) ====== */
+    .su-back{
+      display: inline-flex; gap:6px; align-items:center;
+      color:#334155; text-decoration:none; font-size:13px; margin-bottom:8px;
+    }
+    .su-back:hover{ text-decoration: underline; }
+    .su-back svg{ width:14px; height:14px; }
   </style>
 </head>
-<body>
+
+<!-- ★ 전역과 완전 분리: body에 su-page, 메인 래퍼는 su-wrap / su-* 클래스만 사용 -->
+<body class="su-page">
 <div th:replace="fragments/header :: siteHeader"></div>
-<main class="container">
-  <div class="card">
-    <h1>회원가입</h1>
 
-    <!-- 폼 모델은 SignupRequest -->
-    <form th:action="@{/member/signup}" th:object="${member}" method="post">
+<main class="su-wrap">
+  <a href="javascript:history.back()" class="su-back" aria-label="뒤로가기">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+    뒤로가기
+  </a>
 
-      <div class="grid">
-        <label for="id" class="title">아이디</label>
-        <input id="id" class="input" type="text" th:field="*{id}" placeholder="아이디" required />
+  <section class="su-card">
+    <h1 class="su-title">회원가입</h1>
+    <p class="su-sub">SUMMARIX 계정을 생성합니다</p>
 
-        <label for="password" class="title">비밀번호</label>
-        <input id="password" class="input" type="password" th:field="*{password}" placeholder="비밀번호" required />
+    <!-- 폼 모델: SignupRequest -->
+    <form th:action="@{/member/signup}" th:object="${member}" method="post" novalidate>
+      <div class="su-grid">
+        <label for="id" class="su-label">아이디</label>
+        <input id="id" class="su-input" type="text" th:field="*{id}" placeholder="아이디" required />
 
-        <label for="name" class="title">이름</label>
-        <input id="name" class="input" type="text" th:field="*{name}" placeholder="이름" required />
+        <label for="password" class="su-label">비밀번호</label>
+        <input id="password" class="su-input" type="password" th:field="*{password}"
+               placeholder="비밀번호 (최소 4자)" minlength="4" required />
+        <p class="su-help">영문/숫자 조합 권장</p>
 
-        <label for="birthYear" class="title">출생년도</label>
-        <input id="birthYear" class="input" type="number" min="1900" max="2099" step="1" th:field="*{birthYear}" placeholder="예: 1995" />
+        <label for="name" class="su-label">이름</label>
+        <input id="name" class="su-input" type="text" th:field="*{name}" placeholder="이름" required />
 
-        <label for="phone" class="title">전화번호</label>
-        <input id="phone" class="input" type="tel" th:field="*{phone}" placeholder="010-1234-5678" />
+        <label for="birthYear" class="su-label">출생년도</label>
+        <input id="birthYear" class="su-input" type="number" min="1900" max="2099" step="1"
+               th:field="*{birthYear}" placeholder="예: 1999" />
 
-        <label for="region" class="title">지역</label>
-        <div class="input-group">
-          <input id="region" class="input" type="text" th:field="*{region}" placeholder="예: 서울 강남구" />
-          <button type="button" class="btn secondary" id="btnAddr">주소찾기</button>
+        <label for="phone" class="su-label">전화번호</label>
+        <input id="phone" class="su-input" type="tel" th:field="*{phone}" placeholder="010-1234-5678" />
+
+        <label for="region" class="su-label">지역</label>
+        <div class="su-inline">
+          <input id="region" class="su-input" type="text" th:field="*{region}" placeholder="예: 서울 강남구" />
+          <button type="button" class="su-btn su-btn--ghost" id="btnAddr">주소찾기</button>
         </div>
 
-        <label class="title">성별</label>
-        <div class="radio-group">
-          <label class="radio"><input type="radio" th:field="*{gender}" value="남" /> 남</label>
-          <label class="radio"><input type="radio" th:field="*{gender}" value="여" /> 여</label>
+        <span class="su-label">성별</span>
+        <div class="su-radios">
+          <label class="su-radio"><input type="radio" th:field="*{gender}" value="남" /> 남</label>
+          <label class="su-radio"><input type="radio" th:field="*{gender}" value="여" /> 여</label>
         </div>
 
-        <!-- 에러 메시지 (BindingResult를 쓸 때만 표시) -->
-        <div class="err" th:if="${#fields != null and #fields.hasAnyErrors()}">
+        <!-- 바인딩 오류 -->
+        <div class="su-err" th:if="${#fields != null and #fields.hasAnyErrors()}">
           <p th:each="e : ${#fields.allErrors()}" th:text="${e}">폼 오류 메시지</p>
         </div>
       </div>
 
-      <div class="hr"></div>
+      <div class="su-hr"></div>
 
-      <div class="actions">
-        <a class="btn secondary" th:href="@{/pages/dashboard}">취소</a>
-        <button class="btn primary" type="submit">가입하기</button>
+      <div class="su-actions">
+        <a class="su-btn su-btn--ghost" th:href="@{/pages/dashboard}">취소</a>
+        <button class="su-btn su-btn--primary" type="submit">가입하기</button>
       </div>
     </form>
-  </div>
+  </section>
 </main>
+
 <div th:replace="fragments/footer :: siteFooter"></div>
 
 <!-- 전화번호 자동 하이픈 -->
@@ -125,14 +227,11 @@
     if(!$p) return;
     const fmt = v => {
       v = v.replace(/[^0-9]/g,'');
-      // 02 국번
       if(/^02/.test(v)){
         if(v.length <= 2) return '02';
         if(v.length <= 6) return `02-${v.slice(2)}`;
-        if(v.length <= 10) return `02-${v.slice(2,6)}-${v.slice(6,10)}`;
         return `02-${v.slice(2,6)}-${v.slice(6,10)}`;
       }
-      // 휴대폰/일반
       if(v.length < 4) return v;
       if(v.length < 7) return `${v.slice(0,3)}-${v.slice(3)}`;
       return `${v.slice(0,3)}-${v.slice(3,7)}-${v.slice(7,11)}`;
@@ -148,8 +247,9 @@
 <!-- 다음(카카오) 주소 API -->
 <script src="//t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
 <script>
-  const btn = document.getElementById('btnAddr');
-  if(btn){
+  (function(){
+    const btn = document.getElementById('btnAddr');
+    if(!btn) return;
     btn.addEventListener('click', function(){
       new daum.Postcode({
         oncomplete: function(data) {
@@ -159,7 +259,7 @@
         }
       }).open();
     });
-  }
+  })();
 </script>
 </body>
 </html>

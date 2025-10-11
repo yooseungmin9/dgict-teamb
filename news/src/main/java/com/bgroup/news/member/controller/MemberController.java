@@ -4,6 +4,7 @@ import com.bgroup.news.member.domain.MemberDoc;
 import com.bgroup.news.member.dto.SignupRequest;
 import com.bgroup.news.member.service.MemberService;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpSession;
 import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -46,8 +47,17 @@ public class MemberController {
 
     // 회원 등록 처리
     @PostMapping("/signup")
-    public String signupSubmit(@ModelAttribute SignupRequest req) {
-        memberService.register(req);
+    public String signupSubmit(@ModelAttribute SignupRequest req,
+                               HttpSession session) {
+        // 1) 가입
+        MemberDoc saved = memberService.register(req); // ← MemberDoc 반환 추천
+
+        // 2) 자동 로그인 (세션에 저장)
+        session.setAttribute("loginUser", saved);
+        session.setAttribute("admin", saved.getAdmin());
+        session.setMaxInactiveInterval(3600); // 선택
+
+        // 3) 리다이렉트
         return "redirect:/pages/dashboard";
     }
 
