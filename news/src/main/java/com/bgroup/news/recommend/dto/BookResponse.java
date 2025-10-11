@@ -10,18 +10,33 @@ import java.time.Instant;
 @Data
 @Document(collection = "aladin_books")
 public class BookResponse {
+
     @Id
     private String id;
 
-    @Field("uniqueKey") private String uniqueKey;
-    @Field("author")    private String author;
+    @Field("uniqueKey")  private String uniqueKey;
+    @Field("author")     private String author;
     @Field("categoryId") private Integer categoryId;
-    @Field("cover")     private String cover;
+    @Field("cover")      private String cover;
     @Field("ingestedAt") private Instant ingestedAt;
-    @Field("isbn13")    private String isbn13;
-    @Field("link")      private String link;
-    @Field("pubDate")   private Instant pubDate;  // 필요 시 LocalDate/Date로 변경 가능
-    @Field("source")    private String source;
-    @Field("title")     private String title;
-    @Field("updatedAt") private Instant updatedAt;
+    @Field("isbn13")     private String isbn13;
+    @Field("link")       private String link;
+    @Field("pubDate")    private Instant pubDate;
+    @Field("source")     private String source;
+    @Field("title")      private String title;
+    @Field("updatedAt")  private Instant updatedAt;
+
+    // ✅ 새 필드들
+    @Field("salesPoint")
+    private Integer salesPoint;
+
+    @Field("bestseller")
+    private BestsellerMeta bestseller;
+
+    @Data
+    public static class BestsellerMeta {
+        private Integer rank;
+        private Integer categoryId;
+        private Instant capturedAt;
+    }
 }

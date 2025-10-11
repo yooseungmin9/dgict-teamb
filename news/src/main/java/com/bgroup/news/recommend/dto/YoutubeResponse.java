@@ -19,6 +19,6 @@ public class YoutubeResponse {
         private String publishedAt;
         private String thumbnail;
         private String url;
-        private Map<String, String> statistics; // viewCount, likeCount, commentCount
+        private Map<String, String> statistics;
     }
 }

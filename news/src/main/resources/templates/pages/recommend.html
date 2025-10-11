@@ -90,8 +90,17 @@
             <a th:href="${book.link}" target="_blank" rel="noopener">
               <img th:src="${book.cover}" alt="cover"/>
             </a>
-            <div class="book-title"  th:text="${book.title}"></div>
+            <div class="book-title" th:text="${book.title}"></div>
             <div class="book-author" th:text="${book.author}"></div>
+
+            <!-- ✅ 판매지수 or 랭킹 표시 -->
+            <div class="book-meta" style="font-size:0.85em; color:#888;">
+              <span th:if="${book.bestseller != null && book.bestseller.rank != null}"
+                    th:text="'#' + ${book.bestseller.rank} + ' 베스트셀러'"></span>
+              <span th:if="${book.salesPoint != null}"
+                    th:text="' · 판매지수 ' + ${book.salesPoint}"></span>
+            </div>
+
             <div class="book-date"
                  th:text="${#temporals.format(book.pubDate,'yyyy-MM-dd')}"></div>
           </div>
