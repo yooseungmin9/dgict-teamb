@@ -45,6 +45,7 @@
     margin: 10px 0 16px;
     color: #f0f9ff;
     line-height: 1.6;
+    word-break: keep-all;
 }
 .ft-social a {
     display: inline-flex;
@@ -78,6 +79,7 @@
     border: 1px solid rgba(255, 255, 255, 0.25);
     border-radius: 12px;
     padding: 12px 14px;
+    word-break: keep-all;
 }
 
 /* 프로젝트 정보 */
