@@ -1,18 +1,16 @@
 <header class="appbar" th:fragment="siteHeader" xmlns:th="http://www.w3.org/1999/xhtml">
   <!-- 좌측: 로고 -->
   <a class="appbar__logo" data-url="/pages/" aria-label="대시보드로 이동">
-    <!-- 기존 로고 SVG 재사용 -->
     <svg viewBox="0 0 24 24" class="brand__logo" aria-hidden="true">
       <path d="M3 12h3l3 7 4-14 3 7h5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
     </svg>
     <span class="appbar__brand">SUMMARIX</span>
   </a>
 
-  <!-- 중앙: 탭 내비게이션(가로 스크롤 가능) -->
+  <!-- 중앙: 탭 내비게이션 -->
   <nav class="appbar__tabs" aria-label="주 메뉴">
-    <!-- 버튼은 기존 data-url 방식 그대로 -->
     <button class="tab-btn" data-url="/pages/news">뉴스 요약</button>
-    <button class="tab-btn" data-url="/pages/youtube_opinion">분석</button>
+    <button class="tab-btn" data-url="/pages/youtube_opinion">유튜브 분석</button>
     <button class="tab-btn" data-url="/pages/chat">챗봇</button>
     <button class="tab-btn" data-url="/pages/recommend">추천</button>
   </nav>
@@ -49,10 +47,10 @@
     </div>
   </div>
 
-  <!-- 접근성/라우팅 스크립트: 기존 data-url 처리 재사용 -->
+  <!-- 접근성/라우팅 + 계정 모달 스크립트 -->
   <script>
     (function () {
-      // data-url 속성이 있으면 클릭/Enter/Space로 이동
+      // data-url 이동 처리
       function go(el){ var u=el.dataset.url; if(u) window.location.href=u; }
       function onClick(e){ go(e.currentTarget); }
       function onKey(e){ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); go(e.currentTarget);} }
@@ -62,10 +60,99 @@
         el.style.cursor='pointer';
       });
 
-      // 현재 경로와 동일한 탭에 .active 부여
+      // 현재 탭 활성화
       var path = location.pathname;
       document.querySelectorAll('.appbar__tabs .tab-btn').forEach(function(b){
         if(path.startsWith(b.dataset.url)) b.classList.add('active');
+      });
+
+      // 🔹 계정 모달 (app.js에서 이동)
+      document.addEventListener('DOMContentLoaded', function(){
+        const trigger = document.getElementById('accountBtn');
+        if(!trigger) return;
+
+        let backdrop, dialog, closeBtn;
+        const K = { zBackdrop:99998, zDialog:99999, animMs:160 };
+
+        function build(){
+          if(backdrop && dialog) return;
+          backdrop = document.createElement('div');
+          backdrop.id = 'accountPortalBackdrop';
+          backdrop.style.cssText = `
+            position:fixed; inset:0; background:rgba(0,0,0,.45);
+            z-index:${K.zBackdrop}; opacity:0; transition:opacity 160ms ease;`;
+          dialog = document.createElement('div');
+          dialog.id = 'accountPortalDialog';
+          dialog.style.cssText = `
+            position:fixed; left:50%; top:50%; transform:translate(-50%,-48%);
+            z-index:99999;
+
+            /* ⬇️ 크기 살짝 줄이고, 여백 여유 있게 */
+            width:min(740px, 92vw);
+            max-height:min(72vh, 1000px);
+
+            /* ⬇️ 톤 다운: 더 옅은 보더 + 부드러운 라운드 + 은은한 그림자 */
+            background:#fff;
+            border:1px solid rgba(0,0,0,.06);
+            border-radius:14px;
+            box-shadow:0 12px 24px rgba(0,0,0,.18);
+
+            overflow:hidden; display:flex; flex-direction:column; opacity:0;
+            transition:opacity 160ms ease, transform 160ms ease;
+          `;
+
+// iframe 높이도 위 max-height와 맞춰서
+          dialog.innerHTML = `
+            <div style="display:flex;align-items:center;justify-content:space-between;
+                        padding:12px 16px;border-bottom:1px solid rgba(0,0,0,.06)">
+              <h2 style="margin:0;font-size:16px;font-weight:700;color:#0f172a">계정 정보</h2>
+              <button id="accountPortalClose" aria-label="닫기"
+                      style="border:1px solid rgba(15,23,42,.08);background:#fff;cursor:pointer;
+                             font-size:16px;line-height:1;padding:6px 8px;border-radius:8px">✕</button>
+            </div>
+            <div style="padding:0;height:100%">
+              <iframe src="/member/account" title="계정 정보"
+                      style="display:block;width:100%;
+                             height:calc(min(88vh,1000px) - 49px); border:0"></iframe>
+            </div>
+          `;
+          document.body.append(backdrop, dialog);
+          closeBtn = dialog.querySelector('#accountPortalClose');
+          backdrop.addEventListener('click', close);
+          closeBtn.addEventListener('click', close);
+          document.addEventListener('keydown', onKey);
+        }
+
+        function open(e){
+          e.preventDefault();
+          build();
+          document.documentElement.style.overflow = 'hidden';
+          requestAnimationFrame(()=>{
+            backdrop.style.opacity='1';
+            dialog.style.opacity='1';
+            dialog.style.transform='translate(-50%,-50%)';
+          });
+          trigger.setAttribute('aria-expanded','true');
+          closeBtn.focus();
+        }
+
+        function close(){
+          if(!dialog||!backdrop) return;
+          dialog.style.opacity='0';
+          dialog.style.transform='translate(-50%,-48%)';
+          backdrop.style.opacity='0';
+          setTimeout(()=>{
+            backdrop.remove(); dialog.remove();
+            backdrop = dialog = closeBtn = null;
+            document.documentElement.style.overflow='';
+            trigger.setAttribute('aria-expanded','false');
+            trigger.focus();
+          }, K.animMs);
+        }
+
+        function onKey(ev){ if(ev.key==='Escape') close(); }
+
+        trigger.addEventListener('click', open);
       });
     })();
   </script>

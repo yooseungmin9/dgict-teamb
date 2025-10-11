@@ -5,43 +5,46 @@
   <title>추천</title>
   <link rel="stylesheet" th:href="@{/css/style.css}" />
   <link rel="stylesheet" href="/css/footer.css"/>
+
   <style>
-    .book-list {
+    /* =========================
+       Recommend Page Scoped CSS
+       ========================= */
+    #rec-page .rec-tabs {display:flex;gap:8px;margin:16px 0}
+    #rec-page .rec-tab-btn{padding:8px 12px;border:1px solid #e5e7eb;border-radius:8px;background:#fff;cursor:pointer}
+    #rec-page .rec-tab-btn.rec-active{background:#2563eb;color:#fff;border-color:#2563eb}
+    #rec-page .rec-tab{display:none}
+    #rec-page .rec-tab.rec-show{display:block}
+
+    #rec-page .rec-book-list {
       display: grid;
-      grid-template-columns: repeat(5, 1fr); /* 책 5개 한 줄 */
+      grid-template-columns: repeat(5, 1fr);
       gap: 20px;
     }
-    .book-card {
+    #rec-page .rec-book-card {
       border: 1px solid #ccc;
       border-radius: 8px;
       padding: 10px;
       text-align: center;
+      background:#fff;
     }
-    .book-card img {
+    #rec-page .rec-book-card img {
       width: 120px;
       height: auto;
       border-radius: 4px;
     }
-    .book-title {
-      font-weight: bold;
-      margin: 10px 0 5px;
-    }
-    .book-author {
-      font-size: 0.9em;
-      color: #666;
-    }
-    .book-date {
-      font-size: 0.8em;
-      color: #999;
-    }
+    #rec-page .rec-book-title { font-weight: bold; margin: 10px 0 5px; }
+    #rec-page .rec-book-author { font-size: 0.9em; color: #666; }
+    #rec-page .rec-book-date { font-size: 0.8em; color: #999; }
+    #rec-page .rec-book-meta { font-size:0.85em; color:#888; }
 
-    .videos-grid {
+    #rec-page .rec-videos-grid {
       display: grid;
-      grid-template-columns: repeat(3, 1fr); /* 유튜브 3개 한 줄 */
+      grid-template-columns: repeat(3, 1fr);
       gap: 16px;
       margin-top: 16px;
     }
-    .video-card {
+    #rec-page .rec-video-card {
       border: 1px solid #eee;
       border-radius: 12px;
       overflow: hidden;
@@ -50,73 +53,78 @@
       text-decoration: none;
       color: inherit;
     }
-    .video-card img {
-      width: 100%;
-      display: block;
-    }
-    .video-body {
-      padding: 10px;
-    }
-    .video-title {
-      font-weight: 600;
-      margin-bottom: 6px;
-    }
-    .video-meta {
-      font-size: 12px;
-      color: #666;
-    }
+    #rec-page .rec-video-card img { width: 100%; display: block; }
+    #rec-page .rec-video-body { padding: 10px; }
+    #rec-page .rec-video-title { font-weight: 600; margin-bottom: 6px; }
+    #rec-page .rec-video-meta { font-size: 12px; color: #666; }
+
+    #rec-page .rec-section-head {display:flex; justify-content:space-between; align-items:center; margin:8px 0 6px}
+    #rec-page .rec-hint {font-size:12px; color:#64748b;}
   </style>
 </head>
-<body>
+<body th:with="isLogin=${loggedIn}">
 <div th:replace="~{fragments/header :: siteHeader}"></div>
 
 <main class="main">
   <div class="container">
-    <div id="recommendations" class="page">
-      <h2 class="page-title">맞춤 추천</h2>
+    <div id="rec-page" class="page">
+      <div class="rec-tabs">
+        <button class="rec-tab-btn" data-tab="personal" th:if="${isLogin}">맞춤</button>
+        <button class="rec-tab-btn" data-tab="default" th:text="${isLogin} ? '기본' : '탐색'">탐색</button>
+      </div>
 
-      <!-- 책 추천 -->
-      <div class="recommendations-section">
-        <h3>추천 경제 서적</h3>
-
-        <!-- 비어있을 때 -->
-        <div th:if="${#lists.isEmpty(books)}" style="color:#666">
-          책 데이터가 없습니다.
+      <!-- 맞춤 탭 (로그인 사용자만 렌더) -->
+      <section id="rec-tab-personal" class="rec-tab" th:if="${isLogin}">
+        <div class="rec-section-head">
+          <h3>맞춤 경제 서적</h3>
+          <div class="rec-hint"
+               th:if="${activeKeywords != null and !#strings.isEmpty(activeKeywords)}"
+               th:text="'키워드: ' + ${activeKeywords}">
+          </div>
         </div>
 
-        <!-- 목록 -->
-        <div class="book-list" th:if="${!#lists.isEmpty(books)}">
-          <div class="book-card" th:each="book,iter : ${books}" th:if="${iter.index} < 5">
+        <!-- 책: 비었을 때 -->
+        <div th:if="${#lists.isEmpty(personalBooks)}" style="color:#666">
+          맞춤 서적 데이터가 없습니다. 관심사를 저장하면 더 정확해져요.
+        </div>
+        <!-- 책: 목록 -->
+        <div class="rec-book-list" th:if="${!#lists.isEmpty(personalBooks)}">
+          <div class="rec-book-card" th:each="book,iter : ${personalBooks}">
             <a th:href="${book.link}" target="_blank" rel="noopener">
               <img th:src="${book.cover}" alt="cover"/>
             </a>
-            <div class="book-title"  th:text="${book.title}"></div>
-            <div class="book-author" th:text="${book.author}"></div>
-            <div class="book-date"
-                 th:text="${#temporals.format(book.pubDate,'yyyy-MM-dd')}"></div>
+            <div class="rec-book-title" th:text="${book.title}">제목</div>
+            <div class="rec-book-author" th:text="${book.author}">저자</div>
+            <div class="rec-book-meta">
+              <span th:if="${book.bestseller != null && book.bestseller.rank != null}"
+                    th:text="'#' + ${book.bestseller.rank} + ' 베스트셀러'">#1 베스트셀러</span>
+              <span th:if="${book.salesPoint != null}"
+                    th:text="' · 판매지수 ' + ${#numbers.formatInteger(book.salesPoint, 0, 'COMMA')}"> · 판매지수</span>
+            </div>
+            <div class="rec-book-date" th:text="${#temporals.format(book.pubDate,'yyyy-MM-dd')}">2025-01-01</div>
           </div>
         </div>
-      </div>
 
-      <!-- 유튜브 추천 -->
-      <div class="recommendations-section">
-        <h3>추천 교육 영상</h3>
-
-        <div th:if="${#lists.isEmpty(videos)}" style="color:#666">
-          영상 데이터가 없습니다.
+        <div class="rec-section-head" style="margin-top:24px">
+          <h3>맞춤 교육 영상</h3>
         </div>
 
-        <div class="videos-grid" th:if="${!#lists.isEmpty(videos)}">
-          <a class="video-card" th:each="v : ${videos}"
+        <!-- 유튜브: 비었을 때 -->
+        <div th:if="${#lists.isEmpty(personalVideos)}" style="color:#666">
+          맞춤 영상 데이터가 없습니다.
+        </div>
+        <!-- 유튜브: 목록 -->
+        <div class="rec-videos-grid" th:if="${!#lists.isEmpty(personalVideos)}">
+          <a class="rec-video-card" th:each="v : ${personalVideos}"
              th:href="${v.url}" target="_blank" rel="noopener">
             <img th:src="${v.thumbnail}" alt="thumb"/>
-            <div class="video-body">
-              <div class="video-title" th:text="${v.title}">제목</div>
-              <div class="video-meta">
+            <div class="rec-video-body">
+              <div class="rec-video-title" th:text="${v.title}">제목</div>
+              <div class="rec-video-meta">
                 <span th:text="${v.channelTitle}">채널명</span> ·
                 <span th:text="${#strings.substring(v.publishedAt,0,10)}">2025-01-01</span>
               </div>
-              <div class="video-meta" th:if="${v.statistics != null}">
+              <div class="rec-video-meta" th:if="${v.statistics != null}">
                 조회수 <span th:text="${v.statistics['viewCount']}">0</span> ·
                 좋아요 <span th:text="${v.statistics['likeCount']}">0</span> ·
                 댓글 <span th:text="${v.statistics['commentCount']}">0</span>
@@ -124,13 +132,96 @@
             </div>
           </a>
         </div>
-      </div>
+      </section>
 
+      <!-- 기본/탐색 탭 (항상 렌더) -->
+      <section id="rec-tab-default" class="rec-tab">
+        <div class="rec-section-head">
+          <h3>베스트셀러 서적</h3>
+          <div class="rec-hint">판매지수 우선 + 신간 보정</div>
+        </div>
+
+        <!-- 책: 비었을 때 -->
+        <div th:if="${#lists.isEmpty(defaultBooks)}" style="color:#666">
+          책 데이터가 없습니다.
+        </div>
+        <!-- 책: 목록 -->
+        <div class="rec-book-list" th:if="${!#lists.isEmpty(defaultBooks)}">
+          <div class="rec-book-card" th:each="book : ${defaultBooks}">
+            <a th:href="${book.link}" target="_blank" rel="noopener">
+              <img th:src="${book.cover}" alt="cover"/>
+            </a>
+            <div class="rec-book-title" th:text="${book.title}">제목</div>
+            <div class="rec-book-author" th:text="${book.author}">저자</div>
+            <div class="rec-book-meta">
+              <span th:if="${book.bestseller != null && book.bestseller.rank != null}"
+                    th:text="'#' + ${book.bestseller.rank} + ' 베스트셀러'">#1 베스트셀러</span>
+              <span th:if="${book.salesPoint != null}"
+                    th:text="' · 판매지수 ' + ${#numbers.formatInteger(book.salesPoint, 0, 'COMMA')}"> · 판매지수</span>
+            </div>
+            <div class="rec-book-date" th:text="${#temporals.format(book.pubDate,'yyyy-MM-dd')}">2025-01-01</div>
+          </div>
+        </div>
+
+        <div class="rec-section-head" style="margin-top:24px">
+          <h3>경제 강의 인기 영상</h3>
+          <div class="rec-hint">조회수 내림차순</div>
+        </div>
+
+        <!-- 유튜브: 비었을 때 -->
+        <div th:if="${#lists.isEmpty(defaultVideos)}" style="color:#666">
+          영상 데이터가 없습니다.
+        </div>
+        <!-- 유튜브: 목록 -->
+        <div class="rec-videos-grid" th:if="${!#lists.isEmpty(defaultVideos)}">
+          <a class="rec-video-card" th:each="v : ${defaultVideos}"
+             th:href="${v.url}" target="_blank" rel="noopener">
+            <img th:src="${v.thumbnail}" alt="thumb"/>
+            <div class="rec-video-body">
+              <div class="rec-video-title" th:text="${v.title}">제목</div>
+              <div class="rec-video-meta">
+                <span th:text="${v.channelTitle}">채널명</span> ·
+                <span th:text="${#strings.substring(v.publishedAt,0,10)}">2025-01-01</span>
+              </div>
+              <div class="rec-video-meta" th:if="${v.statistics != null}">
+                조회수 <span th:text="${v.statistics['viewCount']}">0</span> ·
+                좋아요 <span th:text="${v.statistics['likeCount']}">0</span> ·
+                댓글 <span th:text="${v.statistics['commentCount']}">0</span>
+              </div>
+            </div>
+          </a>
+        </div>
+      </section>
     </div>
   </div>
 </main>
 
-<div th:replace="fragments/footer :: siteFooter"></div>
+<div th:replace="~{fragments/footer :: siteFooter}"></div>
 
+<script th:inline="javascript">
+  (function(){
+    const isLogin = /*[[${loggedIn}]]*/ false;
+    const root = document.getElementById('rec-page');
+    const btns = root.querySelectorAll('.rec-tab-btn');
+    const tabPersonal = document.getElementById('rec-tab-personal');
+    const tabDefault  = document.getElementById('rec-tab-default');
+
+    function show(tab){
+      if(tab==='personal'){
+        tabPersonal?.classList.add('rec-show');
+        tabDefault.classList.remove('rec-show');
+      }else{
+        tabDefault.classList.add('rec-show');
+        tabPersonal?.classList.remove('rec-show');
+      }
+      btns.forEach(b=>b.classList.toggle('rec-active', b.dataset.tab===tab));
+    }
+
+    // 초기 화면: 로그인이면 맞춤, 아니면 기본
+    show(isLogin ? 'personal' : 'default');
+
+    btns.forEach(b=>b.addEventListener('click', ()=>show(b.dataset.tab)));
+  })();
+</script>
 </body>
 </html>

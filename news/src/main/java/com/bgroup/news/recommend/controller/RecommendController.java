@@ -1,48 +1,274 @@
 package com.bgroup.news.recommend.controller;
 
+import com.bgroup.news.member.domain.MemberDoc;
 import com.bgroup.news.recommend.dto.BookResponse;
 import com.bgroup.news.recommend.dto.YoutubeResponse;
+import com.bgroup.news.recommend.dto.YoutubeResponse.Item;
 import com.bgroup.news.recommend.repository.BookRepository;
+import com.bgroup.news.recommend.service.PreferenceKeywords;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.SessionAttribute;
 import org.springframework.web.reactive.function.client.WebClient;
-import reactor.core.publisher.Mono;
 
-import java.util.List;
+import java.time.Instant;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Controller
+@RequestMapping("/pages") // 최종 URL: /pages/recommend
 @RequiredArgsConstructor
 public class RecommendController {
 
-    private final BookRepository bookRepository;
-    private final @Qualifier("youtubeClient") WebClient youtubeClient; // 유튜브는 계속 API
+    private final BookRepository bookRepo;    // MongoRepository<BookResponse, String>
+    private final WebClient youtubeClient;    // @Bean("youtubeClient") 로 주입
+    private final PreferenceKeywords pref;    // seed 생성 유틸
 
-    @GetMapping("/pages/recommend")
-    public String discover(@RequestParam(defaultValue = "경제 강의") String q, Model model) {
+    @GetMapping(value = "/recommend", produces = MediaType.TEXT_HTML_VALUE)
+    public String recommendPage(
+            @SessionAttribute(value = "loginUser", required = false) MemberDoc me,
+            Model model
+    ) {
+        final boolean loggedIn = (me != null);
+        model.addAttribute("loggedIn", loggedIn);
 
+        // ===== 기본(비로그인) 목록 =====
+        List<BookResponse> defaultBooks  = getTrendingBooks(5);      // ★ 트렌디 정렬(판매+신간)
+        List<Item>         defaultVideos = getYoutubeForDefault(6);  // ★ 타임아웃↑ + 폴백 쿼리
 
-        //  List<BookResponse> books = bookRepository.findTop10ByOrderByPubDateDesc();
-        List<BookResponse> books = bookRepository.findTop10ByCategoryIdOrderByPubDateDesc(3065);
-        model.addAttribute("books", books);
+        model.addAttribute("defaultBooks", defaultBooks);
+        model.addAttribute("defaultVideos", defaultVideos);
 
-        Mono<YoutubeResponse> ytMono = youtubeClient.get()
-                .uri(uri -> uri.path("/youtube/search")
-                        .queryParam("q", q)
-                        .queryParam("max_results", 6)
-                        .build())
-                .retrieve()
-                .bodyToMono(YoutubeResponse.class);
+        // ===== 개인화(로그인) 목록 =====
+        if (loggedIn) {
+            List<String> seeds = pref.buildSeeds(me, 3, 8); // 상위 3개 서브카테고리 → 키워드 최대 8개
+            List<String> seedsForYoutube = seeds.size() > 2 ? seeds.subList(0, 2) : seeds; // 호출 수 제한
 
-        var videos = ytMono.block() != null ? ytMono.block().getItems() : List.of();
+            List<BookResponse> personalBooks  = safeGet(() -> getPersonalBooks(seeds, 5, defaultBooks), defaultBooks);
+            List<Item>         personalVideos = safeGet(() -> getYoutubePersonal(seedsForYoutube, 6, defaultVideos), defaultVideos);
 
-        model.addAttribute("books", books);
-        model.addAttribute("videos", videos);
-        model.addAttribute("query", q);
+            model.addAttribute("personalBooks", personalBooks);
+            model.addAttribute("personalVideos", personalVideos);
+            model.addAttribute("activeKeywords", String.join(", ", seeds));
+        }
+
         return "pages/recommend";
     }
-}
 
+    // =========================================================
+    // Books
+    // =========================================================
+
+    /**
+     * 기본 서적(비로그인): "판매지수 + 신간가중"으로 트렌디 정렬
+     * score = 0.65 * normalizeSales + 0.35 * freshness(0~1, 365일 선형감쇠)
+     */
+    private List<BookResponse> getTrendingBooks(int size) {
+        // 넉넉한 풀: 판매지수 내림차순 위주로 많이 가져오고(상위 200), 신간도 섞기 위해 신간 기준 풀도 합침
+        Pageable bySales = PageRequest.of(0, 200, Sort.by(Sort.Order.desc("salesPoint")));
+        Pageable byDate  = PageRequest.of(0, 200, Sort.by(Sort.Order.desc("pubDate")));
+
+        List<BookResponse> pool = new ArrayList<>();
+        pool.addAll(bookRepo.findAll(bySales).getContent());
+        pool.addAll(bookRepo.findAll(byDate).getContent());
+
+        // 중복 제거
+        Map<String, BookResponse> unique = new LinkedHashMap<>();
+        for (BookResponse b : pool) {
+            if (b != null && b.getId() != null) unique.putIfAbsent(b.getId(), b);
+        }
+        List<BookResponse> uniqPool = new ArrayList<>(unique.values());
+
+        // 스코어링
+        Instant now = Instant.now();
+        Map<String, Double> scored = new LinkedHashMap<>();
+        for (BookResponse b : uniqPool) {
+            double s = 0.65 * normalizeSales(b.getSalesPoint())
+                    + 0.35 * freshnessScore(b.getPubDate(), now);
+            if (s > 0) scored.put(b.getId(), s);
+        }
+
+        // 정렬 후 상위 N개
+        List<String> topIds = scored.entrySet().stream()
+                .sorted(Map.Entry.<String, Double>comparingByValue().reversed())
+                .limit(size)
+                .map(Map.Entry::getKey)
+                .toList();
+
+        Map<String, BookResponse> idx = uniqPool.stream()
+                .collect(Collectors.toMap(BookResponse::getId, x -> x));
+        List<BookResponse> result = new ArrayList<>();
+        for (String id : topIds) {
+            BookResponse b = idx.get(id);
+            if (b != null) result.add(b);
+        }
+
+        // 혹시 부족하면 판매지수 상위로 채우기
+        if (result.size() < size) {
+            List<BookResponse> best = bookRepo.findAll(bySales).getContent();
+            for (BookResponse b : best) {
+                if (result.size() >= size) break;
+                if (result.stream().noneMatch(x -> Objects.equals(x.getId(), b.getId()))) {
+                    result.add(b);
+                }
+            }
+        }
+        return result;
+    }
+
+    /**
+     * 개인화 도서(로그인): seeds로 제목/저자 매칭 + 신간/판매 가중치
+     * score = 0.60*match + 0.25*fresh + 0.15*sales
+     */
+    private List<BookResponse> getPersonalBooks(List<String> seeds, int size, List<BookResponse> fallback) {
+        if (seeds == null || seeds.isEmpty()) return fallback;
+
+        Pageable poolPg = PageRequest.of(0, Math.max(size * 5, 60), Sort.by(Sort.Order.desc("pubDate")));
+        List<BookResponse> pool = bookRepo.findAll(poolPg).getContent();
+
+        Instant now = Instant.now();
+        Map<String, Double> scored = new LinkedHashMap<>();
+        for (BookResponse b : pool) {
+            double match = keywordMatchScore(b, seeds);
+            double fresh = freshnessScore(b.getPubDate(), now);
+            double sales = normalizeSales(b.getSalesPoint());
+            double score = 0.60 * match + 0.25 * fresh + 0.15 * sales;
+            if (score > 0) scored.put(b.getId(), score);
+        }
+        if (scored.isEmpty()) return fallback;
+
+        List<String> topIds = scored.entrySet().stream()
+                .sorted(Map.Entry.<String, Double>comparingByValue().reversed())
+                .limit(size)
+                .map(Map.Entry::getKey)
+                .toList();
+
+        Map<String, BookResponse> idx = pool.stream()
+                .collect(Collectors.toMap(BookResponse::getId, x -> x));
+        List<BookResponse> ranked = new ArrayList<>();
+        for (String id : topIds) {
+            BookResponse b = idx.get(id);
+            if (b != null) ranked.add(b);
+        }
+
+        if (ranked.size() < size) {
+            List<BookResponse> best = getTrendingBooks(size); // 기본과 동일 기준으로 채움
+            for (BookResponse b : best) {
+                if (ranked.size() >= size) break;
+                if (ranked.stream().noneMatch(x -> Objects.equals(x.getId(), b.getId()))) {
+                    ranked.add(b);
+                }
+            }
+        }
+        return ranked;
+    }
+
+    private static double keywordMatchScore(BookResponse b, List<String> seeds) {
+        if (b == null || seeds == null || seeds.isEmpty()) return 0;
+        String title  = safeLower(b.getTitle());
+        String author = safeLower(b.getAuthor());
+        long hit = seeds.stream()
+                .map(RecommendController::safeLower)
+                .filter(kw -> title.contains(kw) || author.contains(kw))
+                .count();
+        return Math.min(1.0, hit / Math.max(1.0, seeds.size() / 2.0));
+    }
+
+    private static double freshnessScore(Instant pubDate, Instant now) {
+        if (pubDate == null) return 0.2; // 정보 없으면 낮게
+        long days = Math.max(1, (now.toEpochMilli() - pubDate.toEpochMilli()) / (1000L * 60 * 60 * 24));
+        double v = 1.0 - Math.min(1.0, days / 365.0); // 0일(1.0) → 365일(0.0)
+        return Math.max(0.0, v);
+    }
+
+    private static double normalizeSales(Integer salesPoint) {
+        if (salesPoint == null) return 0.0;
+        double v = Math.min(100_000, Math.max(0, salesPoint)); // 상한 100k 가정
+        return v / 100_000.0;
+    }
+
+    // =========================================================
+    // YouTube
+    // =========================================================
+
+    /** 기본(비로그인) 전용: 타임아웃 길게 + 폴백 쿼리 */
+    private List<Item> getYoutubeForDefault(int max) {
+        List<Item> r1 = getYoutubeByQuerySortedWithTimeout("경제 강의", max, 8);
+        if (!r1.isEmpty()) return r1;
+
+        List<Item> r2 = getYoutubeByQuerySortedWithTimeout("경제 입문 강의", max, 8);
+        if (!r2.isEmpty()) return r2;
+
+        return getYoutubeByQuerySortedWithTimeout("재테크 강의", max, 8);
+    }
+
+    /** 개인화 유튜브: seed별(최대 2개) 검색 합치고 videoId 중복 제거 → 조회수순 */
+    private List<Item> getYoutubePersonal(List<String> seeds, int max, List<Item> fallback) {
+        if (seeds == null || seeds.isEmpty()) return fallback;
+
+        List<Item> merged = new ArrayList<>();
+        for (String s : seeds) {
+            merged.addAll(getYoutubeByQuerySortedWithTimeout(s, Math.min(6, max), 4)); // 개인화는 4초
+            if (merged.size() >= max) break;
+        }
+
+        LinkedHashMap<String, Item> uniq = new LinkedHashMap<>();
+        for (Item v : merged) {
+            if (v.getVideoId() != null) uniq.putIfAbsent(v.getVideoId(), v);
+        }
+        List<Item> list = new ArrayList<>(uniq.values());
+        if (list.isEmpty()) return fallback;
+
+        list.sort(Comparator.comparingLong((Item v) -> -viewCount(v)));
+        if (list.size() > max) list = list.subList(0, max);
+        return list;
+    }
+
+    /** 쿼리별 타임아웃 조절 가능한 공용 함수 */
+    private List<Item> getYoutubeByQuerySortedWithTimeout(String query, int max, int timeoutSec) {
+        try {
+            YoutubeResponse res = youtubeClient.get()
+                    .uri(uriBuilder -> uriBuilder.path("/youtube/search")
+                            .queryParam("q", query)
+                            .queryParam("max_results", max)
+                            .build())
+                    .retrieve()
+                    .bodyToMono(YoutubeResponse.class)
+                    .timeout(java.time.Duration.ofSeconds(timeoutSec))
+                    .onErrorReturn(new YoutubeResponse())
+                    .block();
+
+            if (res == null || res.getItems() == null) return List.of();
+            List<Item> items = new ArrayList<>(res.getItems());
+            items.sort(Comparator.comparingLong((Item v) -> -viewCount(v)));
+            if (items.size() > max) items = items.subList(0, max);
+            return items;
+        } catch (Exception e) {
+            return List.of();
+        }
+    }
+
+    private static long viewCount(Item v) {
+        if (v == null || v.getStatistics() == null) return 0L;
+        try { return Long.parseLong(v.getStatistics().getOrDefault("viewCount", "0")); }
+        catch (Exception e) { return 0L; }
+    }
+
+    // =========================================================
+    // Utils
+    // =========================================================
+
+    private static <T> T safeGet(SupplierX<T> s, T fallback){
+        try { return s.get(); } catch (Exception e) { return fallback; }
+    }
+    @FunctionalInterface private interface SupplierX<T> { T get() throws Exception; }
+
+    private static String safeLower(String s) { return s == null ? "" : s.toLowerCase(Locale.ROOT); }
+}

@@ -205,41 +205,64 @@ def get_analysis(
         if len(samples) < 3:
             samples.append({"text": text, "emotion": emo or "Unknown"})
 
-    # 4) 결과 구성
+    # 4) 결과 구성 — 감정별 대표 댓글 포함
+    from collections import defaultdict
+
+    # 감정별 댓글 그룹
+    emo_groups = defaultdict(list)
+    for c in cmts:
+        text = (c.get("text") or "").strip()
+        emo_raw = (c.get("emotion") or "").strip()
+        emo = emo_alias.get(emo_raw, "미분류(Unknown)")
+        if text:
+            emo_groups[emo].append(text)
+
+    # 감정별 대표 댓글 1개씩
+    emo_samples = {emo: texts[0] for emo, texts in emo_groups.items() if texts}
+
+    # 요약 1줄 생성
+    total_comments = len(cmts)
+    if total_comments > 0 and sum(emo_counter.values()) > 0:
+        top_emo, top_cnt = emo_counter.most_common(1)[0]
+        summary_lines = [f"이 영상 댓글 {total_comments}개 중 '{top_emo}' 감정이 {top_cnt}건으로 가장 많음", ""]
+    else:
+        summary_lines = ["댓글이 없어 분석할 수 없습니다."]
+
+    # 감정별 대표 댓글 추가
+    for emo, rep in emo_samples.items():
+        summary_lines.append(f"({emo})")
+        summary_lines.append(rep)
+        summary_lines.append("")
+
+    summary = "\n".join(summary_lines).strip()
+
+    # 워드클라우드 생성
     wc_pairs = [{"text": w, "count": int(cnt)} for w, cnt in word_counter.most_common(topn)]
     if not wc_pairs:
         wc_pairs = [{"text": "댓글없음", "count": 1}]
 
-    total_comments = len(cmts)
-    if total_comments > 0 and sum(emo_counter.values()) > 0:
-        top_emo, top_cnt = emo_counter.most_common(1)[0]
-        summary = f"이 영상 댓글 {total_comments}개 중 '{top_emo}' 감정이 {top_cnt}건으로 가장 많음"
-    elif total_comments == 0:
-        summary = "댓글이 없어 분석할 수 없습니다."
-    else:
-        summary = "분석 결과가 충분하지 않습니다."
-
+    # 최종 반환
     return {
         "video_id": video_id,
         "total_comments_used": total_comments,
         "sentiment": dict(emo_counter),
         "wordcloud": wc_pairs,
-        "summary": summary,
-        "comments": samples,
+        "summary": summary,  # ✅ 감정별 요약 문단
+        "samples_by_emotion": emo_samples  # ✅ 새 필드 추가
     }
+
+
 # ✅ app.py 내 패치: /youtube/results 만 교체
 from random import randint
 
 @app.get("/youtube/results")
 def get_random_youtube_video() -> dict:
-    """대시보드용: 랜덤 1개 영상 + 경량 분석 포함."""
+    """대시보드용: 랜덤 1개 영상 + 요약 축약 포함."""
     try:
-        # 1) 영상 개수 확인
         count = col_video.count_documents({})
         if count == 0:
             return {"error": "no_data"}
 
-        # 2) 랜덤 1건 조회 (_id 제외, 필요한 필드만)
         v = (
             col_video.find(
                 {}, {"_id": 0, "video_id": 1, "title": 1, "thumbnail_url": 1}
@@ -251,27 +274,40 @@ def get_random_youtube_video() -> dict:
         if not vid:
             return {"error": "missing_video_id"}
 
-        # 3) 경량 분석 호출: 무한 조회 방지 (속도 안정)
-        #    get_analysis는 이미 'if limit is not None: cursor.limit(int(limit))' 로 안전
+        # 기존: full_summary → highlight + first_line 조합
         result = get_analysis(vid, limit=200, topn=80)
 
-        # 4) 합쳐서 반환
+        # ✅ 교체: 중복 제거 + 첫 내용 줄 선택
+        full_summary = result.get("summary", "").strip()
+        lines = [l.strip() for l in full_summary.splitlines() if l.strip()]
+
+        head = lines[0] if lines else ""  # "이 영상 댓글 N개 중 … 가장 많음"
+
+        def is_header(s: str) -> bool:
+            # 감정 헤더 "(중립…)" 같은 줄은 제외
+            return s.startswith("(") and s.endswith(")")
+
+        # 첫 내용 줄(감정 헤더/요약문 제외)
+        body = next((l for l in lines[1:] if not is_header(l) and "감정이" not in l), "")
+
+        short_summary = head if not body else f"{head}\n\n{body}"
+        if len(short_summary) > 180:
+            short_summary = short_summary[:180].rstrip() + " ..."
+
         return {
             "video_id": vid,
             "title": v.get("title", ""),
             "thumbnail_url": v.get("thumbnail_url", ""),
-            "summary": result.get("summary"),
+            "summary": short_summary,  # ✅ 중복 없는 축약본
             "wordcloud": result.get("wordcloud"),
             "sentiment": result.get("sentiment"),
         }
 
+
     except Exception as e:
-        # 디버깅 편의용 로그 + 에러 메시지 반환(대시보드에서 처리)
         import traceback
         traceback.print_exc()
         return {"error": f"{type(e).__name__}: {e}"}
-
-
 
 # ✅ 참고: get_analysis 내부 limit 처리(이미 반영되어 있으면 그대로 두세요)
 # cursor = col_comments.find(q, {"_id": 0, "text": 1, "emotion": 1})

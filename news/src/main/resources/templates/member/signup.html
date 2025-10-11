@@ -1,204 +1,165 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org" lang="ko">
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="/css/style.css"/>
+  <link rel="stylesheet" href="/css/footer.css"/>
   <title>회원가입</title>
-  <!-- signup.html <style> 안에 그대로 붙여 넣기 -->
   <style>
-    /* ===== 디자인 토큰(계정 페이지 톤과 유사) ===== */
     :root{
-      --bg:#fafafa; --panel:#ffffff; --ink:#111827; --muted:#6b7280; --line:#e5e7eb;
-      --primary:#2563eb; --btn:#111827; --btn-bg:#f3f4f6; --btn-bg-hover:#e5e7eb;
-      --radius:10px; --field-h:40px;
+      --gap:16px; --line:#e5e7eb; --ink:#0f172a; --muted:#6b7280;
+      --bg:#f8fafc; --card:#ffffff; --primary:#2563eb; --primary-ink:#ffffff;
+      --accent:#111827;
     }
-
-    /* 페이지 기본 */
     html,body{height:100%}
     body{
-      margin:0; background:var(--bg); color:var(--ink);
-      font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Apple SD Gothic Neo,Noto Sans KR,Malgun Gothic,sans-serif;
+      margin:0; background:var(--bg);
+      font-family:system-ui,-apple-system,Segoe UI,Roboto,Apple SD Gothic Neo,Noto Sans KR,sans-serif;
+      color:var(--ink);
     }
-
-    /* 제목 */
-    h1{
-      max-width:min(720px,92vw); margin:24px auto 12px; padding:0 16px;
-      font-size:18px; font-weight:700;
+    .container{max-width:640px;margin:40px auto;padding:0 20px}
+    .card{
+      background:var(--card); border:1px solid var(--line); border-radius:14px;
+      padding:28px 28px 22px; box-shadow:0 1px 2px rgba(0,0,0,.03);
     }
-
-    /* ===== 폼 패널 ===== */
-    form{
-      width:min(720px,92vw); margin:0 auto;
-      background:var(--panel); border:1px solid var(--line); border-radius:var(--radius);
-      padding:16px; display:flex; flex-direction:column; gap:0;
-      box-shadow:0 6px 24px rgba(0,0,0,.06);
+    h1{margin:0 0 22px;font-size:24px;letter-spacing:-.2px}
+    .grid{
+      display:grid; grid-template-columns:220px 1fr; gap:var(--gap) var(--gap);
+      align-items:center;
     }
-
-    /* 행: label 하나가 한 행을 담당 → 2열 그리드로 배치 */
-    form label{
-      display:grid; grid-template-columns: 220px 1fr;
-      align-items:center; column-gap:16px; padding:14px 8px;
-      border-top:1px solid var(--line);
-      font-weight:600; color:var(--ink);
+    /* label column */
+    .grid label.title{font-weight:600;color:#0b1324}
+    /* inputs */
+    .input, select{
+      height:44px; padding:0 12px; border:1px solid var(--line); border-radius:10px;
+      font-size:14px; width:100%; background:#fff; outline:none;
     }
-    /* 첫 행은 윗선 제거 */
-    form label:first-of-type{ border-top:0 }
-
-    /* 라벨 안의 입력/셀렉트는 우측 열로 고정 */
-    form label input,
-    form label select{ grid-column:2; font-weight:400; }
-
-    /* 줄바꿈 <br> 제거 */
-    form br{ display:none; }
-
-    /* 입력 컨트롤 공통 */
-    input[type="text"],
-    input[type="password"],
-    input[type="number"],
-    select{
-      width:100%; height:var(--field-h);
-      border:1px solid var(--line); border-radius:6px; padding:0 12px;
-      background:#fff; outline:none; box-sizing:border-box;
+    .input:focus{border-color:#c7d2fe; box-shadow:0 0 0 3px rgba(37,99,235,.12)}
+    .help{grid-column:2/3; color:var(--muted); font-size:12px; margin-top:-6px}
+    .hr{height:1px;background:var(--line);margin:22px 0}
+    /* input group (region + button) */
+    .input-group{display:flex; gap:10px; align-items:center}
+    .input-group .input{flex:1}
+    .btn{
+      border:1px solid var(--line); background:var(--accent); color:#fff;
+      padding:10px 14px; height:44px; border-radius:10px; cursor:pointer;
+      font-weight:600;
     }
-    input::placeholder{ color:#a1a1aa }
-    input:focus, select:focus{ outline:2px solid var(--primary); outline-offset:2px }
-
-    /* 셀렉트 화살표 위치 조정(성별/지역만) */
-    select[th\\:field="*{gender}"],
-    select[th\\:field="*{region}"]{
-      -webkit-appearance:none; -moz-appearance:none; appearance:none;
-      background-image:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><polyline points="6,9 12,15 18,9" fill="none" stroke="%23111827" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>');
-      background-repeat:no-repeat; background-size:14px 14px; background-position:right 14px center;
-      padding-right:40px;
+    .btn.secondary{background:#fff; color:#0f172a}
+    .btn.primary{background:var(--accent);}
+    .actions{display:flex; gap:10px; justify-content:flex-end; margin-top:18px}
+    /* radio group */
+    .radio-group{display:flex; gap:18px; align-items:center}
+    .radio{display:flex; align-items:center; gap:8px}
+    /* error box */
+    .err{
+      grid-column:1/3; background:#fff3f3; color:#b00020; border:1px solid #ffd6d6;
+      padding:10px 12px; border-radius:10px; margin-top:6px;
     }
-    select::-ms-expand{ display:none; } /* 레거시 IE 숨김 */
-
-    /* 반응형: 좁은 화면에서 1열 라벨 위·입력 아래 */
-    @media (max-width:720px){
-      form label{ grid-template-columns:1fr; row-gap:6px }
-    }
-
-    .hidden-link{
-      max-width:min(720px,92vw); margin:12px auto 6px; padding:0 16px; text-align:right;
-    }
-    .hidden-link a{
-      display:inline-flex; align-items:center; justify-content:center;
-      height:32px; padding:0 12px; border-radius:8px; font-weight:600;
-      color:var(--bg, #fafafa); background:var(--bg, #fafafa); border:1px solid var(--bg, #fafafa);
-      text-decoration:none; transition: all .18s ease;
-    }
-    .hidden-link a:hover,
-    .hidden-link a:focus{
-      color:#fff; background:#2563eb; border-color:#1d4ed8; outline:none;
-    }
-
-    /* ② 폼 하단 버튼 두 개를 한 줄로 정렬 */
-    .button-row{
-      display:flex; gap:12px; justify-content:flex-end; align-items:center;
-      margin:12px 8px 8px;
-    }
-
-   .button-row button{
-      display:inline-flex; align-items:center; justify-content:center;
-      height:40px; padding:0 14px; line-height:1; box-sizing:border-box;
-      border-radius:8px; font-size:14px; font-weight:600; letter-spacing:.01em;
-    }
-
-    /* 가입하기(Primary) */
-    .button-row button[type="submit"]{
-      border:1px solid #1d4ed8; background:#2563eb; color:#fff;
-    }
-    .button-row button[type="submit"]:hover{ background:#1d4ed8 }
-
-    /* 메인화면(Secondary) */
-    .button-row button[type="button"]{
-      border:1px solid var(--line, #e5e7eb); background:#fff; color:var(--ink, #111827);
-    }
-    .button-row button[type="button"]:hover{ background:#f3f4f6 }
-
-    /* 접근성: 포커스 링 */
-    .button-row button:focus{
-      outline:2px solid #2563eb; outline-offset:2px;
+    /* responsive */
+    @media (max-width: 720px){
+      .grid{grid-template-columns:1fr; align-items:stretch}
+      .grid label.title{margin-top:10px}
     }
   </style>
 </head>
 <body>
-<p class="hidden-link"><a href="/pages/members">회원목록 보기</a></p>
-<h1>회원가입</h1>
-<form th:action="@{/member/signup}" th:object="${member}" method="post">
-  <label>ID <input type="text" th:field="*{id}" required /></label><br/>
-  <label>Password <input type="password" th:field="*{password}" required /></label><br/>
-  <label>이름 <input type="text" th:field="*{name}" required /></label><br/>
-  <label>출생년도 <input type="number" th:field="*{birthYear}" /></label><br/>
-  <label>전화번호
-    <input type="text" th:field="*{phone}"
-           inputmode="tel" autocomplete="tel"
-           maxlength="13"
-           pattern="^\d{3}-\d{4}-\d{4}$"
-           oninput="formatKoreanPhone(this)" />
-  </label><br/>
-  <label>지역
-    <select th:field="*{region}">
-      <option value="">-- 지역 선택 --</option>
-      <option value="서울">서울</option>
-      <option value="부산">부산</option>
-      <option value="대구">대구</option>
-      <option value="인천">인천</option>
-      <option value="광주">광주</option>
-      <option value="대전">대전</option>
-      <option value="울산">울산</option>
-      <option value="경기">경기</option>
-      <option value="강원">강원</option>
-      <option value="충북">충북</option>
-      <option value="충남">충남</option>
-      <option value="전북">전북</option>
-      <option value="전남">전남</option>
-      <option value="경북">경북</option>
-      <option value="경남">경남</option>
-      <option value="제주">제주</option>
-    </select>
-  </label><br/>
-  <label>성별
-    <select th:field="*{gender}">
-      <option value="남">남</option>
-      <option value="여">여</option>
-    </select>
-  </label><br/>
-  <div class="button-row">
-    <button type="submit">가입하기</button>
-    <button type="button" onclick="history.back()">로그인화면으로 이동</button>
-    <button type="button" onclick="location.href='/pages/'">대시보드로 이동</button>
+<div th:replace="fragments/header :: siteHeader"></div>
+<main class="container">
+  <div class="card">
+    <h1>회원가입</h1>
+
+    <!-- 폼 모델은 SignupRequest -->
+    <form th:action="@{/member/signup}" th:object="${member}" method="post">
+
+      <div class="grid">
+        <label for="id" class="title">아이디</label>
+        <input id="id" class="input" type="text" th:field="*{id}" placeholder="아이디" required />
+
+        <label for="password" class="title">비밀번호</label>
+        <input id="password" class="input" type="password" th:field="*{password}" placeholder="비밀번호" required />
+
+        <label for="name" class="title">이름</label>
+        <input id="name" class="input" type="text" th:field="*{name}" placeholder="이름" required />
+
+        <label for="birthYear" class="title">출생년도</label>
+        <input id="birthYear" class="input" type="number" min="1900" max="2099" step="1" th:field="*{birthYear}" placeholder="예: 1995" />
+
+        <label for="phone" class="title">전화번호</label>
+        <input id="phone" class="input" type="tel" th:field="*{phone}" placeholder="010-1234-5678" />
+
+        <label for="region" class="title">지역</label>
+        <div class="input-group">
+          <input id="region" class="input" type="text" th:field="*{region}" placeholder="예: 서울 강남구" />
+          <button type="button" class="btn secondary" id="btnAddr">주소찾기</button>
+        </div>
+
+        <label class="title">성별</label>
+        <div class="radio-group">
+          <label class="radio"><input type="radio" th:field="*{gender}" value="남" /> 남</label>
+          <label class="radio"><input type="radio" th:field="*{gender}" value="여" /> 여</label>
+        </div>
+
+        <!-- 에러 메시지 (BindingResult를 쓸 때만 표시) -->
+        <div class="err" th:if="${#fields != null and #fields.hasAnyErrors()}">
+          <p th:each="e : ${#fields.allErrors()}" th:text="${e}">폼 오류 메시지</p>
+        </div>
+      </div>
+
+      <div class="hr"></div>
+
+      <div class="actions">
+        <a class="btn secondary" th:href="@{/pages/dashboard}">취소</a>
+        <button class="btn primary" type="submit">가입하기</button>
+      </div>
+    </form>
   </div>
-</form>
+</main>
+<div th:replace="fragments/footer :: siteFooter"></div>
 
+<!-- 전화번호 자동 하이픈 -->
 <script>
-  function formatKoreanPhone(el){
-    if(!el) return;
-    let v = el.value.replace(/\D/g, "").slice(0, 11); // 숫자만 최대 11
-    if (v.length <= 3){
-      el.value = v;
-    } else if (v.length <= 7){
-      el.value = v.slice(0,3) + "-" + v.slice(3);
-    } else {
-      el.value = v.slice(0,3) + "-" + v.slice(3,7) + "-" + v.slice(7);
-    }
-    // 유효성 즉시 갱신
-    const ok = /^\d{3}-\d{4}-\d{4}$/.test(el.value);
-    el.setCustomValidity(ok || el.value === "" ? "" : "형식: 010-1234-5678");
-  }
-
-  // DOM 로드 후 초기 바인딩(Thymeleaf가 id="phone"을 생성함)
-  document.addEventListener("DOMContentLoaded", function(){
-    const phone = document.getElementById("phone") || document.querySelector('input[name$=".phone"], input[name="phone"]');
-    if (phone){
-      // 페이지 진입 시 값이 있으면 한번 정규화
-      formatKoreanPhone(phone);
-      // 붙여넣기 포함 모든 입력 처리
-      ["input","change","blur","paste"].forEach(ev => {
-        phone.addEventListener(ev, () => formatKoreanPhone(phone));
-      });
-    }
-  });
+  (function(){
+    const $p = document.getElementById('phone');
+    if(!$p) return;
+    const fmt = v => {
+      v = v.replace(/[^0-9]/g,'');
+      // 02 국번
+      if(/^02/.test(v)){
+        if(v.length <= 2) return '02';
+        if(v.length <= 6) return `02-${v.slice(2)}`;
+        if(v.length <= 10) return `02-${v.slice(2,6)}-${v.slice(6,10)}`;
+        return `02-${v.slice(2,6)}-${v.slice(6,10)}`;
+      }
+      // 휴대폰/일반
+      if(v.length < 4) return v;
+      if(v.length < 7) return `${v.slice(0,3)}-${v.slice(3)}`;
+      return `${v.slice(0,3)}-${v.slice(3,7)}-${v.slice(7,11)}`;
+    };
+    let last = '';
+    $p.addEventListener('input', () => {
+      const cur = fmt($p.value);
+      if(cur !== last){ $p.value = cur; last = cur; }
+    });
+  })();
 </script>
 
+<!-- 다음(카카오) 주소 API -->
+<script src="//t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
+<script>
+  const btn = document.getElementById('btnAddr');
+  if(btn){
+    btn.addEventListener('click', function(){
+      new daum.Postcode({
+        oncomplete: function(data) {
+          const addr = data.roadAddress || data.jibunAddress || '';
+          const regionInput = document.getElementById('region');
+          if(regionInput) regionInput.value = addr;
+        }
+      }).open();
+    });
+  }
+</script>
 </body>
 </html>

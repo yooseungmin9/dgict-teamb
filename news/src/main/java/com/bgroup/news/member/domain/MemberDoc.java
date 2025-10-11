@@ -1,33 +1,46 @@
 package com.bgroup.news.member.domain;
 
-import com.bgroup.news.member.dto.Interests;
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.*;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 import org.springframework.data.mongodb.core.mapping.Field;
 
-@Data                       // getter/setter, toString, equals, hashCode 자동 생성
-@NoArgsConstructor          // 기본 생성자 자동 생성
-@AllArgsConstructor         // 모든 필드를 받는 생성자 자동 생성
+import java.time.Instant;
+import java.util.Map;
+
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
 @Document(collection = "members")
 public class MemberDoc {
-
-    @Id
-    private String id;
-
+    @Id private String id;
     private String password;
     private String name;
-
-    @Field("birth_year")
-    private Integer birthYear;
-
+    @Field("birth_year") private Integer birthYear;
     private String phone;
     private String region;
     private String gender;
 
-    private Interests interests;
+    // ✅ 기존(하위호환용 합계)
+    private Interests interests;   // global/finance/estate/industry/stock/general
 
     private Integer admin;
+    private Instant createdAt;
+    private Instant updatedAt;
+
+    // ✅ 신규: 세분화 저장소
+    private Preferences preferences;
+
+    @Data @NoArgsConstructor @AllArgsConstructor @Builder
+    public static class Interests {
+        private Integer global, finance, estate, industry, stock, general;
+    }
+
+    @Data @NoArgsConstructor @AllArgsConstructor @Builder
+    public static class Preferences {
+        // parent -> (sub -> score)
+        private Map<String, Map<String, Integer>> explicit;
+        private Map<String, Map<String, Integer>> implicit;
+        private Instant lastUpdated;
+    }
 }

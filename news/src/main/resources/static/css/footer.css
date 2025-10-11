@@ -1,9 +1,9 @@
 /* ===== Footer ===== */
 .site-footer {
     margin-top: 32px;
-    background: #fff;
-    border-top: 1px solid #e5e7eb;
-    color: #111827;
+    background: #3b82f6;
+    border-top: 1px solid #1d4ed8;
+    color: #f9fafb;
 }
 .site-footer .container {
     max-width: 1280px;
@@ -33,28 +33,29 @@
     gap: 8px;
     font-weight: 800;
     font-size: 18px;
-    color: #1f3a69;
+    color: #fff;
     text-decoration: none;
 }
 .ft-brand .ft-icon {
     width: 22px;
     height: 22px;
-    color: #2563eb;
+    color: #e0f2fe;
 }
 .ft-desc {
     margin: 10px 0 16px;
-    color: #374151;
+    color: #f0f9ff;
     line-height: 1.6;
 }
 .ft-social a {
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    border: 1px solid #e5e7eb;
+    border: 1px solid rgba(255, 255, 255, 0.4);
     border-radius: 999px;
     padding: 6px 10px;
     text-decoration: none;
-    color: #111827;
+    color: #fff;
+    background: rgba(255, 255, 255, 0.1);
     transition: 0.15s;
 }
 .ft-social a:hover {
@@ -66,15 +67,15 @@
 /* 프로젝트 설명 */
 .ft-title {
     font-weight: 800;
-    color: #16325c;
+    color: #fff;
     margin: 0 0 10px;
 }
 .ft-project-desc {
     margin: 10px 0 16px;
-    color: #233549;
+    color: #f8fafc;
     line-height: 1.7;
-    background: #fbfdff;
-    border: 1px solid #e6eef8;
+    background: rgba(255, 255, 255, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.25);
     border-radius: 12px;
     padding: 12px 14px;
 }
@@ -95,10 +96,10 @@
 }
 .ft-key {
     font-size: 13px;
-    color: #6b7280;
+    color: #eff6ff;
 }
 .ft-val {
-    color: #233549;
+    color: #fff;
     line-height: 1.6;
 }
 .ft-badges {
@@ -109,21 +110,21 @@
 }
 .badge {
     font-size: 12px;
-    background: #eef5ff;
-    color: #1f4fb7;
-    border: 1px solid #d7e6ff;
+    background: rgba(255, 255, 255, 0.2);
+    color: #fff;
+    border: 1px solid rgba(255, 255, 255, 0.25);
     padding: 6px 10px;
     border-radius: 999px;
 }
 
 /* 하단 바 */
 .site-footer__bar {
-    border-top: 1px solid #e5e7eb;
-    background: #f9fafb;
+    border-top: 1px solid rgba(255, 255, 255, 0.15);
+    background: #60a5fa;
 }
 .site-footer__bar .container {
     padding: 12px 40px;
-    color: #6b7280;
+    color: #f0f9ff;
     font-size: 13px;
 }
 
@@ -138,21 +139,21 @@
 }
 .quick-btn {
     flex: 0 0 auto;
-    border: 1px solid #e5e7eb;
-    background: #fff;
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    background: rgba(255, 255, 255, 0.15);
     padding: 10px 18px;
     border-radius: 12px;
     text-decoration: none;
-    color: #111827;
+    color: #fff;
     font-size: 14px;
-    box-shadow: 0 2px 8px rgba(31, 58, 105, 0.04);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
     transition: background 0.15s, color 0.15s, border-color 0.15s, transform 0.05s;
     white-space: nowrap;
 }
 .quick-btn:hover {
-    background: #f3f7ff;
-    color: #1f4fb7;
-    border-color: #cfe2ff;
+    background: #2563eb;
+    color: #fff;
+    border-color: #2563eb;
 }
 .quick-btn:active {
     transform: translateY(1px);

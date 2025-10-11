@@ -37,6 +37,31 @@
     .btn.primary{background:#2563eb;color:#fff;border-color:#1d4ed8;}
     .btn.primary:hover{background:#1d4ed8}
     @media (max-width:720px){ .row{grid-template-columns:1fr} .label{margin-bottom:6px} }
+
+    /* === 요청하신 보정(톤다운/포커스/버튼/행 여백) - 기존 규칙 위에 override === */
+    .row{padding:12px 8px;border-top:1px solid #eef2f7}
+    .label{color:#0f172a}
+    .label::before{border-color:#cbd5e1}
+    input[type], select{
+      background:#f9fafb; border:1px solid #e5e7eb;
+      transition:border .15s, box-shadow .15s, background .15s;
+    }
+    input[type]:focus, select:focus{
+      outline:none; border-color:#2563eb;
+      box-shadow:0 0 0 3px rgba(37,99,235,.15); background:#fff;
+    }
+    .btn{border:1px solid #e5e7eb;background:#f8fafc}
+    .btn:hover{background:#eef2f7}
+    .btn.primary{background:#2563eb;border-color:#1d4ed8}
+    .btn.primary:hover{background:#1d4ed8}
+
+    :root{ --input-w: 360px; }  /* ← 원하는 픽셀값으로 조절 (예: 320px, 300px) */
+    .form .control{ display:flex; align-items:center; }
+    .form .control > input,
+    .form .control > select {
+      width: var(--input-w);     /* ← 입력칸 고정 너비 */
+      max-width: 100%;           /* 너무 좁은 화면에서만 안전장치 */
+    }
   </style>
 </head>
 <body>
@@ -82,7 +107,8 @@
         <div class="row">
           <div class="label">출생년도</div>
           <div class="control">
-            <input type="number" id="year" th:value="*{year}" min="1900" max="2100" placeholder="YYYY" aria-label="출생년도" />
+            <!-- ⬇️ year → birthYear 로 수정 -->
+            <input type="number" id="birthYear" th:value="*{birthYear}" min="1900" max="2100" placeholder="YYYY" aria-label="출생년도" />
           </div>
         </div>
 
@@ -105,7 +131,11 @@
         <!-- 버튼 -->
         <div class="actions">
           <button type="button" class="btn primary" id="saveBtn">저장(F8)</button>
-          <a class="btn" th:if="${session.admin != null and session.admin > 0}" th:href="@{/pages/admin}">관리자 페이지</a>
+          <!-- ⬇️ 관리자 체크: session.loginUser.admin 기준 -->
+          <a class="btn"
+             th:if="${session.loginUser != null and session.loginUser.admin != null and session.loginUser.admin > 0}"
+             th:href="@{/member/admin}"
+             target="_top">관리자 페이지</a>
         </div>
       </form>
     </section>
@@ -117,6 +147,20 @@
   document.addEventListener('keydown', function(e){
     if(e.key === 'F8'){ e.preventDefault(); document.getElementById('saveBtn')?.click(); }
   });
+
+  // (선택) 저장 API 예시: 필요 시 엔드포인트에 맞게 수정
+  // document.getElementById('saveBtn')?.addEventListener('click', async () => {
+  //   const body = {
+  //     name: document.getElementById('name').value,
+  //     gender: document.getElementById('gender').value,
+  //     birthYear: parseInt(document.getElementById('birthYear').value, 10) || null,
+  //     phone: document.getElementById('phone').value,
+  //     region: document.getElementById('region').value
+  //   };
+  //   const r = await fetch('/member/me', { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+  //   if(!r.ok) { alert('저장 실패'); return; }
+  //   alert('저장 완료');
+  // });
 </script>
 
 </body>

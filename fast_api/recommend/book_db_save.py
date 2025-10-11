@@ -5,6 +5,9 @@
 #   uvicorn main:app --reload --host 0.0.0.0 --port 8000
 # 사용 예:
 #   GET /books?pages=2&per_page=50&save=true
+# 업데이트용
+#   GET /_refresh_bestseller_meta?pages=3&per_page=20
+
 #   GET /_ping_write  ← Mongo 쓰기 확인용
 #   POST /_repair_isbn_index  ← isbn13:null 정리 + 인덱스 재생성
 
@@ -14,7 +17,7 @@ from fastapi import FastAPI, Query, HTTPException
 from datetime import datetime
 from xml.etree import ElementTree as ET
 
-from pymongo import MongoClient, UpdateOne, ASCENDING, TEXT
+from pymongo import MongoClient, UpdateOne, ASCENDING, DESCENDING, TEXT
 from pymongo.errors import DuplicateKeyError, BulkWriteError
 
 # =========================
@@ -43,7 +46,7 @@ DEFAULT_ECON_CATEGORY_IDS = [
 # 4) 알라딘 API 기본
 ALADIN_URL = "http://www.aladin.co.kr/ttb/api/ItemList.aspx"
 
-app = FastAPI(title="Aladin Save-First API (Mongo)")
+app = FastAPI(title="Aladin Save-First API (Mongo, rank+salesPoint)")
 
 # =========================
 # 공통 유틸
@@ -82,12 +85,10 @@ def ensure_indexes(db):
     db[CATEGORIES_COLLECTION].create_index([("id", ASCENDING)], unique=True, name="uk_category_id")
     db[CATEGORIES_COLLECTION].create_index([("name", ASCENDING)], name="idx_category_name")
 
-    # 도서
+    # 도서 (고유키/ISBN/링크/카테고리+출간일/출간일/텍스트 인덱스)
     db[BOOKS_COLLECTION].create_index([("uniqueKey", ASCENDING)], unique=True, sparse=True, name="uk_uniquekey")
 
-    # (핵심) isbn13 인덱스: partialFilterExpression 쓰지 않고 unique + sparse 사용
-    #   → isbn13 필드가 "존재하지 않는" 문서는 인덱스 대상에서 제외됨.
-    # 먼저 이전에 실패/기존에 있던 인덱스가 있으면 정리
+    # isbn13 unique+sparse (None은 인덱스 제외)
     drop_index_if_exists(db[BOOKS_COLLECTION], "uk_isbn13")
     db[BOOKS_COLLECTION].create_index([("isbn13", ASCENDING)], unique=True, sparse=True, name="uk_isbn13")
 
@@ -95,6 +96,10 @@ def ensure_indexes(db):
     db[BOOKS_COLLECTION].create_index([("categoryId", ASCENDING), ("pubDate", ASCENDING)], name="idx_cat_pubDate")
     db[BOOKS_COLLECTION].create_index([("pubDate", ASCENDING)], name="idx_pubDate")
     db[BOOKS_COLLECTION].create_index([("title", TEXT), ("author", TEXT)], name="txt_title_author")
+
+    # ✅ 인기 정렬용 인덱스 추가
+    db[BOOKS_COLLECTION].create_index([("salesPoint", DESCENDING)], name="idx_salesPoint")
+    db[BOOKS_COLLECTION].create_index([("bestseller.rank", ASCENDING), ("bestseller.categoryId", ASCENDING)], name="idx_bsr_cat")
 
 # =========================
 # 유지보수/진단 엔드포인트
@@ -115,6 +120,9 @@ def ping_write():
             "source": "TEST",
             "ingestedAt": now,
             "updatedAt": now,
+            # 테스트용 필드 (없어도 됨)
+            "salesPoint": 1,
+            "bestseller": {"rank": 999999, "categoryId": 0, "capturedAt": now}
         }
         db[BOOKS_COLLECTION].insert_one(doc)
         return {"ok": True, "collection": BOOKS_COLLECTION, "db": MONGODB_DB}
@@ -139,6 +147,7 @@ def repair_isbn_index():
 # Aladin 호출 & 파싱
 # =========================
 def fetch_xml(cid: int, start: int, max_results: int) -> str:
+    """Bestseller 리스트 호출 (QueryType=Bestseller)"""
     if not TTBKEY:
         raise HTTPException(500, "ALADIN_TTBKEY 가 설정되어 있지 않습니다.")
     params = {
@@ -156,18 +165,32 @@ def fetch_xml(cid: int, start: int, max_results: int) -> str:
     return r.text
 
 def parse_xml(xml_text: str) -> List[Dict]:
+    """
+    XML 파싱: title/author/pubDate/link/cover/isbn13 + salesPoint(있을 경우) + 페이지 내 인덱스
+    """
     try:
         root = ET.fromstring(xml_text)
     except ET.ParseError:
         return []
+
+    # 네임스페이스 제거
     for el in root.iter():
         if isinstance(el.tag, str) and '}' in el.tag:
             el.tag = el.tag.split('}', 1)[1]
+
     out = []
-    for it in root.iter("item"):
+    for idx, it in enumerate(root.iter("item")):
         def get(tag):
             n = it.find(tag)
             return (n.text or "").strip() if n is not None else ""
+
+        # salesPoint는 없을 수도 있음 → 안전 파싱
+        sp_raw = get("salesPoint")
+        try:
+            sales_point = int(sp_raw) if sp_raw else None
+        except ValueError:
+            sales_point = None
+
         out.append({
             "title":  get("title"),
             "author": get("author"),
@@ -175,6 +198,8 @@ def parse_xml(xml_text: str) -> List[Dict]:
             "link":   get("link"),
             "cover":  get("cover"),
             "isbn13": get("isbn13"),
+            "salesPoint": sales_point,       # ✅ 판매 지수(있으면)
+            "__index_in_page": idx           # ✅ 페이지 내 순서 (절대 랭크 계산에 사용)
         })
     return out
 
@@ -216,7 +241,6 @@ def save_to_mongo(items: List[Dict], category_ids: List[int]):
         # category_ids가 단일이면 그 값을 categoryId로, 복수면 아이템에 심어놓은 값 사용
         cat_id = category_ids[0] if len(category_ids) == 1 else it.get("categoryId")
 
-        # $set 필드 구성 (isbn13이 None이면 아예 저장하지 않음)
         set_fields = {
             "title": it.get("title") or "",
             "author": it.get("author") or "",
@@ -229,6 +253,21 @@ def save_to_mongo(items: List[Dict], category_ids: List[int]):
         }
         if isbn is not None:
             set_fields["isbn13"] = isbn
+
+        # ✅ 판매 지수 저장(있을 때만)
+        if it.get("salesPoint") is not None:
+            try:
+                set_fields["salesPoint"] = int(it["salesPoint"])
+            except Exception:
+                pass
+
+        # ✅ 베스트셀러 절대 랭크 저장(있을 때만)
+        if it.get("bestsellerRank") is not None:
+            set_fields["bestseller"] = {
+                "rank": int(it["bestsellerRank"]),
+                "categoryId": int(cat_id) if cat_id else None,
+                "capturedAt": now  # 언제의 랭크인지 스냅샷 시간
+            }
 
         update_doc = {"$set": set_fields, "$setOnInsert": {"ingestedAt": now, "uniqueKey": unique_key}}
         # 혹시 이전에 isbn13:null 이 저장된 적이 있다면 제거
@@ -283,9 +322,15 @@ def books(
             try:
                 xml = fetch_xml(cid, s, per_page)
                 parsed = parse_xml(xml)
-                # 호출당시 cid를 각 아이템에 심어둠
+
+                # ✅ 절대 랭크 계산: Bestseller 호출 시 응답 순서를 랭크로 사용
+                base = (s - 1) * per_page  # 이전 페이지까지의 개수
                 for it in parsed:
                     it.setdefault("categoryId", cid)
+                    local_idx = it.pop("__index_in_page", None)
+                    if local_idx is not None:
+                        it["bestsellerRank"] = base + local_idx + 1  # 1-based
+
                 collected.extend(parsed)
             except requests.RequestException as e:
                 print(f"[books] request error (cid={cid}, page={s}): {e}")
@@ -332,3 +377,44 @@ def books(
             raise HTTPException(500, f"Mongo 저장 실패: {e}")
 
     return {"count": len(dedup), "items": dedup, "saved": bool(save)}
+
+def update_sales_meta(items: List[dict], category_ids: List[int]):
+    """
+    기존 save_to_mongo는 전체 문서를 업서트.
+    이 함수는 메타(salesPoint, bestseller, updatedAt)만 '부분 업데이트' 합니다.
+    """
+    from pymongo import UpdateOne
+    db = get_db()
+    ensure_indexes(db)
+
+    ops = []
+    now = datetime.utcnow()
+    for it in items:
+        key = (it.get("isbn13") or "").strip() or (it.get("link") or "").strip()
+        if not key:
+            continue
+
+        set_fields = {"updatedAt": now}
+
+        if it.get("salesPoint") is not None:
+            try:
+                set_fields["salesPoint"] = int(it["salesPoint"])
+            except Exception:
+                pass
+
+        cat_id = category_ids[0] if len(category_ids) == 1 else it.get("categoryId")
+        if it.get("bestsellerRank") is not None:
+            set_fields["bestseller"] = {
+                "rank": int(it["bestsellerRank"]),
+                "categoryId": int(cat_id) if cat_id else None,
+                "capturedAt": now,
+            }
+
+        ops.append(UpdateOne(
+            {"uniqueKey": key},           # 기존 문서 기준(ISBN 또는 link)
+            {"$set": set_fields},
+            upsert=False                  # 메타 전용 업데이트: 없으면 만들지 않음
+        ))
+
+    if ops:
+        db[BOOKS_COLLECTION].bulk_write(ops, ordered=False)
