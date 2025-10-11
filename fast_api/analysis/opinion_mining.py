@@ -205,28 +205,53 @@ def get_analysis(
         if len(samples) < 3:
             samples.append({"text": text, "emotion": emo or "Unknown"})
 
-    # 4) 결과 구성
+    # 4) 결과 구성 — 감정별 대표 댓글 포함
+    from collections import defaultdict
+
+    # 감정별 댓글 그룹
+    emo_groups = defaultdict(list)
+    for c in cmts:
+        text = (c.get("text") or "").strip()
+        emo_raw = (c.get("emotion") or "").strip()
+        emo = emo_alias.get(emo_raw, "미분류(Unknown)")
+        if text:
+            emo_groups[emo].append(text)
+
+    # 감정별 대표 댓글 1개씩
+    emo_samples = {emo: texts[0] for emo, texts in emo_groups.items() if texts}
+
+    # 요약 1줄 생성
+    total_comments = len(cmts)
+    if total_comments > 0 and sum(emo_counter.values()) > 0:
+        top_emo, top_cnt = emo_counter.most_common(1)[0]
+        summary_lines = [f"이 영상 댓글 {total_comments}개 중 '{top_emo}' 감정이 {top_cnt}건으로 가장 많음", ""]
+    else:
+        summary_lines = ["댓글이 없어 분석할 수 없습니다."]
+
+    # 감정별 대표 댓글 추가
+    for emo, rep in emo_samples.items():
+        summary_lines.append(f"({emo})")
+        summary_lines.append(rep)
+        summary_lines.append("")
+
+    summary = "\n".join(summary_lines).strip()
+
+    # 워드클라우드 생성
     wc_pairs = [{"text": w, "count": int(cnt)} for w, cnt in word_counter.most_common(topn)]
     if not wc_pairs:
         wc_pairs = [{"text": "댓글없음", "count": 1}]
 
-    total_comments = len(cmts)
-    if total_comments > 0 and sum(emo_counter.values()) > 0:
-        top_emo, top_cnt = emo_counter.most_common(1)[0]
-        summary = f"이 영상 댓글 {total_comments}개 중 '{top_emo}' 감정이 {top_cnt}건으로 가장 많음"
-    elif total_comments == 0:
-        summary = "댓글이 없어 분석할 수 없습니다."
-    else:
-        summary = "분석 결과가 충분하지 않습니다."
-
+    # 최종 반환
     return {
         "video_id": video_id,
         "total_comments_used": total_comments,
         "sentiment": dict(emo_counter),
         "wordcloud": wc_pairs,
-        "summary": summary,
-        "comments": samples,
+        "summary": summary,  # ✅ 감정별 요약 문단
+        "samples_by_emotion": emo_samples  # ✅ 새 필드 추가
     }
+
+
 # ✅ app.py 내 패치: /youtube/results 만 교체
 from random import randint
 
