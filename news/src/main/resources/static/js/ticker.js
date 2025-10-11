@@ -1,118 +1,81 @@
-// /src/main/resources/static/js/ticker.js
-function stripTags(html){ return (html || "").replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim(); }
-function decodeHtml(s){ const t=document.createElement("textarea"); t.innerHTML=s??""; return t.value; }
+// /src/main/resources/static/js/ticker.js (compact)
+const strip=s=>(s||"").replace(/<[^>]*>/g,"").replace(/\s+/g," ").trim();
+const decode=s=>{const t=document.createElement("textarea");t.innerHTML=s??"";return t.value;};
 
 function buildItems(list){
   const frag=document.createDocumentFragment();
-  list.forEach((it,idx)=>{
+  list.forEach((it,i)=>{
     const item=document.createElement("span"); item.className="ticker-item";
-    const a=document.createElement("a");
-    a.textContent=stripTags(decodeHtml(it.title));
-    a.href=it.link||"#"; a.target="_blank"; a.rel="noopener noreferrer";
+    const a=document.createElement("a"); a.textContent=strip(decode(it.title)); a.href=it.link||"#"; a.target="_blank"; a.rel="noopener noreferrer";
     item.appendChild(a);
-    if(idx<list.length-1){
-      const sep=document.createElement("span"); sep.className="sep"; sep.textContent="·";
-      item.appendChild(sep);
-    }
+    if(i<list.length-1){ const sep=document.createElement("span"); sep.className="sep"; sep.textContent="·"; item.appendChild(sep); }
     frag.appendChild(item);
   });
   return frag;
 }
 
-// ---- 스크롤 엔진 ----
-function runTicker($wrap, $a, $b, speed=80, gap=64){
-  let xA = 0, xB = 0;
-  let wA = $a.scrollWidth, wB = $b.scrollWidth;
-
-  xA = 0;
-  xB = wA + gap;
-
-  let last = performance.now();
-  let paused = false;
-
-  $wrap.addEventListener('mouseenter', ()=> paused=true);
-  $wrap.addEventListener('mouseleave', ()=> paused=false);
-
+function runTicker($wrap,$a,$b,speed=80,gap=64){
+  let xA=0,xB=0,wA=$a.scrollWidth,wB=$b.scrollWidth,last=performance.now(),paused=false;
+  xB=wA+gap;
+  $wrap.addEventListener("mouseenter",()=>paused=true);
+  $wrap.addEventListener("mouseleave",()=>paused=false);
   function loop(now){
-    const dt = (now - last) / 1000;
-    last = now;
+    const dt=(now-last)/1000; last=now;
     if(!paused){
-      const dx = speed * dt;
-      xA -= dx; xB -= dx;
-      if (xA <= -wA) xA = xB + wB + gap;
-      if (xB <= -wB) xB = xA + wA + gap;
-      $a.style.transform = `translateX(${Math.round(xA)}px)`;
-      $b.style.transform = `translateX(${Math.round(xB)}px)`;
+      const dx=speed*dt; xA-=dx; xB-=dx;
+      if(xA<=-wA) xA=xB+wB+gap; if(xB<=-wB) xB=xA+wA+gap;
+      $a.style.transform=`translateX(${xA|0}px)`; $b.style.transform=`translateX(${xB|0}px)`;
     }
     requestAnimationFrame(loop);
   }
   requestAnimationFrame(loop);
 
-  // 리사이즈 보정
-  let rid = null;
+  let rid=null;
   function recalc(){
-    if (rid) { clearTimeout(rid); rid = null; }
-    const minWidth = $wrap.clientWidth * 2;
-    while ($a.scrollWidth < minWidth) {
-      $a.appendChild(buildItems(
-        Array.from($a.querySelectorAll('.ticker-item a'))
-          .map(a=>({title:a.textContent,link:a.href}))
-      ));
-    }
-    while ($b.scrollWidth < minWidth) {
-      $b.appendChild(buildItems(
-        Array.from($b.querySelectorAll('.ticker-item a'))
-          .map(a=>({title:a.textContent,link:a.href}))
-      ));
-    }
-    wA = $a.scrollWidth;
-    wB = $b.scrollWidth;
-    xA = 0;
-    xB = wA + gap;
+    if(rid){clearTimeout(rid); rid=null;}
+    const minW=$wrap.clientWidth*2;
+    const cloneTo=(el)=>el.appendChild(buildItems([...el.querySelectorAll(".ticker-item a")].map(a=>({title:a.textContent,link:a.href}))));
+    while($a.scrollWidth<minW) cloneTo($a);
+    while($b.scrollWidth<minW) cloneTo($b);
+    wA=$a.scrollWidth; wB=$b.scrollWidth; xA=0; xB=wA+gap;
   }
-  window.addEventListener('resize', ()=>{
-    if (rid) { clearTimeout(rid); }
-    rid = setTimeout(recalc, 150);
-  });
+  window.addEventListener("resize",()=>{ if(rid) clearTimeout(rid); rid=setTimeout(recalc,150); });
   recalc();
 }
 
-// ---- 데이터 로드 & 초기화 ----
 async function initTicker(){
   const $wrap=document.getElementById("news-ticker");
   const $a=document.getElementById("track-a");
   const $b=document.getElementById("track-b");
-  if(!$wrap||!$a||!$b){ return; }
+  if(!$wrap||!$a||!$b) return;
 
   const API_BASE=$wrap.dataset.apiBase||"/api";
-  const Q=$wrap.dataset.q||"일본 경제";
-  const N=parseInt($wrap.dataset.n||"5",10);
+  const Q=$wrap.dataset.q||"미국 경제";
+  const N=+(($wrap.dataset.n)||"5");
   const SORT=$wrap.dataset.sort||"date";
 
-  function mount(articles){
+  let started=false;
+  const mount=(arts)=>{
     $a.innerHTML=""; $b.innerHTML="";
-    $a.appendChild(buildItems(articles));
-    $b.appendChild(buildItems(articles));
-  }
+    $a.appendChild(buildItems(arts)); $b.appendChild(buildItems(arts));
+    if(!started){ runTicker($wrap,$a,$b,80,64); started=true; }
+  };
 
-  async function load(){
-    const url=`${API_BASE}/naver/econ?q=${encodeURIComponent(Q)}&n=${N}&sort=${encodeURIComponent(SORT)}`;
-    try{
-      const r=await fetch(url);
-      if(!r.ok) throw new Error(`HTTP ${r.status}`);
-      const data=await r.json();
-      const list=Array.isArray(data.articles)?data.articles:[];
-      if(!list.length) throw new Error("empty list");
-      mount(list);
-      // DOM 채운 뒤 엔진 시작
-      runTicker($wrap, $a, $b, 80, 64);
-    }catch(e){
-      console.error("[ticker] load failed:", e);
-    }
-  }
-  await load();
+  const N_FETCH=Math.min(50,N*4);
+  const url = `${API_BASE}/naver/econ?q=${encodeURIComponent(Q)}&n=${N_FETCH}&sort=${encodeURIComponent(SORT)}`;
+
+  try{
+    const r=await fetch(url,{cache:"no-store"});
+    if(!r.ok) throw new Error(`HTTP ${r.status}`);
+    const data=await r.json();
+    const raw=Array.isArray(data.articles)?data.articles:[];
+    const filtered = raw
+      .map(it => ({ title: strip(decode(it.title)), link: it.link }))
+      .filter((v,i,self) => self.findIndex(x => x.title === v.title) === i) // 중복 제거만
+      .slice(0, N);
+    if(!filtered.length) throw new Error("empty after filter");
+    mount(filtered);
+  }catch(e){ console.error("[ticker] load failed:",e); }
 }
 
-document.readyState==="loading"
-  ? document.addEventListener("DOMContentLoaded", initTicker)
-  : initTicker();
+document.readyState==="loading"?document.addEventListener("DOMContentLoaded",initTicker):initTicker();
