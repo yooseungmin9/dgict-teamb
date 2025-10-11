@@ -156,7 +156,7 @@
                 <div class="row-2">
                     <div class="card" id="panel-opinion">
                         <strong class="strong">오피니언 마이닝 요약</strong>
-                        <div class="card__body" id="opinion-body">
+                        <div class="card__body" id="opinion-body" style="white-space: pre-wrap; line-height: 1.6; font-size: 14px;">
                             <p style="text-align:center;color:#999;">로딩 중...</p>
                         </div>
                     </div>
@@ -253,12 +253,42 @@
     </div>
 </div>
 
+<div id="toast" class="toast"></div>
+
+<style>
+    .toast {
+        position: fixed;
+        bottom: 30px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(20,20,20,0.9);
+        color: #fff;
+        padding: 12px 20px;
+        border-radius: 8px;
+        font-size: 14px;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.3s ease;
+        z-index: 9999;
+    }
+    .toast.show { opacity: 1; pointer-events: auto; }
+</style>
+
 <script th:inline="javascript">
     (function(){
-        // 1) 표시 여부 판단
-        var need = document.body.getAttribute('data-require-interests') === 'true';
+        // ===== 0) 환경 값 =====
+        const MAX_TOTAL = 12;
+        const MAX_PER_CAT = 4;
 
-        // 2) 카테고리-키워드(대표 키워드만, 사용자가 준 사전에서 핵심 추림)
+        // body data-* 로 주입: <body data-require-interests="true" data-user-id="${#authentication.name}">
+        const need = document.body.getAttribute('data-require-interests') === 'true';
+        const USER_ID = document.body.getAttribute('data-user-id') || 'guest';
+
+        // (선택) CSRF 메타로 주입해두면 자동 포함
+        const CSRF_HEADER = document.querySelector('meta[name="_csrf_header"]')?.content;
+        const CSRF_TOKEN  = document.querySelector('meta[name="_csrf"]')?.content;
+
+        // ===== 1) 키워드 사전 =====
         const CATEGORY_KEYWORDS = {
             "증권": ["주식","코스피","ETF","공모주","배당","리츠","거래량"],
             "금융": ["금리","대출","예금","보험","환율","금융감독원","비트코인"],
@@ -268,23 +298,40 @@
             "일반": ["물가","소비","고용","임금","GDP","경기침체","가계부채"]
         };
 
-        // 3) 렌더
-        const MAX_TOTAL = 12; // 전체 선택 상한
-        const modal = document.getElementById('interestModal');
-        const root  = document.getElementById('interestRoot');
-        const selCnt = document.getElementById('selCount');
-        const limitTotal = document.getElementById('limitTotal');
-        limitTotal.textContent = String(MAX_TOTAL);
+        // ===== 2) 엘리먼트 =====
+        const modal   = document.getElementById('interestModal');
+        const root    = document.getElementById('interestRoot');
+        const selCnt  = document.getElementById('selCount');
+        const limitEl = document.getElementById('limitTotal');
+        const btnSave = document.getElementById('btnSave');
+        const btnSkip = document.getElementById('btnSkip');
+        limitEl.textContent = String(MAX_TOTAL);
 
+        // ===== 3) 상태 =====
+        const state = {
+            total: 0,
+            perCat: {}, // { "증권": 0, ... }
+        };
+
+        // ===== 4) 렌더링 =====
         function render(){
             const frag = document.createDocumentFragment();
             Object.entries(CATEGORY_KEYWORDS).forEach(([cat, kws])=>{
                 const card = document.createElement('section');
                 card.className = 'cat-card';
-                card.innerHTML = `<h4 class="cat-title">${cat}</h4>`;
-                const box = document.createElement('div'); box.className='kw-grid';
+                card.dataset.cat = cat;
+                card.innerHTML = `
+        <div class="cat-head">
+          <h4 class="cat-title">${cat}</h4>
+          <div class="cat-cap"><span class="cat-count">0</span> / ${MAX_PER_CAT}</div>
+        </div>
+      `;
+                const box = document.createElement('div');
+                box.className='kw-grid';
+
                 kws.forEach(kw=>{
-                    const chip = document.createElement('span');
+                    const chip = document.createElement('button');
+                    chip.type = 'button';
                     chip.className='kw';
                     chip.textContent = kw;
                     chip.dataset.kw = kw;
@@ -292,52 +339,130 @@
                     chip.addEventListener('click', onToggle);
                     box.appendChild(chip);
                 });
+
+                // 섹션 초기화 버튼(선택)
+                const tools = document.createElement('div');
+                tools.className = 'cat-tools';
+                const resetBtn = document.createElement('button');
+                resetBtn.type='button';
+                resetBtn.className='cat-reset';
+                resetBtn.textContent='초기화';
+                resetBtn.addEventListener('click', ()=>clearCategory(cat));
+                tools.appendChild(resetBtn);
+
                 card.appendChild(box);
+                card.appendChild(tools);
                 frag.appendChild(card);
+
+                state.perCat[cat] = 0;
             });
+
             root.innerHTML = '';
             root.appendChild(frag);
+            updateCounters();
         }
 
+        // ===== 5) 선택/해제 로직 =====
         function countSelected(){ return root.querySelectorAll('.kw.active').length; }
 
         function onToggle(e){
-            const el = e.currentTarget;
+            const el  = e.currentTarget;
+            const cat = el.dataset.cat;
+
+            // 해제
             if(el.classList.contains('active')){
                 el.classList.remove('active');
-            }else{
-                if(countSelected() >= MAX_TOTAL){ return; }
-                el.classList.add('active');
+                state.perCat[cat] = Math.max(0, state.perCat[cat]-1);
+                state.total = Math.max(0, state.total-1);
+                updateCounters();
+                return;
             }
-            selCnt.textContent = String(countSelected());
+
+            // 선택 제한 체크
+            if(state.total >= MAX_TOTAL) return;
+            if(state.perCat[cat] >= MAX_PER_CAT) return;
+
+            // 선택
+            el.classList.add('active');
+            state.perCat[cat] += 1;
+            state.total += 1;
+            updateCounters();
         }
 
-        // 4) 열고 닫기
+        function clearCategory(cat){
+            root.querySelectorAll(`.kw[data-cat="${cat}"].active`).forEach(el=>{
+                el.classList.remove('active');
+            });
+            state.total -= state.perCat[cat];
+            state.perCat[cat] = 0;
+            if(state.total < 0) state.total = 0;
+            updateCounters();
+        }
+
+        function updateCounters(){
+            // 총계
+            state.total = countSelected();
+            selCnt.textContent = String(state.total);
+
+            // 카테고리별
+            Object.keys(state.perCat).forEach(cat=>{
+                const cnt = root.querySelectorAll(`.kw[data-cat="${cat}"].active`).length;
+                state.perCat[cat] = cnt;
+                const card = root.querySelector(`.cat-card[data-cat="${cat}"]`);
+                card?.querySelector('.cat-count')?.replaceChildren(document.createTextNode(String(cnt)));
+
+                // cap 찬 후 아직 미선택인 칩들 비활성화
+                const capReached = cnt >= MAX_PER_CAT;
+                card?.querySelectorAll('.kw').forEach(chip=>{
+                    if(chip.classList.contains('active')) {
+                        chip.disabled = false; // 이미 선택된 것은 항상 활성
+                    } else {
+                        chip.disabled = capReached || state.total >= MAX_TOTAL;
+                    }
+                });
+            });
+
+            // 전체 cap에 따른 저장 버튼 상태
+            btnSave.disabled = state.total > MAX_TOTAL;
+        }
+
+        // ===== 6) 열고/닫기 =====
         function open(){ modal.classList.add('open'); modal.setAttribute('aria-hidden','false'); }
         function close(){ modal.classList.remove('open'); modal.setAttribute('aria-hidden','true'); }
 
-        // 5) 저장 호출
+        // ===== 7) 저장 =====
+        function showToast(msg, ms=2000){
+            const t = document.getElementById('toast');
+            t.textContent = msg;
+            t.classList.add('show');
+            setTimeout(()=>t.classList.remove('show'), ms);
+        }
+
         async function save(){
             const kws = Array.from(root.querySelectorAll('.kw.active')).map(el=>el.dataset.kw);
-            // 빈 선택도 허용(스킵과 동일하게 처리)
+            const headers = { 'Content-Type':'application/json' };
+            if(CSRF_HEADER && CSRF_TOKEN){ headers[CSRF_HEADER] = CSRF_TOKEN; }
+
             try{
                 const res = await fetch('/member/interests', {
                     method:'POST',
-                    headers:{'Content-Type':'application/json'},
+                    headers,
                     body: JSON.stringify(kws)
                 });
-                if(!res.ok) throw new Error('save failed');
-            }catch(err){ console.error(err); }
-            close();
-            // 선택 반영 토스트(선택)
-            // alert('관심 설정이 저장되었습니다.');
+                if(!res.ok) throw new Error('save failed: ' + res.status);
+                showToast('✅ 관심사가 저장되었습니다!');
+                close();
+            }catch(err){
+                console.error(err);
+                showToast('❌ 저장에 실패했습니다.', 3000);
+            }
         }
 
-        // 6) 이벤트 바인딩
-        document.getElementById('btnSave').addEventListener('click', save);
-        document.getElementById('btnSkip').addEventListener('click', close);
+        // ===== 8) 이벤트 =====
+        btnSave.addEventListener('click', save);
+        btnSkip.addEventListener('click', close);
 
-        // 7) 초기화 & 조건부 오픈
+        // ===== 9) 초기화 =====
         render();
         if(need) open();
     })();

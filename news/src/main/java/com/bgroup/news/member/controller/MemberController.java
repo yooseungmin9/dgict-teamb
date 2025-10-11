@@ -5,11 +5,14 @@ import com.bgroup.news.member.dto.SignupRequest;
 import com.bgroup.news.member.service.MemberService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.data.domain.Page;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Collections;
 import java.util.List;
 
 @Controller
@@ -60,13 +63,25 @@ public class MemberController {
         return "member/admin";
     }
 
-    @PostMapping("/interests")
+    @PostMapping(
+            path = "/interests",
+            consumes = MediaType.APPLICATION_JSON_VALUE,
+            produces = MediaType.APPLICATION_JSON_VALUE
+    )
     @ResponseBody
-    public ResponseEntity<?> saveInterests(
-            @RequestBody List<String> keywords,
-            @SessionAttribute("loginUser") MemberDoc me) {
+    public ResponseEntity<Void> saveInterests(
+            @RequestBody(required = false) List<String> keywords,
+            @SessionAttribute(value = "loginUser", required = false) MemberDoc me
+    ) {
+        if (me == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build(); // 401
+        }
 
-        memberService.updateInterests(me.getId(), keywords);
+        memberService.updateInterests(
+                me.getId(),
+                (keywords == null ? Collections.emptyList() : keywords)
+        );
+
         return ResponseEntity.ok().build();
     }
 }

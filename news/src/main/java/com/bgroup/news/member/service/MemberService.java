@@ -21,31 +21,17 @@ public class MemberService {
         this.repo = repo;
     }
 
-    public Optional<MemberDoc> findById(String id) {
-        return repo.findById(id);
-    }
-
+    public Optional<MemberDoc> findById(String id) { return repo.findById(id); }
     public MemberDoc getOrThrow(String id) {
-        return repo.findById(id)
-                .orElseThrow(() -> new NoSuchElementException("member not found: " + id));
+        return repo.findById(id).orElseThrow(() -> new NoSuchElementException("member not found: " + id));
     }
-
-    public boolean existsById(String id) {
-        return repo.existsById(id);
-    }
-
-    public List<MemberDoc> listAll() {
-        return repo.findAll(Sort.by(Sort.Direction.ASC, "id"));
-    }
-
+    public boolean existsById(String id) { return repo.existsById(id); }
+    public List<MemberDoc> listAll() { return repo.findAll(Sort.by(Sort.Direction.ASC, "id")); }
     public Page<MemberDoc> list(int page, int size) {
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.ASC, "id"));
         return repo.findAll(pageable);
     }
-
-    public MemberDoc save(MemberDoc m) {
-        return repo.save(m);
-    }
+    public MemberDoc save(MemberDoc m) { return repo.save(m); }
 
     public Optional<MemberDoc> authenticate(String id, String rawPassword) {
         return repo.findById(id)
@@ -77,61 +63,98 @@ public class MemberService {
     public void updateInterests(String userId, List<String> selected){
         MemberDoc m = getOrThrow(userId);
 
-        // 키워드 → 카테고리 맵 (서버 기준 룩업)
-        Map<String, String> kw2cat = Map.ofEntries(
-                // 증권
-                Map.entry("주식","증권"), Map.entry("코스피","증권"), Map.entry("ETF","증권"),
-                Map.entry("공모주","증권"), Map.entry("배당","증권"), Map.entry("리츠","증권"),
-                Map.entry("거래량","증권"),
-                // 금융
-                Map.entry("금리","금융"), Map.entry("대출","금융"), Map.entry("예금","금융"),
-                Map.entry("보험","금융"), Map.entry("환율","금융"), Map.entry("금융감독원","금융"),
-                Map.entry("비트코인","금융"),
-                // 부동산
-                Map.entry("부동산","부동산"), Map.entry("아파트","부동산"), Map.entry("전세","부동산"),
-                Map.entry("청약","부동산"), Map.entry("재건축","부동산"), Map.entry("공시지가","부동산"),
-                Map.entry("집값","부동산"),
-                // 산업
-                Map.entry("산업","산업"), Map.entry("자동차","산업"), Map.entry("반도체","산업"),
-                Map.entry("전기차","산업"), Map.entry("배터리","산업"), Map.entry("로봇","산업"),
-                Map.entry("AI","산업"),
-                // 글로벌경제
-                Map.entry("미국","글로벌경제"), Map.entry("중국","글로벌경제"), Map.entry("달러","글로벌경제"),
-                Map.entry("무역","글로벌경제"), Map.entry("유가","글로벌경제"), Map.entry("나스닥","글로벌경제"),
-                Map.entry("IMF","글로벌경제"),
-                // 일반
-                Map.entry("물가","일반"), Map.entry("소비","일반"), Map.entry("고용","일반"),
-                Map.entry("임금","일반"), Map.entry("GDP","일반"), Map.entry("경기침체","일반"),
-                Map.entry("가계부채","일반")
+        // 1) 키워드 → (parent, sub) 매핑
+        record PS(String p, String s) {}
+        Map<String, PS> kw2ps = Map.ofEntries(
+                // stock
+                Map.entry("주식", new PS("stock","equity_basic")),
+                Map.entry("ETF", new PS("stock","etf")),
+                Map.entry("공모주", new PS("stock","ipo")),
+                Map.entry("배당", new PS("stock","dividend")),
+                Map.entry("리츠", new PS("stock","reits")),
+                Map.entry("거래량", new PS("stock","trading")),
+                // finance
+                Map.entry("금리", new PS("finance","monetary")),
+                Map.entry("대출", new PS("finance","credit")),
+                Map.entry("예금", new PS("finance","deposit")),
+                Map.entry("보험", new PS("finance","insurance")),
+                Map.entry("환율", new PS("finance","fx")),
+                Map.entry("금융감독원", new PS("finance","regulation")),
+                Map.entry("비트코인", new PS("finance","crypto")),
+                // estate
+                Map.entry("부동산", new PS("estate","overview")),
+                Map.entry("아파트", new PS("estate","residential")),
+                Map.entry("전세", new PS("estate","lease")),
+                Map.entry("청약", new PS("estate","subscription")),
+                Map.entry("재건축", new PS("estate","redevelopment")),
+                Map.entry("공시지가", new PS("estate","policy_tax")),
+                Map.entry("집값", new PS("estate","price")),
+                // industry
+                Map.entry("산업", new PS("industry","overview")),
+                Map.entry("자동차", new PS("industry","auto_ev")),
+                Map.entry("전기차", new PS("industry","auto_ev")),
+                Map.entry("배터리", new PS("industry","auto_ev")),
+                Map.entry("반도체", new PS("industry","semiconductor")),
+                Map.entry("로봇", new PS("industry","robotics")),
+                Map.entry("AI", new PS("industry","ai_infra")),
+                // global
+                Map.entry("미국", new PS("global","us")),
+                Map.entry("중국", new PS("global","china")),
+                Map.entry("달러", new PS("global","fx_commodities")),
+                Map.entry("무역", new PS("global","geopolitics_supplychain")),
+                Map.entry("유가", new PS("global","fx_commodities")),
+                Map.entry("나스닥", new PS("global","markets_global")),
+                Map.entry("IMF", new PS("global","institutions")),
+                // general
+                Map.entry("물가", new PS("general","macro_basic")),
+                Map.entry("소비", new PS("general","consumer")),
+                Map.entry("고용", new PS("general","labor")),
+                Map.entry("임금", new PS("general","labor")),
+                Map.entry("GDP", new PS("general","macro_basic")),
+                Map.entry("경기침체", new PS("general","cycle")),
+                Map.entry("가계부채", new PS("general","household_debt"))
         );
 
-        int g=0,f=0,e=0,i=0,s=0,n=0;
-        if(selected != null){
-            for(String kw : selected){
-                String c = kw2cat.get(kw);
-                if(c == null) continue;
-                switch (c){
-                    case "글로벌경제" -> g++;
-                    case "금융"      -> f++;
-                    case "부동산"    -> e++;
-                    case "산업"      -> i++;
-                    case "증권"      -> s++;
-                    case "일반"      -> n++;
-                }
+        // 2) preferences 준비
+        MemberDoc.Preferences prefs = m.getPreferences();
+        if (prefs == null) {
+            prefs = MemberDoc.Preferences.builder()
+                    .explicit(new HashMap<>()).implicit(new HashMap<>()).build();
+        }
+        Map<String, Map<String, Integer>> explicit =
+                (prefs.getExplicit()!=null ? prefs.getExplicit() : new HashMap<>());
+
+        // 3) 선택 누적 (카테고리당 최대 4)
+        int capPerSub = 4;
+        if (selected != null) {
+            for (String kw : selected) {
+                PS ps = kw2ps.get(kw);
+                if (ps == null) continue;
+                explicit.computeIfAbsent(ps.p(), k -> new HashMap<>());
+                Map<String,Integer> sub = explicit.get(ps.p());
+                sub.put(ps.s(), Math.min(capPerSub, sub.getOrDefault(ps.s(),0)+1));
             }
         }
 
-        // 간단 정규화 (카테고리당 최대 4개 선택한 걸 0~4 점수로 사용)
-        int cap = 4;
-        MemberDoc.Interests it = new MemberDoc.Interests();
-        it.setGlobal(Math.min(g, cap));
-        it.setFinance(Math.min(f, cap));
-        it.setEstate(Math.min(e, cap));
-        it.setIndustry(Math.min(i, cap));
-        it.setStock(Math.min(s, cap));
-        it.setGeneral(Math.min(n, cap));
+        // 4) 상위합계 재계산 → interests 갱신(하위호환)
+        MemberDoc.Interests agg = new MemberDoc.Interests(0,0,0,0,0,0);
+        for (var e : explicit.entrySet()){
+            int sum = e.getValue().values().stream().mapToInt(Integer::intValue).sum();
+            switch (e.getKey()){
+                case "global"   -> agg.setGlobal(sum);
+                case "finance"  -> agg.setFinance(sum);
+                case "estate"   -> agg.setEstate(sum);
+                case "industry" -> agg.setIndustry(sum);
+                case "stock"    -> agg.setStock(sum);
+                case "general"  -> agg.setGeneral(sum);
+            }
+        }
 
-        m.setInterests(it);
+        // 5) 저장
+        prefs.setExplicit(explicit);
+        prefs.setLastUpdated(Instant.now());
+        m.setPreferences(prefs);
+        m.setInterests(agg);
         m.setUpdatedAt(Instant.now());
         save(m);
     }

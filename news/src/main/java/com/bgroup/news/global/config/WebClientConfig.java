@@ -11,6 +11,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.reactive.ReactorClientHttpConnector;
+import org.springframework.web.reactive.function.client.ExchangeFilterFunction;
 import org.springframework.web.reactive.function.client.ExchangeFilterFunctions;
 import org.springframework.web.reactive.function.client.ExchangeStrategies;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -80,7 +81,34 @@ public class WebClientConfig {
             WebClient.Builder baseWebClientBuilder,
             @Value("${fastapi.youtube}") String baseUrl
     ) {
-        return baseWebClientBuilder.baseUrl(baseUrl.trim()).build();
+        HttpClient httpClient = HttpClient.create()
+                .responseTimeout(Duration.ofSeconds(8)) // 기본 응답 타임아웃(요청별로도 다시 걸어줌)
+                .option(io.netty.channel.ChannelOption.CONNECT_TIMEOUT_MILLIS, 2000)
+                .doOnConnected(conn -> conn
+                        .addHandlerLast(new ReadTimeoutHandler(8))
+                        .addHandlerLast(new WriteTimeoutHandler(8)));
+
+        return baseWebClientBuilder
+                .baseUrl(baseUrl == null ? "" : baseUrl.trim()) // 예: http://localhost:8004
+                .clientConnector(new ReactorClientHttpConnector(httpClient))
+                .filter(logOnError()) // 선택: 에러 로깅
+                .build();
+    }
+
+    private ExchangeFilterFunction logOnError() {
+        return ExchangeFilterFunction.ofResponseProcessor(resp -> {
+            if (resp.statusCode().isError()) {
+                int code = resp.statusCode().value();
+                String text = resp.statusCode().toString(); // "404 NOT_FOUND"
+                return resp.bodyToMono(String.class)
+                        .defaultIfEmpty("")
+                        .doOnNext(body -> System.err.println(
+                                "[youtubeClient] HTTP " + code + " " + text +
+                                        (body.isEmpty() ? "" : " | body=" + body)))
+                        .thenReturn(resp);
+            }
+            return reactor.core.publisher.Mono.just(resp);
+        });
     }
 
     @Bean("trendClient")
