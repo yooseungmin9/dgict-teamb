@@ -87,6 +87,7 @@ function renderPieChart(sentiment) {
             responsive: true,
             maintainAspectRatio: true,   // ✅ 원 비율 유지
             aspectRatio: 1,              // ✅ 정사각형 (1:1)
+            radius: '100%',
             layout: { padding: 10 },
             plugins: {
                 legend: {
