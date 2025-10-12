@@ -1,6 +1,7 @@
 package com.bgroup.news.member.controller;
 
 import com.bgroup.news.member.domain.MemberDoc;
+import com.bgroup.news.member.dto.PreferenceSurveyRequest;
 import com.bgroup.news.member.dto.SignupRequest;
 import com.bgroup.news.member.service.MemberService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -47,10 +48,9 @@ public class MemberController {
 
     // 회원 등록 처리
     @PostMapping("/signup")
-    public String signupSubmit(@ModelAttribute SignupRequest req,
-                               HttpSession session) {
+    public String signupSubmit(@ModelAttribute SignupRequest req, HttpSession session) {
         // 1) 가입
-        MemberDoc saved = memberService.register(req); // ← MemberDoc 반환 추천
+        MemberDoc saved = memberService.register(req);
 
         // 2) 자동 로그인 (세션에 저장)
         session.setAttribute("loginUser", saved);
@@ -61,27 +61,29 @@ public class MemberController {
         return "redirect:/pages/dashboard";
     }
 
+    // 마이페이지(계정 정보)
     @GetMapping("/account")
     public String account(HttpServletRequest request, Model model) {
         boolean ajax = "XMLHttpRequest".equalsIgnoreCase(request.getHeader("X-Requested-With"));
-        // model.addAttribute("me", memberService.current()); // 필요시
         return ajax ? "member/account :: accountPanel" : "member/account";
     }
 
+    // 관리자 페이지
     @GetMapping("/admin")
     public String adminPage(Model model) {
         return "member/admin";
     }
 
+    // 키워드 기반 선호 저장 (/member/interests)
     @PostMapping(
             path = "/interests",
-            consumes = MediaType.APPLICATION_JSON_VALUE,
-            produces = MediaType.APPLICATION_JSON_VALUE
+            consumes = MediaType.APPLICATION_JSON_VALUE
     )
     @ResponseBody
     public ResponseEntity<Void> saveInterests(
             @RequestBody(required = false) List<String> keywords,
-            @SessionAttribute(value = "loginUser", required = false) MemberDoc me
+            @SessionAttribute(value = "loginUser", required = false) MemberDoc me,
+            HttpSession session
     ) {
         if (me == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build(); // 401
@@ -92,6 +94,32 @@ public class MemberController {
                 (keywords == null ? Collections.emptyList() : keywords)
         );
 
-        return ResponseEntity.ok().build();
+        // ✅ 세션 최신화 (화면에서 즉시 최신값 사용)
+        MemberDoc refreshed = memberService.getOrThrow(me.getId());
+        session.setAttribute("loginUser", refreshed);
+
+        return ResponseEntity.noContent().build(); // 204
+    }
+
+    // 설문 메타 저장 (/member/preferences)
+    @PostMapping(
+            path = "/preferences",
+            consumes = MediaType.APPLICATION_JSON_VALUE
+    )
+    @ResponseBody
+    public ResponseEntity<Void> savePreferenceSurvey(
+            @RequestBody PreferenceSurveyRequest req,
+            @SessionAttribute(value = "loginUser", required = false) MemberDoc me,
+            HttpSession session
+    ){
+        if (me == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build(); // 401
+
+        memberService.applyPreferenceSurvey(me.getId(), req);
+
+        // ✅ 세션 최신화
+        MemberDoc refreshed = memberService.getOrThrow(me.getId());
+        session.setAttribute("loginUser", refreshed);
+
+        return ResponseEntity.noContent().build(); // 204
     }
 }

@@ -1,6 +1,7 @@
 package com.bgroup.news.member.service;
 
 import com.bgroup.news.member.domain.MemberDoc;
+import com.bgroup.news.member.dto.PreferenceSurveyRequest;
 import com.bgroup.news.member.dto.SignupRequest;
 import com.bgroup.news.member.repository.MemberRepository;
 import org.springframework.data.domain.Page;
@@ -155,6 +156,51 @@ public class MemberService {
         prefs.setLastUpdated(Instant.now());
         m.setPreferences(prefs);
         m.setInterests(agg);
+        m.setUpdatedAt(Instant.now());
+        save(m);
+    }
+
+    public void applyPreferenceSurvey(String userId, PreferenceSurveyRequest r){
+        MemberDoc m = getOrThrow(userId);
+
+        MemberDoc.Preferences prefs = m.getPreferences();
+        if (prefs == null) {
+            prefs = MemberDoc.Preferences.builder()
+                    .explicit(new HashMap<>())
+                    .implicit(new HashMap<>())
+                    .build();
+        }
+
+        // mainSource
+        if (r.mainSource() != null && !r.mainSource().isBlank()) {
+            prefs.setMainSource(r.mainSource());
+        }
+
+        // platforms
+        MemberDoc.Preferences.Platforms p = prefs.getPlatforms();
+        if (p == null) p = new MemberDoc.Preferences.Platforms(null, new ArrayList<>(), new ArrayList<>(), new ArrayList<>());
+        if (r.portal() != null) p.setPortal(r.portal());
+        if (r.sns() != null)    p.setSns(r.sns());
+        if (r.video() != null)  p.setVideo(r.video());
+        if (r.ott() != null)    p.setOtt(r.ott());
+        prefs.setPlatforms(p);
+
+        // categoryWeights (0.0~1.0로 정규화 가정)
+        if (r.categoryWeights() != null && !r.categoryWeights().isEmpty()) {
+            prefs.setCategoryWeights(r.categoryWeights());
+        }
+
+        // regionInterest
+        MemberDoc.Preferences.RegionInterest ri = prefs.getRegionInterest();
+        if (ri == null) ri = new MemberDoc.Preferences.RegionInterest(null, null, null);
+        if (r.metro() != null)      ri.setMetro(r.metro());
+        if (r.city() != null)       ri.setCity(r.city());
+        if (r.regionLevel() != null)ri.setLevel(r.regionLevel());
+        prefs.setRegionInterest(ri);
+
+        // 타임스탬프
+        prefs.setLastUpdated(Instant.now());
+        m.setPreferences(prefs);
         m.setUpdatedAt(Instant.now());
         save(m);
     }
