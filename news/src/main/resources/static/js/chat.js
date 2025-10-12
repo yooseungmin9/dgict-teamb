@@ -87,12 +87,21 @@ function bubbleStatus(text){
     `<div class="message bot-message"><div class="message-content muted">${escapeHtml(text)}</div></div>`);
   scrollToBottom();
 }
-function bubbleTyping(){
+function bubbleTyping() {
+  // 1) 고유 ID 생성 (crypto.randomUUID() 지원 시 사용)
   const id = "typing-" + (crypto?.randomUUID?.() || Math.random().toString(36).slice(2));
-  chatEl.insertAdjacentHTML("beforeend",
-    `<div id="${id}" class="message bot-message"><div class="message-content">${escapeHtml(I18N[LANG].statusTyping)}</div></div>`);
-  scrollToBottom();
-  return id;
+
+  // 2) 채팅 영역에 '입력중' 말풍선 추가
+  chatEl.insertAdjacentHTML(
+    "beforeend",
+    `<div id="${id}" class="message bot-message">
+      <div class="message-content" aria-live="polite" aria-busy="true">
+        <span class="dot">•</span><span class="dot">•</span><span class="dot">•</span>
+      </div>
+    </div>`
+  );
+
+  return id; // 나중에 제거할 때 ID로 접근 가능
 }
 function removeEl(id){ const el=document.getElementById(id); if(el) el.remove(); }
 

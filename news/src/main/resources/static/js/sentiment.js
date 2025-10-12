@@ -1,4 +1,5 @@
 // 입문자용 주석: 로딩 확인 로그 + API 실패 시 더미데이터로라도 차트 그리기
+
 (function(){
   console.log("[sentiment.js] loaded");
   const card = document.getElementById("sentiment-card");
@@ -103,44 +104,66 @@
       data:{
         labels,
         datasets:[
-          {label:"부정(<0)", data:neg, stack:"s", backgroundColor:"rgba(221,51,51,0.7)"},
-          {label:"중립(=0)", data:neu, stack:"s", backgroundColor:"rgba(201,203,207,0.7)"},
-          {label:"긍정(>0)", data:pos, stack:"s", backgroundColor:"rgba(30,115,190,0.7)"},
+          {label:"부정(<0)", data:neg, stack:"s", backgroundColor:"rgba(235,16,0,0.9)"},
+          {label:"중립(=0)", data:neu, stack:"s", backgroundColor:"rgba(201,203,207,0.9)"},
+          {label:"긍정(>0)", data:pos, stack:"s", backgroundColor:"rgba(37,99,235,0.9)"},
         ]
       },
-      options: makeBarOptions(false)
+      options: {
+        ...makeBarOptions(false),
+        plugins:{
+          datalabels:{ display:false } // 바 차트에서 숨김
+        }
+      }
     });
   }
 
   function renderPieChart(rows){
     let totalNeg = 0, totalNeu = 0, totalPos = 0;
-
     rows.forEach(r => {
       totalNeg += +r["부정"]||0;
       totalNeu += +r["중립"]||0;
       totalPos += +r["긍정"]||0;
     });
 
+    const dataArr = [totalNeg, totalNeu, totalPos];
+
     chart = new Chart(ctx, {
       type:"pie",
       data:{
         labels: ["부정(<0)", "중립(=0)", "긍정(>0)"],
         datasets:[{
-          data: [totalNeg, totalNeu, totalPos],
+          data: dataArr,
           backgroundColor:[
-            "rgba(255,99,132,0.8)",
-            "rgba(201,203,207,0.8)",
-            "rgba(75,192,192,0.8)"
+            "rgba(235,16,0,0.9)",
+            "rgba(201,203,207,0.9)",
+            "rgba(37,99,235,0.9)"
           ],
           borderColor:[
-            "rgba(255,99,132,1)",
-            "rgba(201,203,207,1)",
-            "rgba(75,192,192,1)"
+            "rgba(235,16,0)",
+            "rgba(201,203,207)",
+            "rgba(37,99,235)"
           ],
           borderWidth: 2
         }]
       },
-      options: makePieOptions()
+      options: {
+        ...makePieOptions(),
+        plugins: {
+          ...makePieOptions().plugins,
+          datalabels:{
+            color:"#fff",
+            font:{ weight:"bold" },
+            formatter:(value,ctx)=>{
+              const sum = ctx.chart.data.datasets[0].data.reduce((a,b)=>a+b,0);
+              if(!sum) return "0%";
+              return `${((value/sum)*100).toFixed(1)}%`;
+            }
+          }
+        }
+      },
+      // 파이 차트에만 플러그인 적용
+      plugins: [ChartDataLabels]
     });
   }
 
