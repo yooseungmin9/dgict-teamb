@@ -54,8 +54,8 @@
   --text-color-8: rgba(6, 182, 212, 1); /* cyan */
 
   /* Semantic Color Tokens (Light Mode) */
-  --color-background: var(--color-white);
-  --color-surface: var(--color-cream-100);
+  --color-background: #fff;
+  --color-surface: #fff;
   --color-text: var(--color-slate-900);
   --color-text-secondary: var(--color-slate-500);
   --color-primary: var(--color-teal-500);
@@ -314,7 +314,7 @@ html {
   font-family: var(--font-family-base);
   line-height: var(--line-height-normal);
   color: var(--color-text);
-  background-color: var(--color-background);
+  background-color: #fff;
   -webkit-font-smoothing: antialiased;
   box-sizing: border-box;
 }
@@ -322,6 +322,7 @@ html {
 body {
   margin: 0;
   padding: 0;
+  background-color: #fff;
 }
 
 *,

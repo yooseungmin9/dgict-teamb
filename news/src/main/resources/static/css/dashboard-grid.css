@@ -607,3 +607,7 @@
   transition: color 0.2s ease;
 }
 #co-close:hover { color: #2563eb; }
+
+#DB_kwTable tbody tr.up   { background: rgba(16,185,129,0.12); transition: background .8s ease; }
+#DB_kwTable tbody tr.down { background: rgba(239,68,68,0.12);  transition: background .8s ease; }
+#DB_kwTable tbody tr       { will-change: transform; }

@@ -102,34 +102,53 @@ function renderPieChart(sentiment) {
 
 // ========== 분석 조회 ==========
 function loadAnalysis(video_id){
-    // 더 많은 댓글을 사용해 집계 정확도↑
-    const url = `${API}/analysis/${encodeURIComponent(video_id)}?topn=100&limit=1000`;
-    fetch(url)
-        .then(res=>res.json())
-        .then(data=>{
-            // 디버그가 필요하면 아래 주석을 풀어보세요
-            // console.log("analysis", data);
+  const url = `${API}/analysis/${encodeURIComponent(video_id)}?topn=100&limit=1000`;
+  fetch(url)
+    .then(res=>res.json())
+    .then(data=>{
+      renderPieChart(data.sentiment||{});
+      renderWordCloud(data.wordcloud||[]);
 
-            renderPieChart(data.sentiment||{});
-            renderWordCloud(data.wordcloud||[]);
-            byId("analysisText").textContent = data.summary || "분석 결과 없음";
+      // ===== 감정 단어를 버튼 스타일로 감싸기 =====
+      const emotionMap = {
+        "중립": "neutral",
+        "혐오": "disgust",
+        "분노": "anger",
+        "슬픔": "sadness",
+        "공포": "fear",
+        "놀람": "surprise",
+        "행복": "happiness"
+      };
 
-            const commentsDiv = byId("commentList");
-            commentsDiv.innerHTML = "";
-            (data.comments||[]).forEach(c=>{
-                const div = document.createElement("div");
-                div.className = "comment";
-                div.textContent = `${c.text} (${c.emotion || "Unknown"})`;
-                commentsDiv.appendChild(div);
-            });
-        })
-        .catch(err=>{
-            console.error("분석 데이터 불러오기 실패:", err);
-            byId("analysisText").textContent = "분석 결과 로딩 실패";
-            renderPieChart({});
-            renderWordCloud([]);
-        });
+        let summary = data.summary || "분석 결과 없음";
+
+        // ✅ 감정명 + 영문 둘 다 매칭되게 정규식 교체
+        for (const [k, cls] of Object.entries(emotionMap)) {
+          const regex = new RegExp(`\\(${k}\\([^)]*\\)\\)`, "g");
+          // 예: (중립(Neutral)) 전체를 찾음
+          summary = summary.replace(regex, `<span class="emotion-btn ${cls}">$&</span>`);
+        }
+
+        const analysisEl = byId("analysisText");
+        analysisEl.innerHTML = summary;   // ✅ textContent → innerHTML
+      // 댓글 목록 렌더링
+      const commentsDiv = byId("commentList");
+      commentsDiv.innerHTML = "";
+      (data.comments||[]).forEach(c=>{
+        const div = document.createElement("div");
+        div.className = "comment";
+        div.textContent = `${c.text} (${c.emotion || "Unknown"})`;
+        commentsDiv.appendChild(div);
+      });
+    })
+    .catch(err=>{
+      console.error("분석 데이터 불러오기 실패:", err);
+      byId("analysisText").textContent = "분석 결과 로딩 실패";
+      renderPieChart({});
+      renderWordCloud([]);
+    });
 }
+
 
 // ========== 목록/상세 ==========
 // /static/js/youtube.js

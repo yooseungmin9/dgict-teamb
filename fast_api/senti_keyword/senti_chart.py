@@ -45,7 +45,7 @@ def sentiment_daily(
 ):
     today = datetime.utcnow().date()
     to_d   = isoparse(date_to).date()   if date_to   else today
-    from_d = isoparse(date_from).date() if date_from else (to_d - timedelta(days=29))
+    from_d = isoparse(date_from).date() if date_from else (to_d - timedelta(days=89))
 
     try:
         th = load_thresholds()
