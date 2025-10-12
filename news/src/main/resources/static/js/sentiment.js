@@ -172,12 +172,17 @@
     const needPie = state.mode === 'ratio';
     const type = needPie ? 'pie' : 'bar';
 
+    let viewRows = grouped;
+    if (!needPie && state.group === 'day') {
+      viewRows = grouped.slice(-30); // filterSort가 날짜 오름차순 정렬하므로 뒤에서 30개
+    }
+
     if (!chart) {
-      ensureChart(type, needPie ? buildPieData(grouped) : buildBarData(grouped));
+      ensureChart(type, needPie ? buildPieData(viewRows) : buildBarData(viewRows));
     } else if (chart.config.type === type) {
-      updateChartData(needPie ? buildPieData(grouped) : buildBarData(grouped));
+      updateChartData(needPie ? buildPieData(viewRows) : buildBarData(viewRows));
     } else {
-      ensureChart(type, needPie ? buildPieData(grouped) : buildBarData(grouped));
+      ensureChart(type, needPie ? buildPieData(viewRows) : buildBarData(viewRows));
     }
 
     // 상태 텍스트
