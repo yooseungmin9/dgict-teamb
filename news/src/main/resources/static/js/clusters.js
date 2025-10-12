@@ -109,9 +109,10 @@ chart.on('click', (p) => {
   const name = cleanLabel(p.data.name);
   const n = Number(p.value||0).toLocaleString();
   overlay.innerHTML =
-    `<div class="content" style="position:relative;padding-right:28px">
-       <button id="co-close" style="position:absolute;right:8px;top:6px;border:0;background:transparent;font-size:20px;line-height:1;cursor:pointer">×</button>
-       <strong>${name}</strong> — 유사 주제 기사 수: <strong>${n}</strong>
+    `<div class="content" style="position:relative;padding-right:28px;padding-top:15px">
+       <button id="co-close" style="position:absolute;right:8px;top:6px;border:0;background:transparent;font-size:20px;line-height:1;cursor:pointer;">×</button>
+       <p><strong>${name}</strong></p>
+       <p style="margin-bottom:0px;">유사 주제 기사 수: <strong>${n}</strong></p>
      </div>`;
   overlay.style.display = 'flex';
   document.getElementById('co-close').onclick = () => overlay.style.display='none';
