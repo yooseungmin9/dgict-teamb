@@ -163,42 +163,35 @@ public class MemberService {
     public void applyPreferenceSurvey(String userId, PreferenceSurveyRequest r){
         MemberDoc m = getOrThrow(userId);
 
-        MemberDoc.Preferences prefs = m.getPreferences();
-        if (prefs == null) {
-            prefs = MemberDoc.Preferences.builder()
-                    .explicit(new HashMap<>())
-                    .implicit(new HashMap<>())
-                    .build();
-        }
+        MemberDoc.Preferences prefs = Optional.ofNullable(m.getPreferences())
+                .orElse(MemberDoc.Preferences.builder()
+                        .explicit(new HashMap<>())
+                        .implicit(new HashMap<>())
+                        .build());
 
-        // mainSource
+        // --- 단일값(하위호환: 들어오면 반영)
         if (r.mainSource() != null && !r.mainSource().isBlank()) {
             prefs.setMainSource(r.mainSource());
         }
 
-        // platforms
-        MemberDoc.Preferences.Platforms p = prefs.getPlatforms();
-        if (p == null) p = new MemberDoc.Preferences.Platforms(null, new ArrayList<>(), new ArrayList<>(), new ArrayList<>());
-        if (r.portal() != null) p.setPortal(r.portal());
-        if (r.sns() != null)    p.setSns(r.sns());
-        if (r.video() != null)  p.setVideo(r.video());
-        if (r.ott() != null)    p.setOtt(r.ott());
+        MemberDoc.Preferences.Platforms p = Optional.ofNullable(prefs.getPlatforms())
+                .orElse(new MemberDoc.Preferences.Platforms(null, new ArrayList<>(), new ArrayList<>(), new ArrayList<>()));
+
+        if (r.portal() != null && !r.portal().isBlank()) p.setPortal(r.portal());
+        if (r.sns()   != null) p.setSns(r.sns());
+        if (r.video() != null) p.setVideo(r.video());
+        if (r.ott()   != null) p.setOtt(r.ott());
         prefs.setPlatforms(p);
 
-        // categoryWeights (0.0~1.0로 정규화 가정)
-        if (r.categoryWeights() != null && !r.categoryWeights().isEmpty()) {
-            prefs.setCategoryWeights(r.categoryWeights());
+        // --- ✅ 다중값(신규)
+        if (r.mainSources() != null) {
+            prefs.setMainSources(new ArrayList<>(new LinkedHashSet<>(r.mainSources()))); // 중복 제거 + 순서 유지
+        }
+        if (r.portals() != null) {
+            prefs.setPortals(new ArrayList<>(new LinkedHashSet<>(r.portals())));
         }
 
-        // regionInterest
-        MemberDoc.Preferences.RegionInterest ri = prefs.getRegionInterest();
-        if (ri == null) ri = new MemberDoc.Preferences.RegionInterest(null, null, null);
-        if (r.metro() != null)      ri.setMetro(r.metro());
-        if (r.city() != null)       ri.setCity(r.city());
-        if (r.regionLevel() != null)ri.setLevel(r.regionLevel());
-        prefs.setRegionInterest(ri);
-
-        // 타임스탬프
+        // 타임스탬프 및 저장
         prefs.setLastUpdated(Instant.now());
         m.setPreferences(prefs);
         m.setUpdatedAt(Instant.now());

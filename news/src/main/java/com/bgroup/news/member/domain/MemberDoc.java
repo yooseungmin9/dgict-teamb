@@ -38,32 +38,26 @@ public class MemberDoc {
 
     @Data @NoArgsConstructor @AllArgsConstructor @Builder
     public static class Preferences {
-        // 기존: parent -> (sub -> score)
+        // ===== 기존(그대로 유지)
+        // parent -> (sub -> score)
         private Map<String, Map<String, Integer>> explicit;
         private Map<String, Map<String, Integer>> implicit;
         private Instant lastUpdated;
 
-        // ▼ 신규(설문 전용, 모두 Optional) — 기존 문서에 없으면 null 유지
-        private String mainSource;  // "portal" | "sns" | "youtube" | "ott" | "pressSite"
+        // 단일(하위호환)
+        private String mainSource;
 
         @Data @NoArgsConstructor @AllArgsConstructor
         public static class Platforms {
-            private String portal;          // "Naver" | "Daum" | ...
-            private java.util.List<String> sns;    // ["Instagram","X","TikTok"]
-            private java.util.List<String> video;  // ["YouTube","TikTok"]
-            private java.util.List<String> ott;    // ["Netflix", ...]
+            private String portal;                 // 단일(하위호환)
+            private java.util.List<String> sns;
+            private java.util.List<String> video;
+            private java.util.List<String> ott;
         }
         private Platforms platforms;
 
-        // 카테고리 가중치 (설문 척도 → 0.0~1.0)
-        private Map<String, Double> categoryWeights; // economy, politics, tech, world, stock, realEstate, industry, culture
-
-        @Data @NoArgsConstructor @AllArgsConstructor
-        public static class RegionInterest {
-            private String metro; // "수도권" 등
-            private String city;  // "성남"
-            private Double level; // 0.0~1.0
-        }
-        private RegionInterest regionInterest;
+        // ===== ✅ 신규: 다중 선택 저장
+        private java.util.List<String> mainSources;  // ["portal","youtube",...]
+        private java.util.List<String> portals;      // ["Naver","Google"]
     }
 }

@@ -16,152 +16,152 @@
       font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Apple SD Gothic Neo,Noto Sans KR,Malgun Gothic,sans-serif;}
     a{color:var(--primary);text-decoration:none} a:hover{text-decoration:underline}
     .wrap{margin:24px auto 48px;padding:0 16px;}
-    .panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:20px 16px 16px;margin-bottom:32px;}
+    .panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:20px 16px 16px;}
     .title{font-size:18px;font-weight:700;margin:0 0 12px 0;}
     .form{display:flex;flex-direction:column;gap:0;}
     .row{display:grid;grid-template-columns:220px 1fr;align-items:center;column-gap:16px;
-      padding:12px 8px;border-top:1px solid #eef2f7;}
+      padding:14px 8px;border-top:1px solid var(--line);}
     .row:first-of-type{border-top:0}
-    .label{display:flex;align-items:center;gap:8px;color:#0f172a;white-space:nowrap;}
-    .label::before{content:"";width:12px;height:12px;border:1px solid #cbd5e1;border-radius:50%;display:inline-block;}
+    .label{display:flex;align-items:center;gap:8px;color:var(--ink);white-space:nowrap;}
+    .label::before{content:"";width:12px;height:12px;border:1px solid var(--muted);border-radius:50%;display:inline-block;}
     .control{width:100%}
     input[type="text"],input[type="email"],input[type="tel"],input[type="password"],input[type="number"],select{
-      width:100%;height:var(--field-h);border:1px solid #e5e7eb;border-radius:6px;
-      padding:0 12px;background:#f9fafb;transition:border .15s, box-shadow .15s, background .15s;}
-    input:focus,select:focus{
-      outline:none;border-color:#2563eb;
-      box-shadow:0 0 0 3px rgba(37,99,235,.15);background:#fff;
-    }
+      width:100%;height:var(--field-h);border:1px solid var(--line);border-radius:6px;padding:0 12px;background:#fff;outline:none;}
+    input::placeholder{color:#a1a1aa}
     .inline-link{height:var(--field-h);display:flex;align-items:center;}
+    .upload-link{display:inline-flex;align-items:center;height:var(--field-h);}
+    .visually-hidden{position:absolute!important;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;}
     .actions{display:flex;gap:12px;justify-content:flex-start;margin-top:20px;}
-    .btn{min-width:92px;height:36px;padding:0 14px;border:1px solid #e5e7eb;
-      border-radius:8px;background:#f8fafc;color:#111827;cursor:pointer;}
-    .btn:hover{background:#eef2f7}
-    .btn.primary{background:#2563eb;border-color:#1d4ed8;color:#fff;}
+    .btn{min-width:92px;height:36px;padding:0 14px;border:1px solid var(--line);border-radius:8px;background:var(--btn-bg);color:var(--btn);cursor:pointer;}
+    .btn:hover{background:var(--btn-bg-hover)}
+    .btn.primary{background:#2563eb;color:#fff;border-color:#1d4ed8;}
     .btn.primary:hover{background:#1d4ed8}
-    :root{ --input-w: 360px; }
+    @media (max-width:720px){ .row{grid-template-columns:1fr} .label{margin-bottom:6px} }
+
+    /* === 요청하신 보정(톤다운/포커스/버튼/행 여백) - 기존 규칙 위에 override === */
+    .row{padding:12px 8px;border-top:1px solid #eef2f7}
+    .label{color:#0f172a}
+    .label::before{border-color:#cbd5e1}
+    input[type], select{
+      background:#f9fafb; border:1px solid #e5e7eb;
+      transition:border .15s, box-shadow .15s, background .15s;
+    }
+    input[type]:focus, select:focus{
+      outline:none; border-color:#2563eb;
+      box-shadow:0 0 0 3px rgba(37,99,235,.15); background:#fff;
+    }
+    .btn{border:1px solid #e5e7eb;background:#f8fafc}
+    .btn:hover{background:#eef2f7}
+    .btn.primary{background:#2563eb;border-color:#1d4ed8}
+    .btn.primary:hover{background:#1d4ed8}
+
+    :root{ --input-w: 360px; }  /* ← 원하는 픽셀값으로 조절 (예: 320px, 300px) */
     .form .control{ display:flex; align-items:center; }
     .form .control > input,
     .form .control > select {
-      width: var(--input-w);
-      max-width: 100%;
+      width: var(--input-w);     /* ← 입력칸 고정 너비 */
+      max-width: 100%;           /* 너무 좁은 화면에서만 안전장치 */
     }
-    @media (max-width:720px){ .row{grid-template-columns:1fr} .label{margin-bottom:6px} }
   </style>
 </head>
 <body>
 <div class="wrap">
-  <!-- ✅ 계정정보 -->
+  <!-- ✅ 모달/프래그먼트가 집어갈 래퍼 -->
   <section id="account-panel" th:fragment="accountPanel">
     <section class="panel">
-      <h2 class="title">회원정보</h2>
+      <!-- 세션 사용자 바인딩 -->
       <form class="form" id="profileForm" th:object="${session.loginUser}" onsubmit="return false">
-        <div class="row"><div class="label">ID</div><div class="control"><span id="userId" th:text="*{id}">user-id</span></div></div>
-        <div class="row"><div class="label">비밀번호</div><div class="control inline-link"><a th:href="@{/pwchange}">변경</a></div></div>
-        <div class="row"><div class="label">이름</div><div class="control"><input type="text" id="name" th:value="*{name}" /></div></div>
-        <div class="row"><div class="label">성별</div><div class="control"><input type="text" id="gender" th:value="*{gender}" /></div></div>
-        <div class="row"><div class="label">출생년도</div><div class="control"><input type="number" id="birthYear" th:value="*{birthYear}" min="1900" max="2100" /></div></div>
-        <div class="row"><div class="label">전화번호</div><div class="control"><input type="tel" id="phone" th:value="*{phone}" /></div></div>
-        <div class="row"><div class="label">거주지역</div><div class="control"><input type="text" id="region" th:value="*{region}" /></div></div>
+        <!-- ID -->
+        <div class="row">
+          <div class="label">ID</div>
+          <div class="control">
+            <span id="userId" th:text="*{id}">user-id</span>
+          </div>
+        </div>
+
+        <!-- 비밀번호 -->
+        <div class="row">
+          <div class="label">비밀번호</div>
+          <div class="control inline-link">
+            <a th:href="@{/pwchange}" aria-label="비밀번호 변경">변경</a>
+          </div>
+        </div>
+
+        <!-- 이름 -->
+        <div class="row">
+          <div class="label">이름</div>
+          <div class="control">
+            <input type="text" id="name" th:value="*{name}" placeholder="이름" aria-label="이름" />
+          </div>
+        </div>
+
+        <!-- 성별 -->
+        <div class="row">
+          <div class="label">성별</div>
+          <div class="control">
+            <input type="text" id="gender" th:value="*{gender}" placeholder="성별" aria-label="성별" />
+          </div>
+        </div>
+
+        <!-- 출생년도 -->
+        <div class="row">
+          <div class="label">출생년도</div>
+          <div class="control">
+            <!-- ⬇️ year → birthYear 로 수정 -->
+            <input type="number" id="birthYear" th:value="*{birthYear}" min="1900" max="2100" placeholder="YYYY" aria-label="출생년도" />
+          </div>
+        </div>
+
+        <!-- 전화 -->
+        <div class="row">
+          <div class="label">전화번호</div>
+          <div class="control">
+            <input type="tel" id="phone" th:value="*{phone}" placeholder="010-0000-0000" aria-label="전화" />
+          </div>
+        </div>
+
+        <!-- 주소 -->
+        <div class="row">
+          <div class="label">거주지역</div>
+          <div class="control">
+            <input type="text" id="region" th:value="*{region}" placeholder="예) 서울" aria-label="거주지역" />
+          </div>
+        </div>
+
+        <!-- 버튼 -->
         <div class="actions">
           <button type="button" class="btn primary" id="saveBtn">저장(F8)</button>
+          <!-- ⬇️ 관리자 체크: session.loginUser.admin 기준 -->
           <a class="btn"
              th:if="${session.loginUser != null and session.loginUser.admin != null and session.loginUser.admin > 0}"
-             th:href="@{/member/admin}" target="_top">관리자 페이지</a>
+             th:href="@{/member/admin}"
+             target="_top">관리자 페이지</a>
         </div>
       </form>
     </section>
   </section>
-
-  <!-- ✅ 뉴스 이용 설문 섹션 -->
-  <section class="panel">
-    <h2 class="title">뉴스 이용 설문</h2>
-
-    <div class="row">
-      <div class="label">주요 이용경로</div>
-      <div class="control">
-        <select id="mainSource">
-          <option value="">선택</option>
-          <option value="portal">포털</option>
-          <option value="sns">SNS</option>
-          <option value="youtube">YouTube</option>
-          <option value="ott">OTT</option>
-          <option value="pressSite">언론사 사이트</option>
-        </select>
-      </div>
-    </div>
-
-    <div class="row">
-      <div class="label">SNS</div>
-      <div class="control">
-        <label><input type="checkbox" name="sns" value="Instagram"> Instagram</label>
-        <label><input type="checkbox" name="sns" value="X"> X(트위터)</label>
-        <label><input type="checkbox" name="sns" value="TikTok"> TikTok</label>
-      </div>
-    </div>
-
-    <div class="row">
-      <div class="label">관심 분야 가중치</div>
-      <div class="control">
-        경제 <input type="number" id="wEconomy" value="1.0" step="0.1" min="0" max="1" style="width:80px">
-        부동산 <input type="number" id="wEstate" value="0.6" step="0.1" min="0" max="1" style="width:80px">
-      </div>
-    </div>
-
-    <div class="row">
-      <div class="label">거주지역 선호</div>
-      <div class="control">
-        <input type="text" id="metro" placeholder="예: 수도권" style="width:140px;margin-right:10px;">
-        <input type="text" id="city" placeholder="예: 대구" style="width:140px;margin-right:10px;">
-        선호도(0~1): <input type="number" id="regionLevel" step="0.1" min="0" max="1" value="0.7" style="width:80px">
-      </div>
-    </div>
-
-    <div class="actions">
-      <button class="btn primary" id="surveySave">설문 저장</button>
-    </div>
-  </section>
 </div>
 
 <script>
-  // F8로 저장버튼 트리거
-  document.addEventListener('keydown', e=>{
-    if(e.key==='F8'){ e.preventDefault(); document.getElementById('saveBtn')?.click(); }
+  // 선택: F8로 저장 버튼 눌리게
+  document.addEventListener('keydown', function(e){
+    if(e.key === 'F8'){ e.preventDefault(); document.getElementById('saveBtn')?.click(); }
   });
 
-  // 설문 저장 기능
-  document.getElementById('surveySave')?.addEventListener('click', async ()=>{
-    const mainSource = document.getElementById('mainSource').value;
-    const sns = [...document.querySelectorAll('input[name="sns"]:checked')].map(el=>el.value);
-
-    const body = {
-      mainSource,
-      portal: mainSource === 'portal' ? 'Naver' : null,
-      sns,
-      video: mainSource === 'youtube' ? ['YouTube'] : [],
-      ott: mainSource === 'ott' ? ['Netflix'] : [],
-      categoryWeights: {
-        economy: parseFloat(document.getElementById('wEconomy').value),
-        realEstate: parseFloat(document.getElementById('wEstate').value)
-      },
-      metro: document.getElementById('metro').value,
-      city: document.getElementById('city').value,
-      regionLevel: parseFloat(document.getElementById('regionLevel').value)
-    };
-
-    try {
-      const r = await fetch('/member/preferences', {
-        method: 'POST',
-        headers: {'Content-Type':'application/json'},
-        body: JSON.stringify(body)
-      });
-      if(!r.ok) throw new Error('HTTP '+r.status);
-      alert('설문 저장 완료!');
-    } catch(err){
-      console.error(err);
-      alert('설문 저장 실패');
-    }
-  });
+  // (선택) 저장 API 예시: 필요 시 엔드포인트에 맞게 수정
+  // document.getElementById('saveBtn')?.addEventListener('click', async () => {
+  //   const body = {
+  //     name: document.getElementById('name').value,
+  //     gender: document.getElementById('gender').value,
+  //     birthYear: parseInt(document.getElementById('birthYear').value, 10) || null,
+  //     phone: document.getElementById('phone').value,
+  //     region: document.getElementById('region').value
+  //   };
+  //   const r = await fetch('/member/me', { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+  //   if(!r.ok) { alert('저장 실패'); return; }
+  //   alert('저장 완료');
+  // });
 </script>
+
 </body>
 </html>
