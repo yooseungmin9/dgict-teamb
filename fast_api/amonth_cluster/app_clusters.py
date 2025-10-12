@@ -59,7 +59,7 @@ def _to_obj_ids(ids: List[Any]) -> List[Any]:
     return out
 
 @app.get("/api/clusters/table")
-def clusters_table(cluster_id: int = Query(...), limit: int = 10):
+def clusters_table(cluster_id: int = Query(...), limit: int = 10, skip: int = 0):  # ✅ skip 추가
     clu = db()[COL_CLU].find_one({
         "$or": [
             {"cluster_id": cluster_id},
@@ -71,9 +71,16 @@ def clusters_table(cluster_id: int = Query(...), limit: int = 10):
         raise HTTPException(404, "cluster not found")
 
     ids = list(clu.get("ref_ids") or clu.get("article_ids") or [])
-    ids = _to_obj_ids(ids)[:limit]
+    ids = _to_obj_ids(ids)[skip: skip + limit]  # ✅ 리스트에서도 적용
 
-    proj = {"_id":1, "title":1, "press":1, "published_at":1, "url":1}
+    proj = {
+        "_id": 1,
+        "title_clean": 1,   # ✅ undefined 방지
+        "title": 1,
+        "press": 1,
+        "published_at": 1,
+        "url": 1
+    }
     coll = db()[COL_PREP]
 
     if ids:
@@ -92,12 +99,15 @@ def clusters_table(cluster_id: int = Query(...), limit: int = 10):
                     {"cluster": str(cluster_id)},
                 ]},
                 proj
-            ).sort("published_at", DESCENDING).limit(limit)
+            ).sort("published_at", DESCENDING)
+             .skip(skip)  # ✅ Mongo 쿼리용 skip
+             .limit(limit)
         )
 
     for a in arts:
         if "_id" in a:
             a["_id"] = str(a["_id"])
+        a["title"] = a.get("title_clean") or a.get("title") or "제목 없음"  # ✅ undefined 방지
 
     return {
         "cluster_id": clu.get("cluster_id", clu.get("cluster")),
@@ -106,3 +116,4 @@ def clusters_table(cluster_id: int = Query(...), limit: int = 10):
         "representative": (arts[0] if arts else None),
         "articles": arts
     }
+

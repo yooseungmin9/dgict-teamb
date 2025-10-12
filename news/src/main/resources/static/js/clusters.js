@@ -49,6 +49,7 @@ async function renderTreemapECharts() {
   if (!overlay) {
     overlay = document.createElement("div");
     overlay.id = "cluster-overlay";
+    document.body.appendChild(overlay);   // ✅ 여기 변경
   }
   el.appendChild(overlay);
 
@@ -104,18 +105,52 @@ async function renderTreemapECharts() {
   window.addEventListener('resize', () => chart.resize());
 
 chart.off('click');
-chart.on('click', (p) => {
-  chart.dispatchAction({ type:'hideTip' });   // ← 추가
+chart.on('click', async (p) => {
+  chart.dispatchAction({ type:'hideTip' });
+  const id = p.data.id;
   const name = cleanLabel(p.data.name);
-  const n = Number(p.value||0).toLocaleString();
-  overlay.innerHTML =
-    `<div class="content" style="position:relative;padding-right:28px">
-       <button id="co-close" style="position:absolute;right:8px;top:6px;border:0;background:transparent;font-size:20px;line-height:1;cursor:pointer">×</button>
-       <strong>${name}</strong> — 유사 주제 기사 수: <strong>${n}</strong>
-     </div>`;
-  overlay.style.display = 'flex';
-  document.getElementById('co-close').onclick = () => overlay.style.display='none';
+
+  let page = 0;
+  const pageSize = 10;
+
+  async function loadPage() {
+    const res = await fetch(`${API}/api/clusters/table?cluster_id=${id}&limit=${pageSize}&skip=${page * pageSize}`);
+    const data = await res.json();
+    const arts = data.articles || [];
+
+    const list = arts.map(a => `
+      <li class="article-item">
+        <a href="${a.url}" target="_blank">${a.title || "제목 없음"}</a>
+        <span class="press">(${a.press || "언론사 미상"})</span>
+      </li>
+    `).join('') || `<li style="color:#999">기사가 없습니다.</li>`;
+
+    overlay.innerHTML = `
+      <div class="cluster-card">
+        <button id="co-close" class="close-btn">×</button>
+        <h3 class="cluster-title">${data.label_gpt || name}</h3>
+        <p class="cluster-sub">총 ${data.size}개 기사</p>
+        <ul class="article-list">${list}</ul>
+        <div class="pagination">
+          <button id="prev" class="nav-btn" ${page === 0 ? "disabled" : ""}>◀ 이전</button>
+          <button id="next" class="nav-btn" ${(page + 1) * pageSize >= data.size ? "disabled" : ""}>다음 ▶</button>
+        </div>
+      </div>
+    `;
+
+    // 닫기 및 페이지 이벤트
+    document.getElementById("co-close").onclick = () => overlay.style.display = "none";
+    const prev = document.getElementById("prev");
+    const next = document.getElementById("next");
+    if (prev) prev.onclick = () => { if (page > 0) { page--; loadPage(); } };
+    if (next) next.onclick = () => { if ((page + 1) * pageSize < data.size) { page++; loadPage(); } };
+  }
+
+  overlay.style.display = "flex";
+  loadPage();
 });
+
+
 
 chart.getZr().on('click', (e) => { if (!e.target) overlay.style.display = 'none'; });
 
