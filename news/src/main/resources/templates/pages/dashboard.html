@@ -55,7 +55,7 @@
         .ranking-table th,.ranking-table td{ border-color: var(--line); }
         label input[type="radio"]{ accent-color: var(--brand); }
 
-        /* ===== 단일 온보딩 모달/토스트 ===== */
+        /* ===== 온보딩 모달/토스트 ===== */
         .modal-backdrop{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(10,12,16,.38);backdrop-filter:blur(6px);z-index:9999;opacity:0;transition:opacity .22s ease}
         .modal-backdrop.open{display:flex;opacity:1}
         .modal-card{width:min(780px,92vw);max-height:88vh;overflow:auto;background:rgba(255,255,255,0.94);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow-strong);padding:18px}
@@ -225,7 +225,7 @@
 
 <div th:replace="fragments/footer :: siteFooter"></div>
 
-<!-- ===== 단일 온보딩 모달 (관심 키워드 + 이용경로/플랫폼/칩) ===== -->
+<!-- ===== 온보딩 모달 ===== -->
 <div id="onboardModal" class="modal-backdrop" aria-hidden="true">
     <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="onboardTitle">
         <div class="modal-head">
@@ -246,7 +246,7 @@
                 <div id="kwRoot" class="grid-2" style="margin-top:8px"><!-- JS가 채움 --></div>
             </section>
 
-            <!-- 2) 이용 경로/플랫폼 (칩 UI, 세로 스택) -->
+            <!-- 2) 이용 경로/플랫폼 -->
             <section class="section">
                 <h4>뉴스를 주로 어디서 보세요?</h4>
 
@@ -272,7 +272,7 @@
                     </div>
 
                     <div>
-                        <div class="cap" style="margin-bottom:6px">SNS</div>
+                        <div class="cap" style="margin-bottom:6px">SNS (복수 선택)</div>
                         <div class="chip-set" data-group="sns" data-type="multi">
                             <button class="chip" data-value="Instagram">Instagram</button>
                             <button class="chip" data-value="X">X</button>
@@ -281,7 +281,7 @@
                     </div>
 
                     <div>
-                        <div class="cap" style="margin-bottom:6px">비디오</div>
+                        <div class="cap" style="margin-bottom:6px">비디오 (복수 선택)</div>
                         <div class="chip-set" data-group="video" data-type="multi">
                             <button class="chip" data-value="YouTube">YouTube</button>
                             <button class="chip" data-value="TikTok">TikTok</button>
@@ -289,14 +289,14 @@
                     </div>
 
                     <div>
-                        <div class="cap" style="margin-bottom:6px">OTT</div>
+                        <div class="cap" style="margin-bottom:6px">OTT (복수 선택)</div>
                         <div class="chip-set" data-group="ott" data-type="multi">
                             <button class="chip" data-value="Netflix">Netflix</button>
                             <button class="chip" data-value="Tving">Tving</button>
                         </div>
                     </div>
 
-                    <div class="cap" style="margin-top:2px">* ‘포털’ 선택은 **주요 이용경로가 포털일 때만** 함께 저장됩니다.</div>
+                    <div class="cap" style="margin-top:2px">* ‘포털’ 선택은 <b>주요 이용경로에 포털을 포함</b>했을 때만 대표 포털이 함께 저장됩니다.</div>
                 </div>
 
             </section>
@@ -407,53 +407,62 @@
             });
         }
 
-        // ===== 칩 그룹(단일/복수) 핸들러
+        // ===== 칩 그룹 핸들러 + "마지막 클릭 = 대표값"
+        let lastMainSource = null;
+        let lastPortal = null;
+
         document.querySelectorAll('.chip-set').forEach(set=>{
             set.addEventListener('click', (e)=>{
                 const btn = e.target.closest('.chip'); if(!btn) return;
+                const group = set.dataset.group;
                 const type = set.dataset.type || 'multi';
+
                 if(type === 'single'){
                     set.querySelectorAll('.chip.active').forEach(el=>el.classList.remove('active'));
                     btn.classList.add('active');
                 }else{
                     btn.classList.toggle('active');
+                    // 대표값 갱신
+                    if (btn.classList.contains('active')) {
+                        if (group === 'mainSource') lastMainSource = btn.dataset.value;
+                        if (group === 'portal')     lastPortal     = btn.dataset.value;
+                    } else {
+                        const actives = [...set.querySelectorAll('.chip.active')];
+                        if (group === 'mainSource' && lastMainSource === btn.dataset.value)
+                            lastMainSource = actives.at(-1)?.dataset.value || null;
+                        if (group === 'portal' && lastPortal === btn.dataset.value)
+                            lastPortal = actives.at(-1)?.dataset.value || null;
+                    }
                 }
             });
         });
 
         // ===== 값 수집
-        function getSingle(group){
-            const el = document.querySelector(`.chip-set[data-group="${group}"] .chip.active`);
-            return el ? el.dataset.value : null;
-        }
         function getMulti(group){
             return [...document.querySelectorAll(`.chip-set[data-group="${group}"] .chip.active`)]
                 .map(el => el.dataset.value);
         }
-        function firstOrNull(arr){ return (arr && arr.length>0) ? arr[0] : null; }
 
-        // 👉 다중선택 반영: mainSources/portals 배열 + 단일(첫 값) 동시 전송
         function collectPrefs(){
             const mainSources = getMulti('mainSource'); // ["portal","youtube",...]
             const portals     = getMulti('portal');     // ["Naver","Google",...]
-
-            const sns   = getMulti('sns');
-            const video = getMulti('video');
-            const ott   = getMulti('ott');
+            const includePortal = mainSources.includes('portal');
 
             return {
-                // 신규 다중
+                // 다중 필드
                 mainSources,
                 portals,
-                sns, video, ott,
+                sns:   getMulti('sns'),
+                video: getMulti('video'),
+                ott:   getMulti('ott'),
 
-                // 하위호환(단일): 필요하면 백엔드가 계속 읽을 수 있도록 첫 요소로 채움
-                mainSource: firstOrNull(mainSources),
-                portal:     firstOrNull(portals)
+                // 대표 단일(하위호환): 마지막 클릭 기준
+                mainSource: lastMainSource ?? mainSources.at(-1) ?? null,
+                portal:     includePortal ? (lastPortal ?? portals.at(-1) ?? null) : null
             };
         }
 
-        // ===== 저장(1회 클릭) : interests → preferences 연속 호출
+        // ===== 저장: interests → preferences
         document.getElementById('btnSaveAll').addEventListener('click', async ()=>{
             const keywords = Array.from(kwRoot.querySelectorAll('.chip.active[data-kw]'))
                 .map(el=>el.dataset.kw);
@@ -472,7 +481,7 @@
 
                 showToast('✅ 설정이 저장되었습니다!');
                 close();
-                // location.reload(); // 필요 시 주석 해제
+                // location.reload(); // 필요 시 사용
             }catch(err){
                 console.error(err, {keywords, prefsBody});
                 showToast('❌ 저장에 실패했습니다.', 3000);
@@ -481,7 +490,7 @@
 
         document.getElementById('btnLater').addEventListener('click', close);
 
-        // ===== 초기화: 관심사가 없으면 자동 오픈
+        // ===== 초기화
         renderKW();
         if(need) open();
     })();

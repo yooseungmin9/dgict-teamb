@@ -108,6 +108,14 @@
 
         <div class="rec-section-head" style="margin-top:24px">
           <h3>맞춤 교육 영상</h3>
+          <!-- (선택) 선호 힌트 -->
+          <div class="rec-hint"
+               th:if="${preferYouTube or (activePortals != null and !#strings.isEmpty(activePortals))}">
+            <span th:if="${preferYouTube}">YouTube 선호 반영</span>
+            <span th:if="${preferYouTube and (activePortals != null and !#strings.isEmpty(activePortals))}"> · </span>
+            <span th:if="${activePortals != null and !#strings.isEmpty(activePortals)}"
+                  th:text="'포털: ' + ${activePortals}"></span>
+          </div>
         </div>
 
         <!-- 유튜브: 비었을 때 -->
