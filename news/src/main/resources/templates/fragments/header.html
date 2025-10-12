@@ -1,203 +1,205 @@
 <header class="appbar" th:fragment="siteHeader" xmlns:th="http://www.w3.org/1999/xhtml">
-  <!-- 좌측: 로고 -->
-  <a class="appbar__logo" data-url="/pages/" aria-label="대시보드로 이동">
-    <svg viewBox="0 0 24 24" class="brand__logo" aria-hidden="true">
-      <path d="M3 12h3l3 7 4-14 3 7h5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-    </svg>
-    <span class="appbar__brand">SUMMARIX</span>
-  </a>
+  <div class="appbar__inner">
+    <!-- 좌측: 로고 -->
+    <a class="appbar__logo" data-url="/pages/" aria-label="대시보드로 이동">
+      <svg viewBox="0 0 24 24" class="brand__logo" aria-hidden="true">
+        <path d="M3 12h3l3 7 4-14 3 7h5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <span class="appbar__brand">SUMMARIX</span>
+    </a>
 
-  <!-- 중앙: 탭 내비게이션 -->
-  <nav class="appbar__tabs" aria-label="주 메뉴">
-    <button class="tab-btn" data-url="/pages/news">뉴스 요약</button>
-    <button class="tab-btn" data-url="/pages/youtube_opinion">유튜브 분석</button>
-    <button class="tab-btn" data-url="/pages/chat">챗봇</button>
-    <button class="tab-btn" data-url="/pages/recommend">추천</button>
-  </nav>
+    <!-- 중앙: 탭 내비게이션 -->
+    <nav class="appbar__tabs" aria-label="주 메뉴">
+      <button class="tab-btn" data-url="/pages/news">뉴스 요약</button>
+      <button class="tab-btn" data-url="/pages/youtube_opinion">유튜브 분석</button>
+      <button class="tab-btn" data-url="/pages/chat">챗봇</button>
+      <button class="tab-btn" data-url="/pages/recommend">추천</button>
+    </nav>
 
-  <!-- 우측: 검색 + 계정 -->
-  <div class="appbar__actions">
-    <div class="searchbox" role="search">
-      <input class="search__input" type="text" id="q" placeholder="검색" aria-label="검색어 입력" />
-      <button class="search__btn" type="button" id="searchBtn" aria-label="검색 실행">
-        <svg viewBox="0 0 24 24" class="icon" aria-hidden="true" width="18" height="18">
-          <circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2"/>
-          <path d="M16.5 16.5L21 21" fill="none" stroke="currentColor" stroke-width="2"/>
-        </svg>
-      </button>
+    <!-- 우측: 검색 + 계정 -->
+    <div class="appbar__actions">
+      <div class="searchbox" role="search">
+        <input class="search__input" type="text" id="q" placeholder="검색" aria-label="검색어 입력" />
+        <button class="search__btn" type="button" id="searchBtn" aria-label="검색 실행">
+          <svg viewBox="0 0 24 24" class="icon" aria-hidden="true" width="18" height="18">
+            <circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2"/>
+            <path d="M16.5 16.5L21 21" fill="none" stroke="currentColor" stroke-width="2"/>
+          </svg>
+        </button>
+      </div>
+
+      <script>
+        (function () {
+          // 버튼과 같은 영역(헤더) 안의 검색 입력을 찾아요.
+          // 우선 버튼의 data-target을 찾고, 없으면 .search__input을 검색
+          const btn = document.getElementById('searchBtn');
+          if (!btn) return;
+
+          let input = null;
+          // 버튼에 data-target을 달아 쓰고 싶으면 활성화 (예: data-target="#headerSearch")
+          if (btn.dataset.target) {
+            input = document.querySelector(btn.dataset.target);
+          }
+          if (!input) {
+            // 가장 가까운 컨테이너 내에서 먼저 찾고, 없으면 문서 전체에서 찾기
+            const container = btn.closest('.search') || document;
+            input = container.querySelector('.search__input') || document.querySelector('.search__input');
+          }
+
+          function goSearch() {
+            const q = (input && input.value ? input.value : '').trim();
+            if (!q) {
+              input && input.focus();
+              return;
+            }
+            // 통합검색 페이지로 이동
+            const url = '/pages/search?q=' + encodeURIComponent(q);
+            window.location.assign(url);
+          }
+
+          // 클릭으로 실행
+          btn.addEventListener('click', goSearch);
+
+          // Enter 키로도 실행 (UX)
+          if (input) {
+            input.addEventListener('keydown', function (e) {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                goSearch();
+              }
+            });
+          }
+        })();
+      </script>
+
+      <!-- 로그인 상태 -->
+      <div th:if="${session.loginUser != null}">
+        <button id="accountBtn" class="account-btn" type="button" title="계정정보">
+          <svg viewBox="0 0 24 24" class="account-icon" aria-hidden="true">
+            <path fill="#fff" d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5Zm0 2c-4.42 0-8 2.24-8 5v1h16v-1c0-2.76-3.58-5-8-5Z"/>
+          </svg>
+        </button>
+      </div>
+      <div th:if="${session.loginUser != null}">
+        <form th:action="@{/auth/logout}" method="post">
+          <button id="logoutBtn" class="logout-btn" type="submit" title="로그아웃">Logout</button>
+        </form>
+      </div>
+
+      <!-- 비로그인 상태 -->
+      <div th:if="${session.loginUser == null}">
+        <button id="loginBtn" class="login-btn" title="로그인" data-url="/auth/login">Login</button>
+      </div>
     </div>
 
+    <!-- 접근성/라우팅 + 계정 모달 스크립트 -->
     <script>
       (function () {
-        // 버튼과 같은 영역(헤더) 안의 검색 입력을 찾아요.
-        // 우선 버튼의 data-target을 찾고, 없으면 .search__input을 검색
-        const btn = document.getElementById('searchBtn');
-        if (!btn) return;
+        // data-url 이동 처리
+        function go(el){ var u=el.dataset.url; if(u) window.location.href=u; }
+        function onClick(e){ go(e.currentTarget); }
+        function onKey(e){ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); go(e.currentTarget);} }
+        document.querySelectorAll('[data-url]').forEach(function(el){
+          el.addEventListener('click', onClick);
+          el.addEventListener('keydown', onKey);
+          el.style.cursor='pointer';
+        });
 
-        let input = null;
-        // 버튼에 data-target을 달아 쓰고 싶으면 활성화 (예: data-target="#headerSearch")
-        if (btn.dataset.target) {
-          input = document.querySelector(btn.dataset.target);
-        }
-        if (!input) {
-          // 가장 가까운 컨테이너 내에서 먼저 찾고, 없으면 문서 전체에서 찾기
-          const container = btn.closest('.search') || document;
-          input = container.querySelector('.search__input') || document.querySelector('.search__input');
-        }
+        // 현재 탭 활성화
+        var path = location.pathname;
+        document.querySelectorAll('.appbar__tabs .tab-btn').forEach(function(b){
+          if(path.startsWith(b.dataset.url)) b.classList.add('active');
+        });
 
-        function goSearch() {
-          const q = (input && input.value ? input.value : '').trim();
-          if (!q) {
-            input && input.focus();
-            return;
+        // 🔹 계정 모달 (app.js에서 이동)
+        document.addEventListener('DOMContentLoaded', function(){
+          const trigger = document.getElementById('accountBtn');
+          if(!trigger) return;
+
+          let backdrop, dialog, closeBtn;
+          const K = { zBackdrop:99998, zDialog:99999, animMs:160 };
+
+          function build(){
+            if(backdrop && dialog) return;
+            backdrop = document.createElement('div');
+            backdrop.id = 'accountPortalBackdrop';
+            backdrop.style.cssText = `
+              position:fixed; inset:0; background:rgba(0,0,0,.45);
+              z-index:${K.zBackdrop}; opacity:0; transition:opacity 160ms ease;`;
+            dialog = document.createElement('div');
+            dialog.id = 'accountPortalDialog';
+            dialog.style.cssText = `
+              position:fixed; left:50%; top:50%; transform:translate(-50%,-48%);
+              z-index:99999;
+
+              /* ⬇️ 크기 살짝 줄이고, 여백 여유 있게 */
+              width:min(740px, 92vw);
+              max-height:min(72vh, 1000px);
+
+              /* ⬇️ 톤 다운: 더 옅은 보더 + 부드러운 라운드 + 은은한 그림자 */
+              background:#fff;
+              border:1px solid rgba(0,0,0,.06);
+              border-radius:14px;
+              box-shadow:0 12px 24px rgba(0,0,0,.18);
+
+              overflow:hidden; display:flex; flex-direction:column; opacity:0;
+              transition:opacity 160ms ease, transform 160ms ease;
+            `;
+
+            // iframe 높이도 위 max-height와 맞춰서
+            dialog.innerHTML = `
+              <div style="display:flex;align-items:center;justify-content:space-between;
+                          padding:12px 16px;border-bottom:1px solid rgba(0,0,0,.06)">
+                <h2 style="margin:0;font-size:16px;font-weight:700;color:#0f172a">계정 정보</h2>
+                <button id="accountPortalClose" aria-label="닫기"
+                        style="border:1px solid rgba(15,23,42,.08);background:#fff;cursor:pointer;
+                               font-size:16px;line-height:1;padding:6px 8px;border-radius:8px">✕</button>
+              </div>
+              <div style="padding:0;height:100%">
+                <iframe src="/member/account" title="계정 정보"
+                        style="display:block;width:100%;
+                               height:calc(min(88vh,1000px) - 49px); border:0"></iframe>
+              </div>
+            `;
+            document.body.append(backdrop, dialog);
+            closeBtn = dialog.querySelector('#accountPortalClose');
+            backdrop.addEventListener('click', close);
+            closeBtn.addEventListener('click', close);
+            document.addEventListener('keydown', onKey);
           }
-          // 통합검색 페이지로 이동
-          const url = '/pages/search?q=' + encodeURIComponent(q);
-          window.location.assign(url);
-        }
 
-        // 클릭으로 실행
-        btn.addEventListener('click', goSearch);
+          function open(e){
+            e.preventDefault();
+            build();
+            document.documentElement.style.overflow = 'hidden';
+            requestAnimationFrame(()=>{
+              backdrop.style.opacity='1';
+              dialog.style.opacity='1';
+              dialog.style.transform='translate(-50%,-50%)';
+            });
+            trigger.setAttribute('aria-expanded','true');
+            closeBtn.focus();
+          }
 
-        // Enter 키로도 실행 (UX)
-        if (input) {
-          input.addEventListener('keydown', function (e) {
-            if (e.key === 'Enter') {
-              e.preventDefault();
-              goSearch();
-            }
-          });
-        }
+          function close(){
+            if(!dialog||!backdrop) return;
+            dialog.style.opacity='0';
+            dialog.style.transform='translate(-50%,-48%)';
+            backdrop.style.opacity='0';
+            setTimeout(()=>{
+              backdrop.remove(); dialog.remove();
+              backdrop = dialog = closeBtn = null;
+              document.documentElement.style.overflow='';
+              trigger.setAttribute('aria-expanded','false');
+              trigger.focus();
+            }, K.animMs);
+          }
+
+          function onKey(ev){ if(ev.key==='Escape') close(); }
+
+          trigger.addEventListener('click', open);
+        });
       })();
     </script>
-
-    <!-- 로그인 상태 -->
-    <div th:if="${session.loginUser != null}">
-      <button id="accountBtn" class="account-btn" type="button" title="계정정보">
-        <svg viewBox="0 0 24 24" class="account-icon" aria-hidden="true">
-          <path fill="#fff" d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5Zm0 2c-4.42 0-8 2.24-8 5v1h16v-1c0-2.76-3.58-5-8-5Z"/>
-        </svg>
-      </button>
-    </div>
-    <div th:if="${session.loginUser != null}">
-      <form th:action="@{/auth/logout}" method="post">
-        <button id="logoutBtn" class="logout-btn" type="submit" title="로그아웃">Logout</button>
-      </form>
-    </div>
-
-    <!-- 비로그인 상태 -->
-    <div th:if="${session.loginUser == null}">
-      <button id="loginBtn" class="login-btn" title="로그인" data-url="/auth/login">Login</button>
-    </div>
   </div>
-
-  <!-- 접근성/라우팅 + 계정 모달 스크립트 -->
-  <script>
-    (function () {
-      // data-url 이동 처리
-      function go(el){ var u=el.dataset.url; if(u) window.location.href=u; }
-      function onClick(e){ go(e.currentTarget); }
-      function onKey(e){ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); go(e.currentTarget);} }
-      document.querySelectorAll('[data-url]').forEach(function(el){
-        el.addEventListener('click', onClick);
-        el.addEventListener('keydown', onKey);
-        el.style.cursor='pointer';
-      });
-
-      // 현재 탭 활성화
-      var path = location.pathname;
-      document.querySelectorAll('.appbar__tabs .tab-btn').forEach(function(b){
-        if(path.startsWith(b.dataset.url)) b.classList.add('active');
-      });
-
-      // 🔹 계정 모달 (app.js에서 이동)
-      document.addEventListener('DOMContentLoaded', function(){
-        const trigger = document.getElementById('accountBtn');
-        if(!trigger) return;
-
-        let backdrop, dialog, closeBtn;
-        const K = { zBackdrop:99998, zDialog:99999, animMs:160 };
-
-        function build(){
-          if(backdrop && dialog) return;
-          backdrop = document.createElement('div');
-          backdrop.id = 'accountPortalBackdrop';
-          backdrop.style.cssText = `
-            position:fixed; inset:0; background:rgba(0,0,0,.45);
-            z-index:${K.zBackdrop}; opacity:0; transition:opacity 160ms ease;`;
-          dialog = document.createElement('div');
-          dialog.id = 'accountPortalDialog';
-          dialog.style.cssText = `
-            position:fixed; left:50%; top:50%; transform:translate(-50%,-48%);
-            z-index:99999;
-
-            /* ⬇️ 크기 살짝 줄이고, 여백 여유 있게 */
-            width:min(740px, 92vw);
-            max-height:min(72vh, 1000px);
-
-            /* ⬇️ 톤 다운: 더 옅은 보더 + 부드러운 라운드 + 은은한 그림자 */
-            background:#fff;
-            border:1px solid rgba(0,0,0,.06);
-            border-radius:14px;
-            box-shadow:0 12px 24px rgba(0,0,0,.18);
-
-            overflow:hidden; display:flex; flex-direction:column; opacity:0;
-            transition:opacity 160ms ease, transform 160ms ease;
-          `;
-
-// iframe 높이도 위 max-height와 맞춰서
-          dialog.innerHTML = `
-            <div style="display:flex;align-items:center;justify-content:space-between;
-                        padding:12px 16px;border-bottom:1px solid rgba(0,0,0,.06)">
-              <h2 style="margin:0;font-size:16px;font-weight:700;color:#0f172a">계정 정보</h2>
-              <button id="accountPortalClose" aria-label="닫기"
-                      style="border:1px solid rgba(15,23,42,.08);background:#fff;cursor:pointer;
-                             font-size:16px;line-height:1;padding:6px 8px;border-radius:8px">✕</button>
-            </div>
-            <div style="padding:0;height:100%">
-              <iframe src="/member/account" title="계정 정보"
-                      style="display:block;width:100%;
-                             height:calc(min(88vh,1000px) - 49px); border:0"></iframe>
-            </div>
-          `;
-          document.body.append(backdrop, dialog);
-          closeBtn = dialog.querySelector('#accountPortalClose');
-          backdrop.addEventListener('click', close);
-          closeBtn.addEventListener('click', close);
-          document.addEventListener('keydown', onKey);
-        }
-
-        function open(e){
-          e.preventDefault();
-          build();
-          document.documentElement.style.overflow = 'hidden';
-          requestAnimationFrame(()=>{
-            backdrop.style.opacity='1';
-            dialog.style.opacity='1';
-            dialog.style.transform='translate(-50%,-50%)';
-          });
-          trigger.setAttribute('aria-expanded','true');
-          closeBtn.focus();
-        }
-
-        function close(){
-          if(!dialog||!backdrop) return;
-          dialog.style.opacity='0';
-          dialog.style.transform='translate(-50%,-48%)';
-          backdrop.style.opacity='0';
-          setTimeout(()=>{
-            backdrop.remove(); dialog.remove();
-            backdrop = dialog = closeBtn = null;
-            document.documentElement.style.overflow='';
-            trigger.setAttribute('aria-expanded','false');
-            trigger.focus();
-          }, K.animMs);
-        }
-
-        function onKey(ev){ if(ev.key==='Escape') close(); }
-
-        trigger.addEventListener('click', open);
-      });
-    })();
-  </script>
 </header>
