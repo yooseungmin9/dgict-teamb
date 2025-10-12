@@ -1,5 +1,3 @@
-// 입문자용 주석: 로딩 확인 로그 + API 실패 시 더미데이터로라도 차트 그리기
-
 (function(){
   console.log("[sentiment.js] loaded");
   const card = document.getElementById("sentiment-card");
@@ -20,23 +18,62 @@
   const modeBtns  = [$btnCount, $btnRatio];
   const groupBtns = [$btnDay, $btnWeek, $btnMonth];
 
+  const controlsEl = card.querySelector(".controls");
+  const $sep = controlsEl?.querySelector("span");
+
   let state = { mode:"count", group:"day", raw:[] };
   let chart;
 
-  function updateActiveChips(){
-    // 모드 버튼 강조
-    modeBtns.forEach(btn=>{
-      const active = (btn === ($btnCount && state.mode==="count" ? $btnCount : $btnRatio));
+  function updateActiveChips() {
+    modeBtns.forEach((btn) => {
+      const active = (state.mode === "count" && btn === $btnCount) ||
+                     (state.mode === "ratio" && btn === $btnRatio);
       btn.classList.toggle("active", active);
       btn.setAttribute("aria-pressed", String(active));
     });
-    // 그룹 버튼 강조
-    groupBtns.forEach(btn=>{
-      const idToGroup = { "btn-g-day":"day", "btn-g-week":"week", "btn-g-month":"month" };
+    const idToGroup = { "btn-g-day": "day", "btn-g-week": "week", "btn-g-month": "month" };
+    groupBtns.forEach((btn) => {
       const active = idToGroup[btn.id] === state.group;
       btn.classList.toggle("active", active);
       btn.setAttribute("aria-pressed", String(active));
     });
+  }
+
+  function updateChipVisibility() {
+    const hide = state.mode === "ratio";
+    if ($sep) {
+      $sep.style.display = hide ? "none" : "";
+      $sep.setAttribute("aria-hidden", String(hide));
+    }
+    groupBtns.forEach((btn) => {
+      btn.style.display = hide ? "none" : "";
+      btn.setAttribute("aria-hidden", String(hide));
+      btn.tabIndex = hide ? -1 : 0; // 접근성: 숨김 시 포커스 제외
+    });
+  }
+
+    function updateStatus() {
+      if (state.mode === "ratio") {
+        $status.textContent = '표시: 비율(파이차트)';
+      } else {
+        $status.textContent = `표시:  건수(막대차트) / ${state.group}`;
+      }
+    }
+
+  function render() {
+    updateActiveChips();
+    updateChipVisibility();
+    updateStatus();
+
+    const isRatio = state.mode === "ratio";
+    const rows = groupRecords(state.raw, state.group); // 기존 집계 함수 사용
+
+    if (chart) chart.destroy();
+    if (isRatio) {
+      renderPieChart(rows);    // 기존 파이 렌더 사용
+    } else {
+      renderBarChart(rows);    // 기존 바 렌더 사용
+    }
   }
 
   const toWeekKey = (d)=>{
@@ -96,20 +133,7 @@
     };
   }
 
-  function render(){
-    const isR = state.mode==="ratio";
-    const rows = groupRecords(state.raw, state.group);
 
-    if(chart) chart.destroy();
-
-    if(isR){
-      renderPieChart(rows);
-    } else {
-      renderBarChart(rows);
-    }
-
-    $status.textContent = `표시: ${state.group} / ${isR?"비율(파이차트)":"건수(막대차트)"}`;
-  }
 
   function renderBarChart(rows){
     const labels = rows.map(d=>d.date);
@@ -248,32 +272,23 @@
   }
 
   $btnCount.addEventListener("click", ()=>{
-    state.mode = "count";   // 건수 모드
-    updateActiveChips();    // 즉시 버튼 UI 반영
-    load();                 // 데이터 재요청(막대)
+    state.mode = "count";
+    updateActiveChips();    // 시각 동기화
+    updateChipVisibility(); // 표시/숨김 반영
+    load();                 // 건수 모드 데이터 재요청
   });
   $btnRatio.addEventListener("click", ()=>{
-    state.mode = "ratio";   // 비율 모드
+    state.mode = "ratio";
     updateActiveChips();
-    load();                 // 데이터 재요청(파이)
+    updateChipVisibility();
+    load();                 // 비율 모드 데이터 재요청
   });
-  $btnDay.addEventListener("click", ()=>{
-    state.group = "day";
-    updateActiveChips();
-    render();               // 그룹은 집계만 바뀌므로 재렌더
-  });
-  $btnWeek.addEventListener("click", ()=>{
-    state.group = "week";
-    updateActiveChips();
-    render();
-  });
-  $btnMonth.addEventListener("click", ()=>{
-    state.group = "month";
-    updateActiveChips();
-    render();
-  });
+  $btnDay  .addEventListener("click", ()=>{ state.group="day";   render(); });
+  $btnWeek .addEventListener("click", ()=>{ state.group="week";  render(); });
+  $btnMonth.addEventListener("click", ()=>{ state.group="month"; render(); });
 
   updateActiveChips();
+  updateChipVisibility();
   load();
   loadKeywords();
 })();
