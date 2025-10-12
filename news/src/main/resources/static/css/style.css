@@ -815,18 +815,23 @@ select.form-control {
 
 .appbar{
   position: sticky; top: 0; z-index: 1000;
-  width:100%;
-  max-width: var(--container-xl);
-  height: 64px; /* 고정 높이 */
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  align-items: center;
-  margin: 0 auto;
-  gap: var(--space-16);
-  padding: 0 var(--space-16);
+  width: 100%;
+  height: 64px;
   background: var(--color-surface);
   border-bottom: 1px solid rgba(0,0,0,0.2);
 }
+
+.appbar__inner{
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: var(--space-16);
+  height: 64px;
+  max-width: 1280px;   /* 1280px 토큰 */
+  margin: 0 auto;                   /* 중앙 정렬 */
+  padding: 0 var(--space-16);
+}
+
 
 /* 좌측 로고+브랜드 */
 .appbar__logo{display:inline-flex; align-items:center; gap:10px; text-decoration:none; color:#3b82f6}
