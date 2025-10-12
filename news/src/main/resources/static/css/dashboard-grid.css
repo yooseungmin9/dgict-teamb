@@ -76,6 +76,7 @@
 #panel-news-count .card__body { padding-top: 5px; }
 #panel-today-sentiment .strong { padding: 28px 20px 0px; }
 #panel-today-sentiment .card__body { padding-top: 5px; }
+#panel-today-sentiment .card__body p,strong { font-size:18px }
 #panel-hot-topic-yesterday .strong { padding:28px 20px 0px; }
 #panel-sentiment-series .strong { padding:28px 20px 0px; }
 #panel-keyword-rank .strong { padding:28px 20px 0px; }
