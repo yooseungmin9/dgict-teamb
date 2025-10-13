@@ -73,10 +73,10 @@
         .toast.show{opacity:1;pointer-events:auto}
 
         /* === 칩 버튼 === */
-        .chip{border:1px solid var(--line);background:#fff;border-radius:999px;padding:8px 14px;font-size:13px;cursor:pointer;transition:.16s;display:inline-flex;align-items:center;gap:6px}
-        .chip:hover{border-color: color-mix(in oklab, var(--brand) 35%, var(--line)); background:#f7faff}
-        .chip.active{background:var(--brand);color:#fff;border-color:var(--brand);box-shadow:0 6px 16px rgba(37,99,235,.25)}
-        .chip[disabled]{opacity:.5;cursor:not-allowed}
+        .chip-set .chip{border:1px solid var(--line);background:#fff;border-radius:999px;padding:8px 14px;font-size:13px;cursor:pointer;transition:.16s;display:inline-flex;align-items:center;gap:6px}
+        .chip-set .chip:hover{border-color: color-mix(in oklab, var(--brand) 35%, var(--line)); background:#f7faff}
+        .chip-set .chip.active{background:var(--brand);color:#fff;border-color:var(--brand);box-shadow:0 6px 16px rgba(37,99,235,.25)}
+        .chip-set .chip[disabled]{opacity:.5;cursor:not-allowed}
         .chip-set{display:flex;flex-wrap:wrap;gap:8px}
         .stack-v{display:flex;flex-direction:column;gap:10px}
     </style>
