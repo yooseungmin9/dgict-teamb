@@ -24,7 +24,12 @@ public class AuthController {
 
     // ✅ 로그인 페이지 (GET)
     @GetMapping("/login")
-    public String loginPage() {
+    public String loginPage(@RequestHeader(value = "Referer", required = false) String referer,
+                            HttpSession session) {
+        // 로그인 페이지로 직접 접근한 게 아니라면 referer 저장
+        if (referer != null && !referer.contains("/auth/login")) {
+            session.setAttribute("redirectAfterLogin", referer);
+        }
         return "/member/login";
     }
 
@@ -58,7 +63,11 @@ public class AuthController {
                     session.setAttribute("loginUser", m);
                     session.setAttribute("admin", m.getAdmin());
                     session.setMaxInactiveInterval(3600);
-                    return "redirect:/pages/dashboard";
+
+                    // 원래 페이지 정보가 있으면 그쪽으로 리다이렉트
+                    String redirectUrl = (String) session.getAttribute("redirectAfterLogin");
+                    session.removeAttribute("redirectAfterLogin"); // 한 번 쓰고 삭제
+                    return "redirect:" + (redirectUrl != null ? redirectUrl : "/pages/dashboard");
                 })
                 .orElseGet(() -> {
                     model.addAttribute("error", "아이디 또는 비밀번호가 올바르지 않습니다.");
@@ -68,8 +77,15 @@ public class AuthController {
 
     // ✅ 로그아웃
     @PostMapping("/logout")
-    public String logout(HttpSession session) {
+    public String logout(@RequestHeader(value = "Referer", required = false) String referer,
+                         HttpSession session) {
         session.invalidate();
-        return "redirect:/pages/dashboard";
+
+        // 로그아웃 후 원래 페이지로 돌아감
+        if (referer != null && !referer.contains("/auth")) {
+            return "redirect:" + referer;
+        } else {
+            return "redirect:/pages/dashboard";
+        }
     }
 }

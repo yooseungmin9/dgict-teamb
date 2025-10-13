@@ -1,8 +1,6 @@
-# run_many.py
 import subprocess, sys, signal, os
 
-# ❗️여기에 서버 목록을 추가하세요.
-#   (작업폴더, "모듈:앱", 포트, [선택]가상환경 파이썬 경로)
+# 실행할 서버 목록
 SERVERS = [
     ("C:/dgict-teamb/fast_api/chatbot", "chatbot:app", 8002, None),
     ("C:/dgict-teamb/fast_api/recommend", "youtube_api:app", 8004, None),
@@ -18,19 +16,19 @@ SERVERS = [
 
 PROCS = []
 
+# 실행할 서버 명렁어 조합
 def launch(cwd, app, port, python_path=None):
-    # 현재 파이썬으로 실행하거나, 지정된 venv 파이썬으로 실행
     py = python_path or sys.executable
     cmd = [py, "-m", "uvicorn", app, "--host", "0.0.0.0", "--port", str(port), "--reload"]
-    print(f"[START] {cmd}  (cwd={cwd})")
-    # Windows에서 새 창 없이 백그라운드로 돌리고 싶으면 CREATE_NO_WINDOW 사용 가능
+    print(f"[START] {cmd} (cwd={cwd})")
     creationflags = 0
     if os.name == "nt":
-        creationflags = 0  # subprocess.CREATE_NO_WINDOW  # 필요 시 주석 해제
+        creationflags = 0
 
     p = subprocess.Popen(cmd, cwd=cwd, creationflags=creationflags)
     PROCS.append(p)
 
+# 실행 / 종료
 def main():
     for (cwd, app, port, py) in SERVERS:
         launch(cwd, app, port, py)
@@ -52,5 +50,6 @@ def main():
                 pass
         print("[DONE]")
 
+# 스크립트를 직접 실행 시 main을 수행
 if __name__ == "__main__":
     main()
