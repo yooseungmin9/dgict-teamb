@@ -3,7 +3,7 @@
   if (window.__newsInitOnce) return;
   window.__newsInitOnce = true;
 
-  const pageEl  = document.getElementById("news-page");
+  const pageEl   = document.getElementById("news-page");
   const API_BASE = (pageEl && pageEl.dataset.apiBase) ? pageEl.dataset.apiBase : "";
   const BRIEFING_KEY = "briefing:yesterday:v1";
 
@@ -80,15 +80,38 @@
     }
   }
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initBriefingOnce, { once:true });
-  } else { initBriefingOnce(); }
-
   // -----------------------
-  // B. 뉴스 카드 UX
+  // B. 뉴스 카드 UX (+ 더 보기 자동 토글)
   // -----------------------
   const list = document.getElementById('news-list');
+
+  // 핵심: 요약이 실제로 잘렸는지 검사해서 '더 보기' 버튼을 보이거나 숨김
+  function refreshMoreToggles(root = document) {
+    const wraps = root.querySelectorAll('.summary-wrap');
+    wraps.forEach(wrap => {
+      const p   = wrap.querySelector('.news-summary');
+      const btn = wrap.querySelector('.more-toggle');
+      if (!p || !btn) return;
+
+      const card = wrap.closest('.news-card');
+      const expanded = card?.getAttribute('data-expanded') === 'true';
+
+      // 펼친 상태면 '접기' 버튼은 항상 노출
+      if (expanded) {
+        btn.style.display = 'inline';
+        btn.textContent = '접기';
+        return;
+      }
+
+      // (접힘 상태) line-clamp 적용 상태에서 잘림 여부 체크
+      const isOverflow = p.scrollHeight > p.clientHeight + 1;
+      btn.style.display = isOverflow ? 'inline' : 'none';
+      btn.textContent = '더 보기';
+    });
+  }
+
   if (list) {
+    // 더 보기/접기 클릭
     list.addEventListener('click', (e)=>{
       const btn = e.target.closest('.more-toggle'); if(!btn) return;
       e.preventDefault(); e.stopPropagation();
@@ -96,9 +119,12 @@
       const expanded = card.getAttribute('data-expanded') === 'true';
       card.setAttribute('data-expanded', expanded ? 'false' : 'true');
       btn.textContent = expanded ? '더 보기' : '접기';
+
+      // 상태 변경 이후 가시성 재계산 (접기 → 짧으면 버튼 사라지도록)
+      refreshMoreToggles(card);
     }, {passive:false});
 
-    // 모달
+    // 카드 클릭 시 모달
     const modal = document.getElementById('news-modal');
     if (modal) {
       const closeBtn = modal.querySelector('.modal-close');
@@ -136,7 +162,11 @@
           showModal();
         }catch(e){ console.error(e); alert('상세를 불러오지 못했습니다.'); }
       }
-      list.addEventListener('click', (e)=>{ const card=e.target.closest('.news-card'); if(!card || e.target.closest('.more-toggle')) return; const id=card.getAttribute('data-id'); if(id) openModalById(id); });
+      list.addEventListener('click', (e)=>{
+        const card=e.target.closest('.news-card');
+        if(!card || e.target.closest('.more-toggle')) return;
+        const id=card.getAttribute('data-id'); if(id) openModalById(id);
+      });
     }
   }
 
@@ -167,6 +197,9 @@
         </div>
       </div>
     `).join("");
+
+    // 새로 그린 카드들 대상 ‘더 보기’ 가시성 재계산
+    refreshMoreToggles($list);
   }
 
   async function goPage(page, size) {
@@ -179,38 +212,27 @@
     }
   }
 
-  let __pagingBusy = false;
-  window.addEventListener("click", (e) => {
-    const a = e.target.closest("a.page-btn");
-    if (!a) return;
+  // -----------------------
+  // D. 초기화 & 리사이즈 대응
+  // -----------------------
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', ()=>{
+      initBriefingOnce();
+      refreshMoreToggles(document);
+    }, { once:true });
+  } else {
+    initBriefingOnce();
+    refreshMoreToggles(document);
+  }
 
-    const u = new URL(a.href, location.origin);
-    if (u.origin !== location.origin) return; // 외부 링크는 SPA 제외
-
-    e.preventDefault();
-    e.stopPropagation();
-    if (e.stopImmediatePropagation) e.stopImmediatePropagation();
-    if (__pagingBusy) return;
-    __pagingBusy = true;
-
-    try {
-      const page = u.searchParams.get("page") || "1";
-      const size = u.searchParams.get("size") || "10";
-      history.pushState({ page, size }, "", `${location.pathname}?page=${page}&size=${size}`);
-      Promise.resolve()
-        .then(() => goPage(page, size))
-        .finally(() => { __pagingBusy = false; });
-    } catch (err) {
-      __pagingBusy = false;
-      console.error("[paging] error", err);
-      window.location.href = a.href; // 폴백
-    }
-  }, { capture: true, passive: false });
-
-  window.addEventListener("popstate", (e) => {
-    const page = (e.state && e.state.page) || new URLSearchParams(location.search).get("page") || "1";
-    const size = (e.state && e.state.size) || new URLSearchParams(location.search).get("size") || "10";
-    goPage(page, size);
+  // 반응형에서 줄 수 변동 시 재계산
+  let __moResizeTimer;
+  window.addEventListener('resize', ()=>{
+    clearTimeout(__moResizeTimer);
+    __moResizeTimer = setTimeout(()=>refreshMoreToggles(document), 150);
   });
+
+  // (선택) 페이지네이션 버튼에 goPage 연결하고 싶으면 아래 유틸 활용
+  // window.goNewsPage = (p, s)=>goPage(p, s);
 
 })();

@@ -40,25 +40,56 @@ public class RecommendController {
         model.addAttribute("loggedIn", loggedIn);
 
         // ===== 기본(비로그인) 목록 =====
-        final int BOOK_SIZE_DEFAULT   = 5; // ★ 서적 5개
-        final int YOUTUBE_SIZE_DEFAULT= 6; // ★ 유튜브 6개
+        final int BOOK_SIZE_DEFAULT    = 5; // 서적 5개
+        final int YOUTUBE_SIZE_DEFAULT = 6; // 유튜브 6개
 
-        List<BookResponse> defaultBooks  = getTrendingBooks(BOOK_SIZE_DEFAULT);      // 판매 + 신간 가중
-        List<Item>         defaultVideos = getYoutubeForDefault(YOUTUBE_SIZE_DEFAULT); // 타임아웃↑ + 폴백 쿼리
+        List<BookResponse> defaultBooks   = getTrendingBooks(BOOK_SIZE_DEFAULT);
+        List<Item>         defaultVideos  = getYoutubeForDefault(YOUTUBE_SIZE_DEFAULT);
 
         model.addAttribute("defaultBooks", defaultBooks);
         model.addAttribute("defaultVideos", defaultVideos);
 
         // ===== 개인화(로그인) 목록 =====
         if (loggedIn) {
-            List<String> seeds = pref.buildSeeds(me, 3, 8); // 상위 3개 서브카테고리 → 키워드 최대 8개
-            // 유튜브는 1차로 2개 seed만, 부족하면 5개까지 확장 (함수 내부 로직)
+            // --- 선호 채널 신호(신규 배열 필드 우선 + 하위호환) ---
+            var prefs = Optional.ofNullable(me.getPreferences()).orElse(null);
+
+            List<String> mainSources = (prefs != null && prefs.getMainSources() != null)
+                    ? prefs.getMainSources() : List.of();
+            List<String> portals = (prefs != null && prefs.getPortals() != null)
+                    ? prefs.getPortals() : List.of();
+
+            boolean preferYouTube = mainSources.contains("youtube")
+                    || (prefs != null && prefs.getPlatforms() != null
+                    && prefs.getPlatforms().getVideo() != null
+                    && !prefs.getPlatforms().getVideo().isEmpty());
+
+            boolean preferSNS = mainSources.contains("sns")
+                    || (prefs != null && prefs.getPlatforms() != null
+                    && prefs.getPlatforms().getSns() != null
+                    && !prefs.getPlatforms().getSns().isEmpty());
+
+            boolean preferPortal = mainSources.contains("portal") || !portals.isEmpty();
+
+            // --- seeds 생성(기존 explicit/implicit 기반) ---
+            List<String> seeds = pref.buildSeeds(me, 3, 8);
+
+            // --- 책/유튜브 추천 ---
             List<BookResponse> personalBooks  = safeGet(() -> getPersonalBooks(seeds, BOOK_SIZE_DEFAULT, defaultBooks), defaultBooks);
-            List<Item>         personalVideos = safeGet(() -> getYoutubePersonal(seeds, YOUTUBE_SIZE_DEFAULT, defaultVideos), defaultVideos);
+            List<Item>         personalVideos = safeGet(
+                    () -> getYoutubePersonalWithPreference(seeds, YOUTUBE_SIZE_DEFAULT, defaultVideos, preferYouTube),
+                    defaultVideos
+            );
 
             model.addAttribute("personalBooks", personalBooks);
             model.addAttribute("personalVideos", personalVideos);
             model.addAttribute("activeKeywords", String.join(", ", seeds));
+
+            // (선택) 뷰 힌트 제공
+            model.addAttribute("preferYouTube", preferYouTube);
+            model.addAttribute("preferSNS", preferSNS);
+            model.addAttribute("preferPortal", preferPortal);
+            model.addAttribute("activePortals", String.join(", ", portals));
         }
 
         return "pages/recommend";
@@ -73,7 +104,6 @@ public class RecommendController {
      * score = 0.65 * normalizeSales + 0.35 * freshness(0~1, 365일 선형감쇠)
      */
     private List<BookResponse> getTrendingBooks(int size) {
-        // 넉넉한 풀: 판매지수/신간 각각 상위 200개씩
         Pageable bySales = PageRequest.of(0, 200, Sort.by(Sort.Order.desc("salesPoint")));
         Pageable byDate  = PageRequest.of(0, 200, Sort.by(Sort.Order.desc("pubDate")));
 
@@ -161,7 +191,7 @@ public class RecommendController {
         }
 
         if (ranked.size() < size) {
-            List<BookResponse> best = getTrendingBooks(size); // 기본 기준으로 채움
+            List<BookResponse> best = getTrendingBooks(size);
             for (BookResponse b : best) {
                 if (ranked.size() >= size) break;
                 if (ranked.stream().noneMatch(x -> Objects.equals(x.getId(), b.getId()))) {
@@ -212,31 +242,29 @@ public class RecommendController {
     }
 
     /**
-     * 개인화 유튜브: 점진적 확장 + 타임아웃 완화 + 폴백
-     * - 1차: 상위 2개 seed, per-seed 5개, timeout 5s
-     * - 부족하면 2차: 상위 5개 seed, per-seed 4개, timeout 6s
-     * - 그래도 부족하면 기본 추천으로 폴백
+     * YouTube 선호를 반영: 선호시 더 많은 시도/타임아웃↑, 비선호시 보수적으로 시도
+     * - preferYouTube=false: 상위 2개 seed, perSeed 2, timeout 4s → 없으면 기본
+     * - preferYouTube=true : 1차 상위 3개 seed(perSeed 5, timeout 6s) → 부족하면 상위 6개(perSeed 4, timeout 7s)
      */
-    private List<Item> getYoutubePersonal(List<String> seeds, int max, List<Item> fallback) {
+    private List<Item> getYoutubePersonalWithPreference(List<String> seeds, int max, List<Item> fallback, boolean preferYouTube){
         if (seeds == null || seeds.isEmpty()) return fallback;
 
-        // 1) 1차: 상위 2개 seed
-        List<String> s1 = seeds.size() > 2 ? seeds.subList(0, 2) : seeds;
-        List<Item> list = mergeYoutubeBySeeds(s1, max, 5 /*perSeedMax*/, 5 /*timeoutSec*/);
+        if (!preferYouTube) {
+            List<String> s1 = (seeds.size() > 2) ? seeds.subList(0,2) : seeds;
+            List<Item> list = mergeYoutubeBySeeds(s1, Math.min(max, 4), /*perSeedMax*/2, /*timeoutSec*/4);
+            return list.isEmpty() ? getYoutubeForDefault(max) : list;
+        }
 
-        // 2) 결과가 너무 적으면: 상위 5개까지 확장
-        if (list.size() < Math.max(2, max / 2) && seeds.size() > s1.size()) {
-            int to = Math.min(5, seeds.size()); // 최대 5개 seed
+        // 선호: 공격적
+        List<String> s1 = seeds.size() > 3 ? seeds.subList(0, 3) : seeds;
+        List<Item> list = mergeYoutubeBySeeds(s1, max, /*perSeedMax*/5, /*timeoutSec*/6);
+
+        if (list.size() < Math.max(2, max/2) && seeds.size() > s1.size()){
+            int to = Math.min(6, seeds.size());
             List<String> s2 = seeds.subList(0, to);
-            list = mergeYoutubeBySeeds(s2, max, 4 /*perSeedMax*/, 6 /*timeoutSec*/);
+            list = mergeYoutubeBySeeds(s2, max, /*perSeedMax*/4, /*timeoutSec*/7);
         }
-
-        // 3) 그래도 부족하면: 기본 추천으로 폴백
-        if (list.isEmpty()) {
-            List<Item> def = getYoutubeForDefault(max);
-            return def.isEmpty() ? fallback : def;
-        }
-        return list;
+        return list.isEmpty() ? getYoutubeForDefault(max) : list;
     }
 
     /** 여러 seed를 합쳐서 videoId 중복 제거 후 조회수순 정렬 */

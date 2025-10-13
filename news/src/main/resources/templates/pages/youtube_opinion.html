@@ -287,16 +287,16 @@
           display: inline-flex;
           align-items: center;
           justify-content: center;
-          width: 110px;             /* ✅ 고정 폭 (텍스트 길이에 맞춰 조정) */
-          height: 26px;             /* ✅ 일정 높이 */
-          border-radius: 14px;
-          margin: 2px 4px;
-          font-size: 13px;
+          min-width: 120px;       /* ✅ 버튼 폭 확장 */
+          height: 34px;           /* ✅ 버튼 높이 증가 */
+          padding: 6px 14px;      /* ✅ 여백 확대 */
+          border-radius: 18px;    /* ✅ 라운드 크게 */
+          font-size: 14px;        /* ✅ 글자 약간 크게 */
           font-weight: 600;
           color: #fff;
           background: var(--main-blue);
-          box-shadow: 0 1px 2px rgba(0,0,0,0.1);
-          white-space: nowrap;      /* ✅ 줄바꿈 방지 */
+          box-shadow: 0 2px 4px rgba(0,0,0,0.12);
+          white-space: nowrap;
         }
 
         /* 감정별 색상 (선택) */

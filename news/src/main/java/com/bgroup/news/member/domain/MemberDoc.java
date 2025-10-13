@@ -38,9 +38,26 @@ public class MemberDoc {
 
     @Data @NoArgsConstructor @AllArgsConstructor @Builder
     public static class Preferences {
+        // ===== 기존(그대로 유지)
         // parent -> (sub -> score)
         private Map<String, Map<String, Integer>> explicit;
         private Map<String, Map<String, Integer>> implicit;
         private Instant lastUpdated;
+
+        // 단일(하위호환)
+        private String mainSource;
+
+        @Data @NoArgsConstructor @AllArgsConstructor
+        public static class Platforms {
+            private String portal;                 // 단일(하위호환)
+            private java.util.List<String> sns;
+            private java.util.List<String> video;
+            private java.util.List<String> ott;
+        }
+        private Platforms platforms;
+
+        // ===== ✅ 신규: 다중 선택 저장
+        private java.util.List<String> mainSources;  // ["portal","youtube",...]
+        private java.util.List<String> portals;      // ["Naver","Google"]
     }
 }

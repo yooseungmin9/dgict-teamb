@@ -12,7 +12,7 @@ import torch
 # --------------------------
 # 1. API & DB 설정
 # --------------------------
-API_KEY = "AIzaSyDtsdmz204NoNAFBam4S3Fe_gNR4Sy_7Ko"  # 🔑 본인 키
+API_KEY = "AIzaSyAvBT58ksxCS_E0nehgiy5fMJbtXnePghk"  # 🔑 본인 키
 youtube = build("youtube", "v3", developerKey=API_KEY, static_discovery=False)
 
 client = MongoClient("mongodb+srv://Dgict_TeamB:team1234@cluster0.5d0uual.mongodb.net/")
@@ -145,12 +145,18 @@ def get_video_comments(video_id: str, max_total: int = 1000):
     return comments
 
 # --------------------------
-# 6. 메인 수집 (영상 단위로 저장)
+# 6. 메인 수집 (중복·무관 필터링 추가)
 # --------------------------
+from difflib import SequenceMatcher
+
+def is_similar(a: str, b: str, threshold: float = 0.8) -> bool:
+    """문자열 유사도 계산"""
+    return SequenceMatcher(None, a, b).ratio() > threshold
+
 def collect_videos_with_emotions(query: str, category: str, target_count: int = 10):
-    """댓글 가능한 영상이 target_count 개수 확보될 때까지 수집"""
     saved_count = 0
     next_page_token = None
+    seen_titles = []  # 중복 제목 감시
 
     while saved_count < target_count:
         request = youtube.search().list(
@@ -168,13 +174,27 @@ def collect_videos_with_emotions(query: str, category: str, target_count: int = 
                 break
 
             video_id = item["id"]["videoId"]
+
+            # (1) DB 중복 확인
+            if col.find_one({"video_id": video_id}):
+                print(f"⚠️ 중복 영상 → 스킵 ({video_id})")
+                continue
+
             info = get_video_info(video_id, category)
             if not info:
                 continue
 
-            # 🔑 댓글 수 50개 이상인 영상만 수집
-            if info["comment_count"] < 50:
-                print(f"❌ 댓글 수 {info['comment_count']}개 → 스킵: {info['title']}")
+            title = info["title"].strip()
+            desc = item["snippet"].get("description", "")
+
+            # (3) 제목 유사도 검사
+            if any(is_similar(title, t) for t in seen_titles):
+                print(f"⚠️ 유사 제목 → 스킵: {title}")
+                continue
+
+            # (4) 댓글 수 기준
+            if info["comment_count"] < 20:
+                print(f"❌ 댓글 {info['comment_count']}개 → 스킵: {title}")
                 continue
 
             comments = get_video_comments(video_id, max_total=1000)
@@ -184,7 +204,8 @@ def collect_videos_with_emotions(query: str, category: str, target_count: int = 
             info["comments"] = comments
             col.insert_one(info)
             saved_count += 1
-            print(f"✅ 저장 완료: {info['title']} ({len(comments)} 댓글)")
+            seen_titles.append(title)
+            print(f"✅ 저장 완료: {title} ({len(comments)}개 댓글)")
 
         next_page_token = response.get("nextPageToken")
         if not next_page_token:
@@ -197,7 +218,7 @@ def collect_videos_with_emotions(query: str, category: str, target_count: int = 
 # 7. 실행
 # --------------------------
 if __name__ == "__main__":
-    query = "글로벌경제 뉴스"
-    category = "글로벌경제"
-    collect_videos_with_emotions(query, category, target_count=50)  # ✅ target_count 사용
+    query = "산업 뉴스"
+    category = "산업"
+    collect_videos_with_emotions(query, category, target_count=20)  # ✅ target_count 사용
 

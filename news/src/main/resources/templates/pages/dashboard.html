@@ -7,14 +7,11 @@
     <link rel="stylesheet" href="/css/dashboard-grid.css"/>
     <link rel="stylesheet" href="/css/footer.css"/>
     <link rel="stylesheet" href="/css/header.css"/>
+
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels"></script>
-
-    <!-- 반드시 opinion-widget.js보다 먼저 -->
     <script src="/js/wordcloud2.js"></script>
     <script defer src="/js/opinion-widget.js"></script>
-
-    <!-- 나머지는 그대로 -->
     <script defer src="/js/sentiment.js"></script>
     <script defer src="/js/trends.js"></script>
     <script defer src="/js/app.js"></script>
@@ -25,8 +22,6 @@
     <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
     <script defer src="/js/clusters.js"></script>
 
-
-    <!-- trands.js가 전역에서 읽어갈 API 경로(없으면 상대경로 기본값 사용) -->
     <script>
         window.API_ENDPOINTS = {
             sentimentLine: "/api/dashboard/sentiment/line",
@@ -35,6 +30,56 @@
             emoaScore:      "/api/dashboard/emoa/score"
         };
     </script>
+
+    <style>
+        :root{
+            --brand:#2563eb; --bg:#fafafa; --panel:#ffffff; --ink:#111827; --muted:#6b7280; --line:#e5e7eb;
+            --ring: rgba(37,99,235,.35);
+            --shadow-strong: 0 24px 80px rgba(0,0,0,.28);
+            --shadow-soft: 0 10px 30px rgba(0,0,0,.12);
+        }
+        *,*::before,*::after{box-sizing:border-box}
+        html,body{height:100%}
+        body{margin:0;background:var(--bg);color:var(--ink);
+            font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Apple SD Gothic Neo,Noto Sans KR,Malgun Gothic,sans-serif;}
+        a{color:var(--brand);text-decoration:none} a:hover{text-decoration:underline}
+        .dash .container{max-width:1200px;margin:0 auto;padding:0 16px}
+
+        /* partner grid */
+        #partner-organization { padding: 24px 6%; }
+        #partner-organization .strong { display:block;margin-bottom:16px;font-size:24px;font-weight:700;color:#1b2733; }
+        .partner-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; justify-items:center; align-items:center; margin:0 auto; max-width:1000px; }
+        .partner-card { display:flex; justify-content:center; align-items:center; background:#fff; border-radius:14px; box-shadow:0 3px 8px rgba(0,0,0,0.08); width:100%; height:90px; padding:8px 10px; transition:.2s; }
+        .partner-card:hover { transform: translateY(-3px); box-shadow:0 6px 12px rgba(0,0,0,0.12); }
+        .partner-card img { max-width:105%; max-height:100%; object-fit:contain; display:block; }
+        .ranking-table th,.ranking-table td{ border-color: var(--line); }
+        label input[type="radio"]{ accent-color: var(--brand); }
+
+        /* ===== 온보딩 모달/토스트 ===== */
+        .modal-backdrop{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(10,12,16,.38);backdrop-filter:blur(6px);z-index:9999;opacity:0;transition:opacity .22s ease}
+        .modal-backdrop.open{display:flex;opacity:1}
+        .modal-card{width:min(780px,92vw);max-height:88vh;overflow:auto;background:rgba(255,255,255,0.94);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow-strong);padding:18px}
+        .modal-head{display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line);padding-bottom:8px;margin-bottom:12px}
+        .modal-body{display:grid;gap:14px}
+        .section{border:1px solid var(--line);border-radius:12px;padding:12px}
+        .section h4{margin:0 0 8px;font-size:15px}
+        .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+        .cap{font-size:12px;color:var(--muted)}
+        .controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+        .btn{appearance:none;border:1px solid transparent;background:var(--brand);color:#fff;padding:10px 16px;border-radius:10px;font-weight:700;cursor:pointer;transition:.16s;box-shadow:0 8px 18px rgba(37,99,235,.25)}
+        .btn.secondary{background:#fff;color:var(--brand);border-color:#cbd5e1;box-shadow:none}
+        .btn[disabled]{opacity:.5;cursor:not-allowed}
+        .toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%);background:#0f1a33;color:#fff;padding:12px 18px;border-radius:10px;opacity:0;pointer-events:none;transition:.22s;z-index:10000}
+        .toast.show{opacity:1;pointer-events:auto}
+
+        /* === 칩 버튼 === */
+        .chip{border:1px solid var(--line);background:#fff;border-radius:999px;padding:8px 14px;font-size:13px;cursor:pointer;transition:.16s;display:inline-flex;align-items:center;gap:6px}
+        .chip:hover{border-color: color-mix(in oklab, var(--brand) 35%, var(--line)); background:#f7faff}
+        .chip.active{background:var(--brand);color:#fff;border-color:var(--brand);box-shadow:0 6px 16px rgba(37,99,235,.25)}
+        .chip[disabled]{opacity:.5;cursor:not-allowed}
+        .chip-set{display:flex;flex-wrap:wrap;gap:8px}
+        .stack-v{display:flex;flex-direction:column;gap:10px}
+    </style>
 </head>
 
 <body data-page="dashboard"
@@ -63,20 +108,17 @@
                 <div class="card" id="panel-sentiment-series">
                     <strong class="strong">긍·부정추이</strong>
                     <article class="card__body">
-                        <div class="feature-card" id="sentiment-card"
-                             data-api="http://localhost:8007/sentiment/line">
+                        <div class="feature-card" id="sentiment-card" data-api="http://localhost:8007/sentiment/line">
                             <div class="controls" style="display:flex; gap:8px; align-items:center; margin-left:auto;">
                                 <button id="btn-mode-count" class="chip">건수</button>
                                 <button id="btn-mode-ratio" class="chip">비율</button>
                                 <span style="margin: auto 10px; font-size: 20px;"> | </span>
-                                <button id="btn-g-day"   class="chip">일별</button>
-                                <button id="btn-g-week"  class="chip">주별</button>
+                                <button id="btn-g-day" class="chip">일별</button>
+                                <button id="btn-g-week" class="chip">주별</button>
                                 <button id="btn-g-month" class="chip">월별</button>
                             </div>
                             <div id="sentiment-status" style="font-size:12px;color:#666;margin:4px 0;">준비됨</div>
-                            <div style="height:400px;">
-                                <canvas id="sentiment-chart"></canvas>
-                            </div>
+                            <div style="height:400px;"><canvas id="sentiment-chart"></canvas></div>
                         </div>
                     </article>
                 </div>
@@ -86,10 +128,7 @@
             <div class="stack" id="col-center">
                 <div class="card" id="panel-hot-topic-yesterday">
                     <strong class="strong">오늘의 키워드 핫토픽</strong>
-                    <!-- ✅ placeholder 클래스 제거, hot-topic.js가 채움 -->
-                    <div class="card__body" id="hot-topic-body">
-                        <p style="text-align:center; color:#999;">로딩 중...</p>
-                    </div>
+                    <div class="card__body" id="hot-topic-body"><p style="text-align:center; color:#999;">로딩 중...</p></div>
                 </div>
 
                 <div class="card" id="panel-news-count">
@@ -99,62 +138,24 @@
 
                 <div class="card" id="panel-today-sentiment">
                     <strong class="strong">오늘의 감성 요약</strong>
-                    <div class="card__body" id="emoa-summary">
-                        <p>데이터 수집 중...</p>
-                    </div>
+                    <div class="card__body" id="emoa-summary"><p>데이터 수집 중...</p></div>
                 </div>
 
                 <div class="card" id="partner-organization">
                     <strong class="strong">협력기관</strong>
                     <section id="partners" class="partner-grid">
-                      <!-- 각 로고는 클릭 시 공식 사이트로 이동 -->
-                      <a href="https://www.daegu.go.kr/" target="_blank" class="partner-card">
-                        <img src="/img/daegu.png" alt="대구광역시 로고" />
-                      </a>
-
-                      <a href="https://www.suseong.kr/" target="_blank" class="partner-card">
-                        <img src="/img/susung.png" alt="수성구 로고" />
-                      </a>
-
-                      <a href="https://alphacity.or.kr/index" target="_blank" class="partner-card">
-                        <img src="/img/alphacity.png" alt="수성알파시티 로고" />
-                      </a>
-
-                      <a href="https://dgict.org/" target="_blank" class="partner-card">
-                        <img src="/img/dgict.png" alt="대경ICT산업협회 로고" />
-                      </a>
-
-                      <a href="https://www.dip.or.kr/home/main.ubs" target="_blank" class="partner-card">
-                        <img src="/img/dip.png" alt="대구디지털혁신진흥원 로고" />
-                      </a>
-
-                      <a href="https://dgtp.or.kr/" target="_blank" class="partner-card">
-                        <img src="/img/dgtp.png" alt="대구테크노파크 로고" />
-                      </a>
-
-                      <a href="https://www.alphacity.or.kr/boardView?board_id=69" target="_blank" class="partner-card">
-                        <img src="/img/koreawide.png" alt="코리아와이드 로고" />
-                      </a>
-
-                      <a href="https://www.yhdatabase.com/main.do" target="_blank" class="partner-card">
-                        <img src="/img/yhdatabase.png" alt="YH데이터베이스 로고" />
-                      </a>
-
-                      <a href="https://www.igis.co.kr/" target="_blank" class="partner-card">
-                        <img src="/img/igis.png" alt="아이지아이에스 로고" />
-                      </a>
-
-                      <a href="http://www.sillasystem.com/main.php" target="_blank" class="partner-card">
-                        <img src="/img/sillasystem.png" alt="신라시스템 로고" />
-                      </a>
-
-                      <a href="http://www.bumil.co.kr" target="_blank" class="partner-card">
-                        <img src="/img/bumil.png" alt="범일정보 로고" />
-                      </a>
-
-                      <a href="https://computermate.co.kr/kor" target="_blank" class="partner-card">
-                        <img src="/img/computermate.png" alt="컴퓨터메이트 로고" />
-                      </a>
+                        <a href="https://www.daegu.go.kr/" target="_blank" class="partner-card"><img src="/img/daegu.png" alt="대구광역시 로고" /></a>
+                        <a href="https://www.suseong.kr/" target="_blank" class="partner-card"><img src="/img/susung.png" alt="수성구 로고" /></a>
+                        <a href="https://alphacity.or.kr/index" target="_blank" class="partner-card"><img src="/img/alphacity.png" alt="수성알파시티 로고" /></a>
+                        <a href="https://dgict.org/" target="_blank" class="partner-card"><img src="/img/dgict.png" alt="대경ICT산업협회 로고" /></a>
+                        <a href="https://www.dip.or.kr/home/main.ubs" target="_blank" class="partner-card"><img src="/img/dip.png" alt="대구디지털혁신진흥원 로고" /></a>
+                        <a href="https://dgtp.or.kr/" target="_blank" class="partner-card"><img src="/img/dgtp.png" alt="대구테크노파크 로고" /></a>
+                        <a href="https://www.alphacity.or.kr/boardView?board_id=69" target="_blank" class="partner-card"><img src="/img/koreawide.png" alt="코리아와이드 로고" /></a>
+                        <a href="https://www.yhdatabase.com/main.do" target="_blank" class="partner-card"><img src="/img/yhdatabase.png" alt="YH데이터베이스 로고" /></a>
+                        <a href="https://www.igis.co.kr/" target="_blank" class="partner-card"><img src="/img/igis.png" alt="아이지아이에스 로고" /></a>
+                        <a href="http://www.sillasystem.com/main.php" target="_blank" class="partner-card"><img src="/img/sillasystem.png" alt="신라시스템 로고" /></a>
+                        <a href="http://www.bumil.co.kr" target="_blank" class="partner-card"><img src="/img/bumil.png" alt="범일정보 로고" /></a>
+                        <a href="https://computermate.co.kr/kor" target="_blank" class="partner-card"><img src="/img/computermate.png" alt="컴퓨터메이트 로고" /></a>
                     </section>
                 </div>
 
@@ -187,13 +188,7 @@
                         </div>
                         <div id="DB_kwTabs" style="margin:6px 0; display:flex; gap:6px; flex-wrap:wrap;"></div>
                         <table id="DB_kwTable" class="ranking-table">
-                            <thead>
-                            <tr>
-                                <th style="width:64px;">순위</th>
-                                <th>키워드</th>
-                                <th class="right" style="width:100px;">언급량</th>
-                            </tr>
-                            </thead>
+                            <thead><tr><th style="width:64px;">순위</th><th>키워드</th><th class="right" style="width:100px;">언급량</th></tr></thead>
                             <tbody id="DB_keywordRankingBody"></tbody>
                         </table>
                     </div>
@@ -209,7 +204,6 @@
                 </div>
             </div>
 
-            <!-- 하단 트렌드 -->
             <div class="card" id="panel-hot-datalab">
                 <div class="card__body">
                     <strong class="strong">키워드 핫토픽 그래프 (데이터랩)</strong>
@@ -222,9 +216,7 @@
                             </select>
                         </label>
                     </div>
-                    <div class="chart-container">
-                        <canvas id="DB_categoryTrendChart"></canvas>
-                    </div>
+                    <div class="chart-container"><canvas id="DB_categoryTrendChart"></canvas></div>
                 </div>
             </div>
         </section>
@@ -233,289 +225,85 @@
 
 <div th:replace="fragments/footer :: siteFooter"></div>
 
-<script th:inline="javascript">
-    (function () {
-        function go(el) {
-            var url = el.dataset.url;
-            if (url) window.location.href = url;
-        }
-        function onClick(e) { go(e.currentTarget); }
-        function onKey(e) {
-            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(e.currentTarget); }
-        }
-        var links = document.querySelectorAll('[data-url]');
-        links.forEach(function (el) {
-            el.addEventListener('click', onClick);
-            el.addEventListener('keydown', onKey);
-            el.style.cursor = 'pointer';
-        });
-    })();
-</script>
-
-<!-- ===== 관심 키워드 온보딩 모달 ===== -->
-<style>
-    /* ===== SUMMARIX Interest-Modal — Drop-in CSS (replace your modal+toast styles) ===== */
-    :root {
-        --brand: #2563eb;
-        --ink: #111827;
-        --muted: #6b7280;
-        --panel: rgba(255,255,255,0.92);
-        --line: #e5e7eb;
-        --ring: rgba(37,99,235,.35);
-        --shadow-strong: 0 24px 80px rgba(0,0,0,.28);
-        --shadow-soft: 0 10px 30px rgba(0,0,0,.12);
-        --radius-lg: 14px;
-        --radius-md: 12px;
-        --radius-sm: 10px;
-    }
-
-    /* Backdrop */
-    .modal-backdrop{
-        position:fixed; inset:0;
-        display:none; align-items:center; justify-content:center;
-        background: rgba(10,12,16,.38);
-        -webkit-backdrop-filter: blur(6px);
-        backdrop-filter: blur(6px);
-        z-index: 9999;
-        opacity: 0;
-        transition: opacity .22s ease;
-    }
-    .modal-backdrop.open{ display:flex; opacity: 1; }
-
-    /* Card */
-    .modal-card{
-        width: min(700px, 92vw);
-        max-height: 88vh; overflow:auto;
-        background: var(--panel);
-        border: 1px solid var(--line);
-        border-radius: var(--radius-lg);
-        box-shadow: var(--shadow-strong);
-        padding: 18px 18px 14px;
-        color: var(--ink);
-        transform: translateY(6px);
-        animation: modal-enter .22s ease forwards;
-    }
-    @keyframes modal-enter { to { transform: translateY(0); } }
-    @media (prefers-reduced-motion: reduce){
-        .modal-backdrop, .modal-card { transition: none; animation: none; }
-    }
-
-    /* Head */
-    .modal-head{
-        display:flex; align-items:center; gap:12px;
-        padding: 2px 4px 8px 4px;
-        border-bottom: 1px solid var(--line);
-        margin-bottom: 12px;
-    }
-    .modal-head h3{
-        margin:0; font-size: 18px; font-weight: 800; letter-spacing:.2px;
-    }
-    .muted{ color: var(--muted); font-size:12px; }
-
-    /* Body grid */
-    .modal-body{
-        display:grid; gap: 12px;
-        grid-template-columns: repeat(2, minmax(0,1fr));
-    }
-    @media (max-width: 900px){ .modal-body{ grid-template-columns: 1fr 1fr; } }
-    @media (max-width: 640px){ .modal-body{ grid-template-columns: 1fr; } }
-
-    /* Category card */
-    .cat-card{
-        background: #fff;
-        border: 1px solid var(--line);
-        border-radius: var(--radius-md);
-        padding: 12px;
-        box-shadow: var(--shadow-soft);
-        transition: border-color .18s ease, box-shadow .18s ease;
-    }
-    .cat-card:hover{
-        border-color: color-mix(in oklab, var(--brand) 30%, var(--line));
-        box-shadow: 0 8px 20px rgba(0,0,0,.08);
-    }
-    .cat-card:focus-within{
-        outline: 2px solid var(--ring);
-        outline-offset: 2px;
-    }
-
-    /* Category header */
-    .cat-title{
-        margin: 0 0 6px;
-        font-weight: 800; font-size: 14px;
-    }
-    .cat-head{ display:flex; align-items:center; justify-content:space-between; gap:8px; }
-    .cat-cap{ font-size:12px; color: var(--muted); }
-    .cat-tools{
-        display:flex; justify-content:flex-start; gap:8px; margin-top:10px;
-    }
-    .cat-reset{
-        appearance:none; border:none; background:transparent; color:var(--muted);
-        font-size:12px; padding:6px 8px; border-radius: 8px; cursor:pointer;
-    }
-    .cat-reset:hover{ background:#f5f7fb; color: var(--brand); }
-    .cat-reset:focus-visible{ outline:2px solid var(--ring); outline-offset:2px; }
-
-    /* Keyword chips */
-    .kw-grid{ display:flex; flex-wrap: wrap; gap: 8px; }
-    .kw{
-        appearance:none;
-        border: 1px solid var(--line);
-        background: #fff;
-        color: var(--ink);
-        padding: 7px 12px;
-        border-radius: 999px;
-        font-size: 13px;
-        line-height: 1;
-        cursor: pointer;
-        transition: transform .06s ease, background-color .16s ease, border-color .16s ease, color .16s ease, box-shadow .16s ease;
-        will-change: transform;
-    }
-    .kw:hover{
-        border-color: color-mix(in oklab, var(--brand) 35%, var(--line));
-        background: #f7faff;
-    }
-    .kw:active{ transform: scale(0.98); }
-    .kw:focus-visible{ outline: 2px solid var(--ring); outline-offset: 2px; }
-
-    .kw.active{
-        background: var(--brand);
-        color: #fff;
-        border-color: var(--brand);
-        box-shadow: 0 6px 16px rgba(37,99,235,.25);
-    }
-    .kw[disabled]{
-        cursor: not-allowed;
-        opacity: .5;
-    }
-
-    /* Footer */
-    .modal-foot{
-        display:flex; justify-content:space-between; align-items:center;
-        gap: 10px; margin-top: 14px; padding-top: 12px;
-        border-top: 1px solid var(--line);
-    }
-
-    /* Buttons */
-    .btn{
-        appearance:none;
-        border: 1px solid transparent;
-        background: var(--brand);
-        color: #fff;
-        padding: 10px 16px;
-        border-radius: var(--radius-sm);
-        font-weight: 700; font-size: 14px;
-        letter-spacing:.2px;
-        cursor: pointer;
-        transition: transform .06s ease, background-color .16s ease, box-shadow .16s ease;
-        box-shadow: 0 8px 18px rgba(37,99,235,.25);
-    }
-    .btn:hover{ background: #1f4fd6; }
-    .btn:active{ transform: translateY(1px); }
-    .btn:focus-visible{ outline: 2px solid var(--ring); outline-offset: 2px; }
-
-    .btn.secondary{
-        background:#fff; color: var(--brand);
-        border-color: color-mix(in oklab, var(--brand) 45%, var(--line));
-        box-shadow: none;
-    }
-    .btn.secondary:hover{
-        background: #f7faff;
-        border-color: var(--brand);
-    }
-    .btn[disabled]{
-        opacity:.5; cursor:not-allowed; box-shadow:none;
-    }
-
-    /* Toast (brand tone) */
-    .toast{
-        position: fixed;
-        left: 50%; bottom: 28px; transform: translateX(-50%);
-        background: #0f1a33;
-        color: #fff;
-        padding: 12px 18px;
-        border-radius: 10px;
-        font-size: 14px;
-        line-height: 1.2;
-        box-shadow: 0 12px 30px rgba(0,0,0,.25);
-        opacity: 0; pointer-events: none;
-        transition: opacity .22s ease, transform .22s ease;
-        z-index: 10000;
-    }
-    .toast.show{
-        opacity: 1; pointer-events: auto;
-        transform: translateX(-50%) translateY(-2px);
-    }
-
-    #partner-organization {
-      padding: 24px 6%; /* 전체 여백: 좌우 6% */
-    }
-
-    #partner-organization .strong {
-      display: block;
-      margin-bottom: 16px; /* 제목 아래 여백 */
-      font-size: 24px;
-      font-weight: 700;
-      color: #1b2733;
-    }
-
-    .partner-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 10px;
-      justify-items: center;
-      align-items: center;
-      margin: 0 auto;
-      max-width: 1000px;
-    }
-
-    .partner-card {
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      background: #fff;
-      border-radius: 14px;
-      box-shadow: 0 3px 8px rgba(0, 0, 0, 0.08);
-      transition: transform 0.2s ease, box-shadow 0.2s ease;
-      width: 100%;
-      height: 90px;
-      padding: 8px 10px;
-    }
-
-    .partner-card:hover {
-      transform: translateY(-3px);
-      box-shadow: 0 6px 12px rgba(0, 0, 0, 0.12);
-    }
-
-    .partner-card img {
-      max-width: 105%; /* 크기 살짝 축소 */
-      max-height: 100%;
-      object-fit: contain;
-      display: block;
-    }
-
-    /* Small polish for table/radio in the side panel (optional; safe no-op if not present) */
-    .ranking-table th, .ranking-table td{ border-color: var(--line); }
-    label input[type="radio"]{ accent-color: var(--brand); }
-
-    /* Make sure modal fonts inherit the page font */
-    .modal-card, .modal-card *{ font-family: inherit; }
-
-</style>
-
-<div id="interestModal" class="modal-backdrop" aria-hidden="true">
-    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="interestTitle">
+<!-- ===== 온보딩 모달 ===== -->
+<div id="onboardModal" class="modal-backdrop" aria-hidden="true">
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="onboardTitle">
         <div class="modal-head">
-            <h3 id="interestTitle">관심 키워드를 선택하세요</h3>
-            <span class="muted">최대 <b id="limitTotal">12</b>개 선택 가능</span>
+            <h3 id="onboardTitle" style="margin:0;font-size:18px;font-weight:800">맞춤 뉴스 설정</h3>
+            <span class="cap">아래 두 가지만 골라주세요 (1분)</span>
         </div>
 
-        <div id="interestRoot" class="modal-body"><!-- JS가 채움 --></div>
+        <div class="modal-body">
+            <!-- 1) 관심 키워드 -->
+            <section class="section">
+                <div class="grid-2">
+                    <div>
+                        <h4>관심 키워드</h4>
+                        <div class="cap">최대 <b id="capTotal">12</b>개 · 카테고리당 4개</div>
+                    </div>
+                    <div class="cap" style="text-align:right">선택: <b id="selCount">0</b>개</div>
+                </div>
+                <div id="kwRoot" class="grid-2" style="margin-top:8px"><!-- JS가 채움 --></div>
+            </section>
 
-        <div class="modal-foot">
-            <span class="muted">선택: <b id="selCount">0</b>개</span>
-            <div style="display:flex; gap:8px">
-                <button id="btnSkip" class="btn secondary">나중에</button>
-                <button id="btnSave" class="btn">저장</button>
+            <!-- 2) 이용 경로/플랫폼 -->
+            <section class="section">
+                <h4>뉴스를 주로 어디서 보세요?</h4>
+
+                <div class="stack-v" style="margin-top:6px">
+                    <div>
+                        <div class="cap" style="margin-bottom:6px">주요 이용경로</div>
+                        <div class="chip-set" data-group="mainSource" data-type="multi">
+                            <button class="chip" data-value="portal">포털</button>
+                            <button class="chip" data-value="sns">SNS</button>
+                            <button class="chip" data-value="youtube">YouTube</button>
+                            <button class="chip" data-value="ott">OTT</button>
+                            <button class="chip" data-value="pressSite">언론사 사이트</button>
+                        </div>
+                    </div>
+
+                    <div>
+                        <div class="cap" style="margin-bottom:6px">포털</div>
+                        <div class="chip-set" data-group="portal" data-type="multi">
+                            <button class="chip" data-value="Naver">Naver</button>
+                            <button class="chip" data-value="Daum">Daum</button>
+                            <button class="chip" data-value="Google">Google</button>
+                        </div>
+                    </div>
+
+                    <div>
+                        <div class="cap" style="margin-bottom:6px">SNS (복수 선택)</div>
+                        <div class="chip-set" data-group="sns" data-type="multi">
+                            <button class="chip" data-value="Instagram">Instagram</button>
+                            <button class="chip" data-value="X">X</button>
+                            <button class="chip" data-value="TikTok">TikTok</button>
+                        </div>
+                    </div>
+
+                    <div>
+                        <div class="cap" style="margin-bottom:6px">비디오 (복수 선택)</div>
+                        <div class="chip-set" data-group="video" data-type="multi">
+                            <button class="chip" data-value="YouTube">YouTube</button>
+                            <button class="chip" data-value="TikTok">TikTok</button>
+                        </div>
+                    </div>
+
+                    <div>
+                        <div class="cap" style="margin-bottom:6px">OTT (복수 선택)</div>
+                        <div class="chip-set" data-group="ott" data-type="multi">
+                            <button class="chip" data-value="Netflix">Netflix</button>
+                            <button class="chip" data-value="Tving">Tving</button>
+                        </div>
+                    </div>
+
+                    <div class="cap" style="margin-top:2px">* ‘포털’ 선택은 <b>주요 이용경로에 포털을 포함</b>했을 때만 대표 포털이 함께 저장됩니다.</div>
+                </div>
+
+            </section>
+
+            <div class="controls" style="justify-content:flex-end">
+                <button id="btnLater" class="btn secondary">나중에</button>
+                <button id="btnSaveAll" class="btn">저장</button>
             </div>
         </div>
     </div>
@@ -525,20 +313,38 @@
 
 <script th:inline="javascript">
     (function(){
-        // ===== 0) 환경 값 =====
-        const MAX_TOTAL = 12;
-        const MAX_PER_CAT = 4;
-
-        // body data-* 로 주입: <body data-require-interests="true" data-user-id="${#authentication.name}">
+        const API_BASE = ''; // 컨텍스트 경로가 있으면 '/api' 등으로 변경
         const need = document.body.getAttribute('data-require-interests') === 'true';
-        const USER_ID = document.body.getAttribute('data-user-id') || 'guest';
 
-        // (선택) CSRF 메타로 주입해두면 자동 포함
         const CSRF_HEADER = document.querySelector('meta[name="_csrf_header"]')?.content;
         const CSRF_TOKEN  = document.querySelector('meta[name="_csrf"]')?.content;
+        const headersJSON = {'Content-Type':'application/json'};
+        if (CSRF_HEADER && CSRF_TOKEN) headersJSON[CSRF_HEADER] = CSRF_TOKEN;
 
-        // ===== 1) 키워드 사전 =====
-        const CATEGORY_KEYWORDS = {
+        // ===== 링크 카드 접근성(원본 유지)
+        (function () {
+            function go(el) { var url = el.dataset.url; if (url) window.location.href = url; }
+            function onClick(e) { go(e.currentTarget); }
+            function onKey(e) { if (e.key==='Enter'||e.key===' '){ e.preventDefault(); go(e.currentTarget); } }
+            var links = document.querySelectorAll('[data-url]');
+            links.forEach(function (el) {
+                el.addEventListener('click', onClick);
+                el.addEventListener('keydown', onKey);
+                el.style.cursor = 'pointer';
+            });
+        })();
+
+        // ===== 모달/토스트
+        const modal = document.getElementById('onboardModal');
+        const toast = document.getElementById('toast');
+        const open  = ()=>{ modal.classList.add('open'); modal.setAttribute('aria-hidden','false'); };
+        const close = ()=>{ modal.classList.remove('open'); modal.setAttribute('aria-hidden','true'); };
+        const showToast = (m,ms=2000)=>{ toast.textContent=m; toast.classList.add('show'); setTimeout(()=>toast.classList.remove('show'),ms); };
+
+        // ===== 관심 키워드
+        const MAX_TOTAL=12, MAX_PER_CAT=4;
+        document.getElementById('capTotal').textContent = MAX_TOTAL;
+        const KW_DICT = {
             "증권": ["주식","코스피","ETF","공모주","배당","리츠","거래량"],
             "금융": ["금리","대출","예금","보험","환율","금융감독원","비트코인"],
             "부동산": ["부동산","아파트","전세","청약","재건축","공시지가","집값"],
@@ -546,175 +352,149 @@
             "글로벌경제": ["미국","중국","달러","무역","유가","나스닥","IMF"],
             "일반": ["물가","소비","고용","임금","GDP","경기침체","가계부채"]
         };
+        const kwRoot   = document.getElementById('kwRoot');
+        const selCntEl = document.getElementById('selCount');
+        const state    = { total:0, perCat:{} };
 
-        // ===== 2) 엘리먼트 =====
-        const modal   = document.getElementById('interestModal');
-        const root    = document.getElementById('interestRoot');
-        const selCnt  = document.getElementById('selCount');
-        const limitEl = document.getElementById('limitTotal');
-        const btnSave = document.getElementById('btnSave');
-        const btnSkip = document.getElementById('btnSkip');
-        limitEl.textContent = String(MAX_TOTAL);
-
-        // ===== 3) 상태 =====
-        const state = {
-            total: 0,
-            perCat: {}, // { "증권": 0, ... }
-        };
-
-        // ===== 4) 렌더링 =====
-        function render(){
+        function renderKW(){
             const frag = document.createDocumentFragment();
-            Object.entries(CATEGORY_KEYWORDS).forEach(([cat, kws])=>{
-                const card = document.createElement('section');
-                card.className = 'cat-card';
-                card.dataset.cat = cat;
-                card.innerHTML = `
-        <div class="cat-head">
-          <h4 class="cat-title">${cat}</h4>
-          <div class="cat-cap"><span class="cat-count">0</span> / ${MAX_PER_CAT}</div>
-        </div>
-      `;
-                const box = document.createElement('div');
-                box.className='kw-grid';
-
+            Object.entries(KW_DICT).forEach(([cat, kws])=>{
+                state.perCat[cat]=0;
+                const wrap=document.createElement('div');
+                wrap.innerHTML = `<div class="cap" style="margin-bottom:6px"><b>${cat}</b> · <span data-cap="${cat}">0</span> / ${MAX_PER_CAT}</div>`;
+                const box=document.createElement('div'); box.className='chip-set';
                 kws.forEach(kw=>{
-                    const chip = document.createElement('button');
-                    chip.type = 'button';
-                    chip.className='kw';
-                    chip.textContent = kw;
-                    chip.dataset.kw = kw;
-                    chip.dataset.cat = cat;
-                    chip.addEventListener('click', onToggle);
-                    box.appendChild(chip);
+                    const b=document.createElement('button');
+                    b.type='button'; b.className='chip'; b.textContent=kw;
+                    b.dataset.kw=kw; b.dataset.cat=cat;
+                    b.addEventListener('click', onToggleKW);
+                    box.appendChild(b);
                 });
-
-                // 섹션 초기화 버튼(선택)
-                const tools = document.createElement('div');
-                tools.className = 'cat-tools';
-                const resetBtn = document.createElement('button');
-                resetBtn.type='button';
-                resetBtn.className='cat-reset';
-                resetBtn.textContent='초기화';
-                resetBtn.addEventListener('click', ()=>clearCategory(cat));
-                tools.appendChild(resetBtn);
-
-                card.appendChild(box);
-                card.appendChild(tools);
-                frag.appendChild(card);
-
-                state.perCat[cat] = 0;
+                wrap.appendChild(box);
+                frag.appendChild(wrap);
             });
-
-            root.innerHTML = '';
-            root.appendChild(frag);
-            updateCounters();
+            kwRoot.replaceChildren(frag);
+            syncCounts();
         }
 
-        // ===== 5) 선택/해제 로직 =====
-        function countSelected(){ return root.querySelectorAll('.kw.active').length; }
-
-        function onToggle(e){
-            const el  = e.currentTarget;
-            const cat = el.dataset.cat;
-
-            // 해제
-            if(el.classList.contains('active')){
+        function onToggleKW(e){
+            const el=e.currentTarget, cat=el.dataset.cat;
+            const active=el.classList.contains('active');
+            if(active){
                 el.classList.remove('active');
-                state.perCat[cat] = Math.max(0, state.perCat[cat]-1);
-                state.total = Math.max(0, state.total-1);
-                updateCounters();
-                return;
+                state.perCat[cat]=Math.max(0,state.perCat[cat]-1);
+            }else{
+                if(state.total>=MAX_TOTAL) return;
+                if(state.perCat[cat]>=MAX_PER_CAT) return;
+                el.classList.add('active');
+                state.perCat[cat]+=1;
             }
-
-            // 선택 제한 체크
-            if(state.total >= MAX_TOTAL) return;
-            if(state.perCat[cat] >= MAX_PER_CAT) return;
-
-            // 선택
-            el.classList.add('active');
-            state.perCat[cat] += 1;
-            state.total += 1;
-            updateCounters();
+            syncCounts();
         }
 
-        function clearCategory(cat){
-            root.querySelectorAll(`.kw[data-cat="${cat}"].active`).forEach(el=>{
-                el.classList.remove('active');
-            });
-            state.total -= state.perCat[cat];
-            state.perCat[cat] = 0;
-            if(state.total < 0) state.total = 0;
-            updateCounters();
-        }
-
-        function updateCounters(){
-            // 총계
-            state.total = countSelected();
-            selCnt.textContent = String(state.total);
-
-            // 카테고리별
+        function syncCounts(){
+            state.total = kwRoot.querySelectorAll('.chip.active[data-kw]').length;
+            selCntEl.textContent = String(state.total);
             Object.keys(state.perCat).forEach(cat=>{
-                const cnt = root.querySelectorAll(`.kw[data-cat="${cat}"].active`).length;
-                state.perCat[cat] = cnt;
-                const card = root.querySelector(`.cat-card[data-cat="${cat}"]`);
-                card?.querySelector('.cat-count')?.replaceChildren(document.createTextNode(String(cnt)));
-
-                // cap 찬 후 아직 미선택인 칩들 비활성화
-                const capReached = cnt >= MAX_PER_CAT;
-                card?.querySelectorAll('.kw').forEach(chip=>{
-                    if(chip.classList.contains('active')) {
-                        chip.disabled = false; // 이미 선택된 것은 항상 활성
-                    } else {
-                        chip.disabled = capReached || state.total >= MAX_TOTAL;
-                    }
+                const cnt = kwRoot.querySelectorAll(`.chip.active[data-cat="${cat}"]`).length;
+                state.perCat[cat]=cnt;
+                const span=kwRoot.querySelector(`[data-cap="${cat}"]`); if(span) span.textContent=cnt;
+                const capReached = cnt>=MAX_PER_CAT;
+                kwRoot.querySelectorAll(`.chip[data-cat="${cat}"]`).forEach(btn=>{
+                    if(btn.classList.contains('active')) btn.disabled=false;
+                    else btn.disabled = capReached || state.total>=MAX_TOTAL;
                 });
             });
-
-            // 전체 cap에 따른 저장 버튼 상태
-            btnSave.disabled = state.total > MAX_TOTAL;
         }
 
-        // ===== 6) 열고/닫기 =====
-        function open(){ modal.classList.add('open'); modal.setAttribute('aria-hidden','false'); }
-        function close(){ modal.classList.remove('open'); modal.setAttribute('aria-hidden','true'); }
+        // ===== 칩 그룹 핸들러 + "마지막 클릭 = 대표값"
+        let lastMainSource = null;
+        let lastPortal = null;
 
-        // ===== 7) 저장 =====
-        function showToast(msg, ms=2000){
-            const t = document.getElementById('toast');
-            t.textContent = msg;
-            t.classList.add('show');
-            setTimeout(()=>t.classList.remove('show'), ms);
+        document.querySelectorAll('.chip-set').forEach(set=>{
+            set.addEventListener('click', (e)=>{
+                const btn = e.target.closest('.chip'); if(!btn) return;
+                const group = set.dataset.group;
+                const type = set.dataset.type || 'multi';
+
+                if(type === 'single'){
+                    set.querySelectorAll('.chip.active').forEach(el=>el.classList.remove('active'));
+                    btn.classList.add('active');
+                }else{
+                    btn.classList.toggle('active');
+                    // 대표값 갱신
+                    if (btn.classList.contains('active')) {
+                        if (group === 'mainSource') lastMainSource = btn.dataset.value;
+                        if (group === 'portal')     lastPortal     = btn.dataset.value;
+                    } else {
+                        const actives = [...set.querySelectorAll('.chip.active')];
+                        if (group === 'mainSource' && lastMainSource === btn.dataset.value)
+                            lastMainSource = actives.at(-1)?.dataset.value || null;
+                        if (group === 'portal' && lastPortal === btn.dataset.value)
+                            lastPortal = actives.at(-1)?.dataset.value || null;
+                    }
+                }
+            });
+        });
+
+        // ===== 값 수집
+        function getMulti(group){
+            return [...document.querySelectorAll(`.chip-set[data-group="${group}"] .chip.active`)]
+                .map(el => el.dataset.value);
         }
 
-        async function save(){
-            const kws = Array.from(root.querySelectorAll('.kw.active')).map(el=>el.dataset.kw);
-            const headers = { 'Content-Type':'application/json' };
-            if(CSRF_HEADER && CSRF_TOKEN){ headers[CSRF_HEADER] = CSRF_TOKEN; }
+        function collectPrefs(){
+            const mainSources = getMulti('mainSource'); // ["portal","youtube",...]
+            const portals     = getMulti('portal');     // ["Naver","Google",...]
+            const includePortal = mainSources.includes('portal');
+
+            return {
+                // 다중 필드
+                mainSources,
+                portals,
+                sns:   getMulti('sns'),
+                video: getMulti('video'),
+                ott:   getMulti('ott'),
+
+                // 대표 단일(하위호환): 마지막 클릭 기준
+                mainSource: lastMainSource ?? mainSources.at(-1) ?? null,
+                portal:     includePortal ? (lastPortal ?? portals.at(-1) ?? null) : null
+            };
+        }
+
+        // ===== 저장: interests → preferences
+        document.getElementById('btnSaveAll').addEventListener('click', async ()=>{
+            const keywords = Array.from(kwRoot.querySelectorAll('.chip.active[data-kw]'))
+                .map(el=>el.dataset.kw);
+            const prefsBody = collectPrefs();
 
             try{
-                const res = await fetch('/member/interests', {
-                    method:'POST',
-                    headers,
-                    body: JSON.stringify(kws)
+                const r1 = await fetch(`${API_BASE}/member/interests`, {
+                    method:'POST', headers: headersJSON, body: JSON.stringify(keywords)
                 });
-                if(!res.ok) throw new Error('save failed: ' + res.status);
-                showToast('✅ 관심사가 저장되었습니다!');
+                if(!r1.ok) throw new Error('interests '+r1.status);
+
+                const r2 = await fetch(`${API_BASE}/member/preferences`, {
+                    method:'POST', headers: headersJSON, body: JSON.stringify(prefsBody)
+                });
+                if(!r2.ok) throw new Error('preferences '+r2.status);
+
+                showToast('✅ 설정이 저장되었습니다!');
                 close();
+                // location.reload(); // 필요 시 사용
             }catch(err){
-                console.error(err);
+                console.error(err, {keywords, prefsBody});
                 showToast('❌ 저장에 실패했습니다.', 3000);
             }
-        }
+        });
 
-        // ===== 8) 이벤트 =====
-        btnSave.addEventListener('click', save);
-        btnSkip.addEventListener('click', close);
+        document.getElementById('btnLater').addEventListener('click', close);
 
-        // ===== 9) 초기화 =====
-        render();
+        // ===== 초기화
+        renderKW();
         if(need) open();
     })();
 </script>
+
 </body>
 </html>
