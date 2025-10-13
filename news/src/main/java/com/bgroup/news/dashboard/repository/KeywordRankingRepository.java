@@ -2,6 +2,7 @@ package com.bgroup.news.dashboard.repository;
 
 import com.bgroup.news.dashboard.dto.KeywordRankingResponse;
 import lombok.RequiredArgsConstructor;
+import org.bson.Document;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.aggregation.*;
@@ -9,6 +10,10 @@ import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.stereotype.Repository;
 import org.springframework.data.mongodb.core.aggregation.StringOperators;
 
+import java.sql.Date;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -24,9 +29,22 @@ public class KeywordRankingRepository {
     public List<KeywordRankingResponse> topKeywords(
             String collection,
             String category,
+            int days,
             int limit
     ) {
+        final String dateField = "published_at";
         List<AggregationOperation> ops = new ArrayList<>();
+
+        ops.add(Aggregation.match(Criteria.where(dateField).exists(true)));
+
+        Document toDateExpr = Document.parse("{ $toDate: \"$" + dateField + "\" }");
+        ops.add(Aggregation.addFields().addFieldWithValue("__dt", toDateExpr).build());
+
+        // 최근 N일 기준시각 계산(UTC)
+        Instant fromUtc = Instant.now().minusSeconds((long)Math.max(days,1)*86400);
+
+        // 기간 필터
+        ops.add(Aggregation.match(Criteria.where("__dt").gte(Date.from(fromUtc))));
 
         // category 필터 (예: 부동산, 금융 등)
         if (!"all".equalsIgnoreCase(category)) {
@@ -34,13 +52,17 @@ public class KeywordRankingRepository {
         }
 
         // 1️⃣ keywords 배열 펼치기
+        ops.add(Aggregation.match(Criteria.where("keywords").exists(true)));
         ops.add(Aggregation.unwind("keywords"));
 
         // 2️⃣ 문자열 정규화 (trim, 소문자 변환)
-        ops.add(Aggregation.project()
-                .and(StringOperators.valueOf("keywords").trim()).as("kw_trim"));
-        ops.add(Aggregation.project()
-                .and(StringOperators.valueOf("kw_trim").toLower()).as("kw"));
+        ops.add(Aggregation.project().and(StringOperators.valueOf("keywords").trim()).as("kw_trim"));
+        ops.add(Aggregation.project().and(StringOperators.valueOf("kw_trim").toLower()).as("kw"));
+        ops.add(Aggregation.match(new Criteria().andOperator(
+                Criteria.where("kw").ne(null),
+                Criteria.where("kw").ne(""),
+                Criteria.where("kw").regex(".*\\S.*")
+        )));
 
         // 3️⃣ 그룹핑: 같은 키워드별로 집계
         ops.add(Aggregation.group("kw").count().as("count"));

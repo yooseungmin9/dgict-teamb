@@ -17,11 +17,11 @@ public class KeywordService {
     @Qualifier("trendClient")
     private final WebClient trendClient;
 
-    public List<KeywordRankingResponse> fetchRanking(String category, int periodDays) {
+    public List<KeywordRankingResponse> fetchRanking(String category, int days) {
         return trendClient.get()
                 .uri(u -> u.path("/keywords/ranking")
                         .queryParam("category", category)
-                        .queryParam("periodDays", periodDays)
+                        .queryParam("days", days)
                         .build())
                 .retrieve()
                 .bodyToFlux(KeywordRankingResponse.class)
