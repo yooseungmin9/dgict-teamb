@@ -53,7 +53,7 @@ public class DashboardApiController {
             @RequestParam(defaultValue = "30") int days,
             @RequestParam(defaultValue = "50") int limit) {
         // 너희 컬렉션명으로 바꿔줘 (예: "news")
-        return keywordRepo.topKeywords("shared_articles", category, limit);
+        return keywordRepo.topKeywords("shared_articles", category, days, limit);
     }
 
     // /emoa/score?score_key=sentiment_score
