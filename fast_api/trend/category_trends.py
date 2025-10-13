@@ -16,6 +16,7 @@ mongo_col = mongo_client["test123"]["shared_articles"]
 
 CATEGORIES = ["증권", "금융", "부동산", "산업", "글로벌경제", "일반"]
 
+
 CATEGORY_KEYWORDS = {
     "증권": ["증권", "주식", "코스피", "코스닥"],
     "금융": ["금융", "예금", "대출", "금리"],
