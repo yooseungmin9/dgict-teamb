@@ -219,8 +219,6 @@ class DocEventHandler(FileSystemEventHandler):
             schedule_upload(p)
 
     def on_modified(self, event):
-        if ONLY_MOVE_CREATE:
-            return  # 수정 이벤트는 무시
         if event.is_directory: return
         p = Path(event.src_path)
         if p.suffix.lower() in ALLOW_EXTS and not is_lock_like(p):

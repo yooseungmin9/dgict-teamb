@@ -663,3 +663,4 @@ $RECYCLE.BIN/
 *.pyc
 
 # End of https://www.toptal.com/developers/gitignore/api/windows,macos,pycharm,intellij,python,java,jetbrains,webstorm,react,jupyternotebooks
+run_many.py

@@ -508,6 +508,14 @@ textarea.form-control {
   padding-left: 25px;
 }
 
+#messageInput:focus,
+.chat-form .chat-input-auto:focus,
+.chat-form .form-control:focus {
+  outline: none !important;            /* 기본 외곽선 제거 */
+  box-shadow: none !important;         /* 혹시 남아있는 그림자 제거 */
+  border-color: rgba(var(--color-teal-500-rgb), 0.40); /* 은은한 포커스 색 */
+}
+
 select.form-control {
   padding: var(--space-8) var(--space-12);
   -webkit-appearance: none;

@@ -134,6 +134,7 @@ VS_ID_PATH = Path(".vector_store_id")
 if not VS_ID_PATH.exists():
     log.error(".vector_store_id 없음. watcher.py 먼저 실행하세요.")
     sys.exit(1)
+
 VS_ID = VS_ID_PATH.read_text().strip()
 log.info(f"VectorStore ID: {VS_ID}")
 
