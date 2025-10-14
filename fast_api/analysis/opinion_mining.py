@@ -212,7 +212,13 @@ def get_analysis(
             emo_groups[emo].append(text)
 
     # 감정별 대표 댓글 1개씩
-    emo_samples = {emo: texts[0] for emo, texts in emo_groups.items() if texts}
+    emo_samples = {}
+    for emo, texts in emo_groups.items():
+        candidates = [c for c in cmts if c.get("emotion") == emo and c.get("text")]
+        if candidates:
+            # emotion_scores에서 해당 감정 점수 기준으로 정렬
+            best = max(candidates, key=lambda c: c.get("emotion_scores", {}).get(emo, 0))
+            emo_samples[emo] = best["text"]
 
     # 요약 1줄 생성
     total_comments = len(cmts)
