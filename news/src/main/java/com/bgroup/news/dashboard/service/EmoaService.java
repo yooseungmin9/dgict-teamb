@@ -16,7 +16,6 @@ public class EmoaService {
 
     private final MongoTemplate mongoTemplate;
 
-    // ⚙️ 컬렉션명 직접 지정
     private final String collectionName = "shared_articles";
     private final ZoneId zone = ZoneId.of("Asia/Seoul");
 

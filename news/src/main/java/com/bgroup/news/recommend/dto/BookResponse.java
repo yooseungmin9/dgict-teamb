@@ -26,7 +26,6 @@ public class BookResponse {
     @Field("title")      private String title;
     @Field("updatedAt")  private Instant updatedAt;
 
-    // ✅ 새 필드들
     @Field("salesPoint")
     private Integer salesPoint;
 
