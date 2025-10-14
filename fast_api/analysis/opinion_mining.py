@@ -10,9 +10,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from pymongo import MongoClient
 
 
-# ------------------
+
 # FastAPI 초기화
-# ------------------
 app = FastAPI(title="YouTube Opinion API")
 
 # CORS: 프론트는 8081
@@ -29,44 +28,39 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ------------------
 # MongoDB 연결
-# ------------------
-# 주의: 실제 배포 시 환경변수로 교체 권장
 MONGO_URI = "mongodb+srv://Dgict_TeamB:team1234@cluster0.5d0uual.mongodb.net/"
 client = MongoClient(MONGO_URI)
 db = client["test123"]
 col_video = db["youtube_db2"]
 col_comments = db["youtube_comments"]
 
-# ------------------
+
 # 간단 토크나이저
-# ------------------
+# Okt 형태소 분석기로 명사만 추출
 from konlpy.tag import Okt
 
 okt = Okt()
 
-# 불용어 확장 (필요에 따라 계속 추가 가능)
+# 불용어 확장
 STOPWORDS = {
     "그리고", "하지만", "영상", "정말", "그냥", "진짜",
     "하면", "해서", "하는", "에서", "으로", "이다",
     "것", "거", "저", "나", "너", "우리", "너무", "이런"
 }
-
+# 토크나이저 함수
 def tokenize(text: str) -> list[str]:
     """Okt 명사 추출 기반 토큰화 + 불용어 제거"""
     tokens = okt.nouns(text or "")
     return [t for t in tokens if t not in STOPWORDS and len(t) > 1]
 
-# ------------------
-# API 라우트
-# ------------------
+# 서버 정상 동작 확인용 엔드포인트.
 @app.get("/health")
 def health() -> dict:
     """헬스체크."""
     return {"status": "ok"}
 
-
+# /videos — 영상 목록 조회
 @app.get("/videos")
 def get_videos(
     category: Optional[str] = Query(None, description="카테고리 필터"),
@@ -76,12 +70,12 @@ def get_videos(
     유튜브 영상 리스트 (카테고리+정렬)
     - ?category=증권&sort_by=views
     """
-    # 1️⃣ 필터 조건
+    # 1. 필터 조건
     query = {}
     if category:
         query["category"] = category
 
-    # 2️⃣ 정렬 기준 매핑
+    # 2. 정렬 기준 매핑
     sort_map = {
         "views": ("view_count", -1),       # 조회수순
         "comments": ("comment_count", -1), # 댓글순
@@ -89,14 +83,14 @@ def get_videos(
     }
     sort_field, sort_dir = sort_map.get(sort_by, ("published_at", -1))
 
-    # 3️⃣ MongoDB 쿼리
+    # MongoDB 쿼리
     docs = (
         col_video.find(query, {"_id": 0, "video_id": 1, "title": 1, "thumbnail_url": 1, "category": 1})
         .sort(sort_field, sort_dir)
         .limit(20)
     )
 
-    # 4️⃣ 반환 구조
+    # 반환 구조
     return [
         {
             "video_id": d.get("video_id"),
@@ -107,7 +101,7 @@ def get_videos(
         for d in docs
     ]
 
-
+# /videos/{video_id} — 단일 영상 상세
 @app.get("/videos/{video_id}")
 def get_video_detail(video_id: str) -> dict:
     """특정 영상 메타정보 반환."""
@@ -126,7 +120,7 @@ def get_video_detail(video_id: str) -> dict:
         "video_url": f"https://www.youtube.com/embed/{doc.get('video_id','')}",
     }
 
-
+# /analysis/{video_id} — 댓글 기반 감정 분석
 @app.get("/analysis/{video_id}")
 def get_analysis(
     video_id: str,
@@ -252,7 +246,7 @@ def get_analysis(
     }
 
 
-# ✅ app.py 내 패치: /youtube/results 만 교체
+# app.py 내 패치: /youtube/results 만 교체
 from random import randint
 
 @app.get("/youtube/results")
@@ -277,7 +271,7 @@ def get_random_youtube_video() -> dict:
         # 기존: full_summary → highlight + first_line 조합
         result = get_analysis(vid, limit=200, topn=80)
 
-        # ✅ 교체: 중복 제거 + 첫 내용 줄 선택
+        # 교체: 중복 제거 + 첫 내용 줄 선택
         full_summary = result.get("summary", "").strip()
         lines = [l.strip() for l in full_summary.splitlines() if l.strip()]
 
@@ -298,7 +292,7 @@ def get_random_youtube_video() -> dict:
             "video_id": vid,
             "title": v.get("title", ""),
             "thumbnail_url": v.get("thumbnail_url", ""),
-            "summary": short_summary,  # ✅ 중복 없는 축약본
+            "summary": short_summary,  # 중복 없는 축약본
             "wordcloud": result.get("wordcloud"),
             "sentiment": result.get("sentiment"),
         }
@@ -309,7 +303,7 @@ def get_random_youtube_video() -> dict:
         traceback.print_exc()
         return {"error": f"{type(e).__name__}: {e}"}
 
-# ✅ 참고: get_analysis 내부 limit 처리(이미 반영되어 있으면 그대로 두세요)
+#  참고: get_analysis 내부 limit 처리(이미 반영되어 있으면 그대로 두세요)
 # cursor = col_comments.find(q, {"_id": 0, "text": 1, "emotion": 1})
 # if limit is not None:
 #     cursor = cursor.limit(int(limit))

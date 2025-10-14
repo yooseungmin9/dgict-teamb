@@ -13,9 +13,7 @@ from pymongo import MongoClient
 from bson import ObjectId  # 상세 조회용
 from openai import OpenAI  # 전일 브리핑용
 
-# =========================
 # (1) 환경 상수 (필요 시만 수정)
-# =========================
 MONGO_URI = "mongodb+srv://Dgict_TeamB:team1234@cluster0.5d0uual.mongodb.net/"
 DB_NAME   = "test123"
 COLL_NAME = "shared_articles"
@@ -23,9 +21,8 @@ COLL_NAME = "shared_articles"
 OPENAI_API_KEY = "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"
 OPENAI_MODEL   = "gpt-4o-mini"        # 가벼운 모델 예시(원하면 다른 모델로 교체)
 
-# =========================
+
 # (2) FastAPI + CORS
-# =========================
 app = FastAPI(title="News API (All-in-one)", version="1.0.0")
 app.add_middleware(
     CORSMiddleware,
@@ -38,21 +35,20 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# =========================
+
 # (3) Mongo 연결
-# =========================
 client = MongoClient(MONGO_URI)
 coll   = client[DB_NAME][COLL_NAME]
 
-# =========================
+
 # (공용) 간단 유틸
-# =========================
+# MongoDB ObjectId 등 비문자형 식별자를 안전하게 문자열로 변환
 def oid_str(x: Any) -> str:
     try:
         return str(x)
     except:
         return ""
-
+# MongoDB 문서나 FastAPI 응답에서 날짜를 표준화된 문자열로 안전하게 변환하는 유틸리티
 def to_iso(dt: Any) -> str:
     """datetime 또는 문자열을 ISO 문자열로 반환(문자열이면 그대로 반환)"""
     if isinstance(dt, datetime):
@@ -60,7 +56,7 @@ def to_iso(dt: Any) -> str:
     if isinstance(dt, str):
         return dt
     return ""
-
+# 데이터 수집 시 필드명이 불규칙할 때 대표 이미지 URL을 일관되게 반환하기 위한 헬퍼 함수
 def pick_image(doc: Dict[str, Any]) -> str:
     """
     이미지 필드명이 섞여 있을 때 가장 먼저 존재하는 값을 선택
@@ -74,9 +70,7 @@ def pick_image(doc: Dict[str, Any]) -> str:
         or ""
     )
 
-# =========================
 # (4) /news — 카드 목록 (title/url/summary/published_at/image)
-# =========================
 @app.get("/news")
 def list_news(
     limit: int = Query(10, ge=1, le=50),
@@ -104,9 +98,8 @@ def list_news(
     ]
 
 
-# =========================
+
 # (5) /news/{id} — 상세(모달용)
-# =========================
 @app.get("/news/{news_id}")
 def get_news_detail(news_id: str) -> Dict[str, Any]:
     """
@@ -142,9 +135,8 @@ def get_news_detail(news_id: str) -> Dict[str, Any]:
         "press": press,
     }
 
-# =========================
+
 # (6) /briefing/yesterday — DB 기사 기반 전일 요약
-# =========================
 from openai import OpenAI
 _oai = OpenAI(api_key=OPENAI_API_KEY)
 
