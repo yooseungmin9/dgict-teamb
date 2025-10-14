@@ -1,6 +1,3 @@
-# insert_members_ko.py
-# - MemberDoc 스키마(한글 parent/sub + 영문 interests)에 맞춘 더미 회원 2,000명 생성
-
 from pymongo import MongoClient
 from pymongo.errors import BulkWriteError
 import random, re
@@ -18,9 +15,7 @@ client = MongoClient(MONGO_URI)
 db = client[DB_NAME]
 col = db[COL_NAME]
 
-# =========================
 # 분포/가중치 (한글 키)
-# =========================
 PARENT_WEIGHT = {
     "글로벌": 0.25,
     "금융": 0.18,
@@ -89,15 +84,15 @@ REGION_DIST = {
 GENDER_DIST = {"남":0.49,"여":0.51}
 AGE_DIST = {"1960-1969":0.13,"1970-1979":0.18,"1980-1989":0.24,"1990-1999":0.28,"2000-2005":0.17}
 
-# =========================
 # 유틸
-# =========================
 surnames = ["김","이","박","최","정","강","조","윤","장","임","오","한","신","서","권","황","안","송","류","홍"]
 first_names = ["민","수","지","영","준","호","현","아","진","우","선","재","태","성","보","은","하","채","동","혁"]
 
+# 램덤 이름 조합
 def random_korean_name():
     return random.choice(surnames) + random.choice(first_names) + random.choice(first_names)
 
+# 가중치를 부여한 값을 추출
 def sample_from_dist(dist: dict, k=1, unique=True):
     labels, weights = zip(*dist.items())
     total = float(sum(weights)) or 1.0
@@ -111,17 +106,17 @@ def sample_from_dist(dist: dict, k=1, unique=True):
         return [lbl for (lbl,_) in scored[:k]]
     return random.choices(labels, probs, k=k)
 
+# 랜덤 출생년도
 def sample_age_birth_year():
     bucket = sample_from_dist(AGE_DIST,1)[0]
     s,e = bucket.split("-")
     return random.randint(int(s), int(e))
 
+# 램덤 연락처
 def random_phone():
     return f"010-{random.randint(1000,9999)}-{random.randint(1000,9999)}"
 
-# =========================
-# interests / preferences
-# =========================
+# 관심사: interests / preferences
 PARENTS = ["글로벌","금융","부동산","산업","주식","일반"]
 SUBS = {
     "글로벌":["미국","중국","환율원자재","지정학공급망","국제기구"],
@@ -132,6 +127,7 @@ SUBS = {
     "일반":["거시기초","소비","노동","경기순환","가계부채"]
 }
 
+# 내부 확률 0~1 정규화
 def norm_weights(d: dict):
     tot = float(sum(v for v in d.values() if v>0))
     if tot<=0: return {k:1.0/len(d) for k in d}
@@ -140,6 +136,7 @@ def norm_weights(d: dict):
 PARENT_WEIGHT_N = norm_weights(PARENT_WEIGHT)
 SUB_WEIGHT_N = {p: norm_weights(SUB_WEIGHT.get(p,{s:1.0 for s in SUBS[p]})) for p in PARENTS}
 
+# 관심사 필드 저장
 def build_preferences_and_interests():
     explicit = {}
     interests_sum = {p:0 for p in PARENTS}
@@ -204,9 +201,7 @@ def build_preferences_and_interests():
 
     return preferences, interests
 
-# =========================
-# user index finder
-# =========================
+# 유저번호
 def find_next_user_index():
     max_idx=0
     cursor=col.find({"_id":{"$regex":r"^user\d{3,5}$"}},{"_id":1})
@@ -217,9 +212,7 @@ def find_next_user_index():
             if n>max_idx: max_idx=n
     return max_idx+1
 
-# =========================
-# main insert
-# =========================
+# 데이터 저장
 def main():
     start_idx=find_next_user_index()
     end_idx=start_idx+TOTAL_USERS-1

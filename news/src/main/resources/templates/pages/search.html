@@ -73,11 +73,11 @@
 <main class="main">
   <div class="container">
     <div id="search-page" class="page">
-      <h2 class="page-title">통합검색</h2>
+      <h2 class="page-title" style="color:#000000">통합검색</h2>
 
       <div class="s-head">
         <div>
-          <span th:if="${!emptyQuery}">“<strong th:text="${q}">query</strong>” 검색 결과</span>
+          <span th:if="${!emptyQuery}">“<strong th:text="${q}" style="color:#000000">query</strong>” 검색 결과</span>
           <span class="s-hint" th:if="${emptyQuery}">검색어를 입력해 주세요.</span>
         </div>
       </div>
@@ -85,7 +85,7 @@
       <!-- ===== News ===== -->
       <section style="margin-top:24px">
         <div class="s-head">
-          <h3>뉴스</h3>
+          <h3 style="color:#000000">뉴스</h3>
           <div class="s-hint">최신순</div>
         </div>
 
@@ -125,7 +125,7 @@
             <a th:href="${b.link}" target="_blank" rel="noopener">
               <img th:src="${b.cover}" alt="cover"/>
             </a>
-            <div class="s-book-title" th:text="${b.title}">제목</div>
+            <div class="s-book-title" th:text="${b.title}" style="color:#000000">제목</div>
             <div class="s-book-author" th:text="${b.author}">저자</div>
             <div class="s-book-meta">
               <span th:if="${b.bestseller != null && b.bestseller.rank != null}"
@@ -158,7 +158,7 @@
              th:attr="data-vid=${v.videoId}">
             <img th:src="${v.thumbnail}" alt="thumb"/>
             <div class="s-video-body">
-              <div class="s-video-title" th:text="${v.title}">제목</div>
+              <div class="s-video-title" th:text="${v.title}" style="color:#000000">제목</div>
               <div class="s-video-meta">
                 <span th:text="${v.channelTitle}">채널명</span> ·
                 <span th:text="${#strings.substring(v.publishedAt,0,10)}">2025-01-01</span>

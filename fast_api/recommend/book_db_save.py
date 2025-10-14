@@ -1,16 +1,8 @@
-# -*- coding: utf-8 -*-
-# FastAPI + Aladin API → (필터/중복제거) → [옵션] MongoDB 저장(save=true)
-# 실행:
-#   pip install fastapi uvicorn pymongo requests
-#   uvicorn main:app --reload --host 0.0.0.0 --port 8000
-# 사용 예:
+# uvicorn 서버 열고 아래 링크 실행
+# 저장용
 #   GET /books?pages=2&per_page=50&save=true
 # 업데이트용
 #   GET /_refresh_bestseller_meta?pages=3&per_page=20
-
-#   GET /_ping_write  ← Mongo 쓰기 확인용
-#   POST /_repair_isbn_index  ← isbn13:null 정리 + 인덱스 재생성
-
 import requests
 from typing import List, Dict, Optional
 from fastapi import FastAPI, Query, HTTPException
@@ -20,21 +12,15 @@ from xml.etree import ElementTree as ET
 from pymongo import MongoClient, UpdateOne, ASCENDING, DESCENDING, TEXT
 from pymongo.errors import DuplicateKeyError, BulkWriteError
 
-# =========================
-# 🔧 고정 설정(여기만 수정)
-# =========================
-# 1) 알라딘 TTB 키
-TTBKEY = "ttb2win0min1217001"  # ← 네 키로 교체
+TTBKEY = "ttb2win0min1217001"
 
-# 2) MongoDB 연결 및 DB/컬렉션 이름
 MONGODB_URI = "mongodb+srv://Dgict_TeamB:team1234@cluster0.5d0uual.mongodb.net/"
 MONGODB_DB  = "test123"
 
-# 👉 컬렉션 이름은 여기서 한 번만 지정
 BOOKS_COLLECTION      = "aladin_books"
 CATEGORIES_COLLECTION = "aladin_categories"
 
-# 3) 기본 경제 카테고리(필요시 수정/추가)
+# 알라딘 기본 경제 카테고리 넘버
 DEFAULT_ECON_CATEGORY_IDS = [
     170, 3057, 3059, 3061, 3062, 3063, 8586, 3065, 3140, 8587,
     2172, 3103, 2173, 2841, 8593, 2747, 3123, 3069, 2028, 853,
@@ -43,16 +29,12 @@ DEFAULT_ECON_CATEGORY_IDS = [
     3049, 3104, 2408, 3110, 11503, 6189
 ]
 
-# 4) 알라딘 API 기본
 ALADIN_URL = "http://www.aladin.co.kr/ttb/api/ItemList.aspx"
 
 app = FastAPI(title="Aladin Save-First API (Mongo, rank+salesPoint)")
 
-# =========================
-# 공통 유틸
-# =========================
+# 문자열 리스트를 정수 리스트로 반환
 def normalize_category_ids(raw_ids: Optional[List[str]]) -> List[int]:
-    """'3065,3057' 이든 ['3065','3057'] 이든 정수 리스트로 정규화"""
     if not raw_ids:
         return []
     out: List[int] = []
@@ -63,23 +45,22 @@ def normalize_category_ids(raw_ids: Optional[List[str]]) -> List[int]:
             p = part.strip()
             if p.isdigit():
                 out.append(int(p))
-    return list(dict.fromkeys(out))  # 중복 제거(순서 보존)
+    return list(dict.fromkeys(out))
 
-# =========================
-# Mongo 유틸
-# =========================
+# db연결
 def get_db():
     client = MongoClient(MONGODB_URI)
     return client[MONGODB_DB]
 
+# 인덱스 존재 확인 / 삭제
 def drop_index_if_exists(coll, name: str):
     try:
         coll.drop_index(name)
         print(f"[ensure_indexes] dropped index: {name}")
     except Exception:
-        # 존재하지 않으면 무시
         pass
 
+# 인덱스 생성
 def ensure_indexes(db):
     # 카테고리
     db[CATEGORIES_COLLECTION].create_index([("id", ASCENDING)], unique=True, name="uk_category_id")
@@ -91,22 +72,18 @@ def ensure_indexes(db):
     # isbn13 unique+sparse (None은 인덱스 제외)
     drop_index_if_exists(db[BOOKS_COLLECTION], "uk_isbn13")
     db[BOOKS_COLLECTION].create_index([("isbn13", ASCENDING)], unique=True, sparse=True, name="uk_isbn13")
-
     db[BOOKS_COLLECTION].create_index([("link", ASCENDING)], unique=True, sparse=True, name="uk_link")
     db[BOOKS_COLLECTION].create_index([("categoryId", ASCENDING), ("pubDate", ASCENDING)], name="idx_cat_pubDate")
     db[BOOKS_COLLECTION].create_index([("pubDate", ASCENDING)], name="idx_pubDate")
     db[BOOKS_COLLECTION].create_index([("title", TEXT), ("author", TEXT)], name="txt_title_author")
 
-    # ✅ 인기 정렬용 인덱스 추가
+    # 인기 정렬용
     db[BOOKS_COLLECTION].create_index([("salesPoint", DESCENDING)], name="idx_salesPoint")
     db[BOOKS_COLLECTION].create_index([("bestseller.rank", ASCENDING), ("bestseller.categoryId", ASCENDING)], name="idx_bsr_cat")
 
-# =========================
-# 유지보수/진단 엔드포인트
-# =========================
+# db 연결/쓰기 테스트
 @app.get("/_ping_write")
 def ping_write():
-    """MongoDB 연결/쓰기 확인용 간단 테스트"""
     try:
         db = get_db()
         ensure_indexes(db)
@@ -120,7 +97,7 @@ def ping_write():
             "source": "TEST",
             "ingestedAt": now,
             "updatedAt": now,
-            # 테스트용 필드 (없어도 됨)
+            # 테스트용
             "salesPoint": 1,
             "bestseller": {"rank": 999999, "categoryId": 0, "capturedAt": now}
         }
@@ -129,25 +106,17 @@ def ping_write():
     except Exception as e:
         return {"ok": False, "error": str(e)}
 
+# 유지보수용: 문서정리, uk_isbn13 인덱스 재생성
 @app.post("/_repair_isbn_index")
 def repair_isbn_index():
-    """
-    1) isbn13:null 문서 정리(unset)
-    2) uk_isbn13 인덱스 재생성(sparse unique)
-    """
     db = get_db()
-    # 1) isbn13:null → 필드 제거
     res = db[BOOKS_COLLECTION].update_many({"isbn13": None}, {"$unset": {"isbn13": ""}})
-    # 2) 인덱스 재생성
     drop_index_if_exists(db[BOOKS_COLLECTION], "uk_isbn13")
     db[BOOKS_COLLECTION].create_index([("isbn13", ASCENDING)], unique=True, sparse=True, name="uk_isbn13")
     return {"ok": True, "unset_null_count": res.modified_count, "index": "uk_isbn13 (unique,sparse)"}
 
-# =========================
-# Aladin 호출 & 파싱
-# =========================
+# 알라딘 호출
 def fetch_xml(cid: int, start: int, max_results: int) -> str:
-    """Bestseller 리스트 호출 (QueryType=Bestseller)"""
     if not TTBKEY:
         raise HTTPException(500, "ALADIN_TTBKEY 가 설정되어 있지 않습니다.")
     params = {
@@ -164,16 +133,13 @@ def fetch_xml(cid: int, start: int, max_results: int) -> str:
     r.raise_for_status()
     return r.text
 
+# 호출한 데이터에서 필드 추출
 def parse_xml(xml_text: str) -> List[Dict]:
-    """
-    XML 파싱: title/author/pubDate/link/cover/isbn13 + salesPoint(있을 경우) + 페이지 내 인덱스
-    """
     try:
         root = ET.fromstring(xml_text)
     except ET.ParseError:
         return []
 
-    # 네임스페이스 제거
     for el in root.iter():
         if isinstance(el.tag, str) and '}' in el.tag:
             el.tag = el.tag.split('}', 1)[1]
@@ -184,7 +150,6 @@ def parse_xml(xml_text: str) -> List[Dict]:
             n = it.find(tag)
             return (n.text or "").strip() if n is not None else ""
 
-        # salesPoint는 없을 수도 있음 → 안전 파싱
         sp_raw = get("salesPoint")
         try:
             sales_point = int(sp_raw) if sp_raw else None
@@ -194,24 +159,22 @@ def parse_xml(xml_text: str) -> List[Dict]:
         out.append({
             "title":  get("title"),
             "author": get("author"),
-            "pubDate": get("pubDate")[:10],  # YYYY-MM-DD
+            "pubDate": get("pubDate")[:10],
             "link":   get("link"),
             "cover":  get("cover"),
             "isbn13": get("isbn13"),
-            "salesPoint": sales_point,       # ✅ 판매 지수(있으면)
-            "__index_in_page": idx           # ✅ 페이지 내 순서 (절대 랭크 계산에 사용)
+            "salesPoint": sales_point,
+            "__index_in_page": idx
         })
     return out
 
-# =========================
-# Mongo 저장(업서트) + 진단 로그
-# =========================
+# 파싱된 데이터를 업서트(없으면 insert, 있으면 update)로 저장
 def save_to_mongo(items: List[Dict], category_ids: List[int]):
     print(f"[save_to_mongo] incoming items: {len(items)}  cats={category_ids}")
     db = get_db()
     ensure_indexes(db)
 
-    # 카테고리 upsert
+    # 카테고리
     for cid in set(category_ids):
         db[CATEGORIES_COLLECTION].update_one(
             {"id": int(cid)},
@@ -228,7 +191,6 @@ def save_to_mongo(items: List[Dict], category_ids: List[int]):
         link = (it.get("link") or "").strip() or None
         unique_key = isbn or link
         if not unique_key:
-            # isbn도 link도 없으면 스킵
             continue
 
         pub_dt = None
@@ -238,7 +200,6 @@ def save_to_mongo(items: List[Dict], category_ids: List[int]):
             except Exception:
                 pub_dt = None
 
-        # category_ids가 단일이면 그 값을 categoryId로, 복수면 아이템에 심어놓은 값 사용
         cat_id = category_ids[0] if len(category_ids) == 1 else it.get("categoryId")
 
         set_fields = {
@@ -254,14 +215,14 @@ def save_to_mongo(items: List[Dict], category_ids: List[int]):
         if isbn is not None:
             set_fields["isbn13"] = isbn
 
-        # ✅ 판매 지수 저장(있을 때만)
+        # 판매지수
         if it.get("salesPoint") is not None:
             try:
                 set_fields["salesPoint"] = int(it["salesPoint"])
             except Exception:
                 pass
 
-        # ✅ 베스트셀러 절대 랭크 저장(있을 때만)
+        # 베스트셀러
         if it.get("bestsellerRank") is not None:
             set_fields["bestseller"] = {
                 "rank": int(it["bestsellerRank"]),
@@ -270,7 +231,6 @@ def save_to_mongo(items: List[Dict], category_ids: List[int]):
             }
 
         update_doc = {"$set": set_fields, "$setOnInsert": {"ingestedAt": now, "uniqueKey": unique_key}}
-        # 혹시 이전에 isbn13:null 이 저장된 적이 있다면 제거
         if isbn is None:
             update_doc["$unset"] = {"isbn13": ""}
 
@@ -286,18 +246,14 @@ def save_to_mongo(items: List[Dict], category_ids: List[int]):
     except DuplicateKeyError as e:
         print(f"[save_to_mongo] DuplicateKeyError: {e}")
     except BulkWriteError as bwe:
-        # 일부 문서 실패 시에도 성공분은 반영됨. 세부 사유만 로그
         print(f"[save_to_mongo] BulkWriteError: {bwe.details}")
     except Exception as e:
         print(f"[save_to_mongo] bulk_write error: {e}")
         raise
 
-# =========================
-# API 엔드포인트
-# =========================
+# 엔드포인트
 @app.get("/books")
 def books(
-    # 콤마/반복 허용
     category_ids: Optional[List[str]] = Query(
         None, description="예: 3065,3057 또는 category_ids=3065&category_ids=3057"
     ),
@@ -307,14 +263,12 @@ def books(
     since: Optional[str] = None,  # YYYY-MM-DD
     save: bool = Query(False, description="true면 MongoDB에 저장 후 반환"),
 ):
-    # 1) 카테고리 정규화
     ids = normalize_category_ids(category_ids)
     if not ids:
         ids = DEFAULT_ECON_CATEGORY_IDS
     if not ids:
         raise HTTPException(400, "category_ids가 비어있습니다.")
 
-    # 2) 수집
     collected: List[Dict] = []
     for cid in ids:
         s = start
@@ -323,13 +277,12 @@ def books(
                 xml = fetch_xml(cid, s, per_page)
                 parsed = parse_xml(xml)
 
-                # ✅ 절대 랭크 계산: Bestseller 호출 시 응답 순서를 랭크로 사용
-                base = (s - 1) * per_page  # 이전 페이지까지의 개수
+                base = (s - 1) * per_page
                 for it in parsed:
                     it.setdefault("categoryId", cid)
                     local_idx = it.pop("__index_in_page", None)
                     if local_idx is not None:
-                        it["bestsellerRank"] = base + local_idx + 1  # 1-based
+                        it["bestsellerRank"] = base + local_idx + 1
 
                 collected.extend(parsed)
             except requests.RequestException as e:
@@ -338,7 +291,6 @@ def books(
 
     print(f"[books] collected={len(collected)} before dedup")
 
-    # 3) 중복 제거 (isbn13 우선, 없으면 link)
     seen = set()
     dedup = []
     for it in collected:
@@ -352,7 +304,6 @@ def books(
 
     print(f"[books] after dedup={len(dedup)}")
 
-    # 4) since 필터 (선택)
     if since:
         try:
             since_dt = datetime.strptime(since[:10], "%Y-%m-%d")
@@ -369,7 +320,6 @@ def books(
         except ValueError:
             print(f"[books] invalid since format, ignored: {since}")
 
-    # 5) save=true이면 Mongo에 업서트
     if save:
         try:
             save_to_mongo(dedup, ids)
@@ -378,11 +328,8 @@ def books(
 
     return {"count": len(dedup), "items": dedup, "saved": bool(save)}
 
+# salesPoint, bestseller, updatedAt 만 부분 업서트
 def update_sales_meta(items: List[dict], category_ids: List[int]):
-    """
-    기존 save_to_mongo는 전체 문서를 업서트.
-    이 함수는 메타(salesPoint, bestseller, updatedAt)만 '부분 업데이트' 합니다.
-    """
     from pymongo import UpdateOne
     db = get_db()
     ensure_indexes(db)
@@ -411,9 +358,9 @@ def update_sales_meta(items: List[dict], category_ids: List[int]):
             }
 
         ops.append(UpdateOne(
-            {"uniqueKey": key},           # 기존 문서 기준(ISBN 또는 link)
+            {"uniqueKey": key},
             {"$set": set_fields},
-            upsert=False                  # 메타 전용 업데이트: 없으면 만들지 않음
+            upsert=False
         ))
 
     if ops:

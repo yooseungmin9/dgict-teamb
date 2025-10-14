@@ -14,8 +14,9 @@ NAVER_CLIENT_SECRET = "3Y5I7ZkpmP"
 mongo_client = MongoClient("mongodb+srv://Dgict_TeamB:team1234@cluster0.5d0uual.mongodb.net/")
 mongo_col = mongo_client["test123"]["shared_articles"]
 
-CATEGORIES = ["증권", "금융", "부동산", "산업", "글로벌경제", "일반"]
+app = FastAPI(title="Trend API (Naver Datalab)", version="1.0.0")
 
+CATEGORIES = ["증권", "금융", "부동산", "산업", "글로벌경제", "일반"]
 
 CATEGORY_KEYWORDS = {
     "증권": ["증권", "주식", "코스피", "코스닥"],
@@ -26,8 +27,6 @@ CATEGORY_KEYWORDS = {
     "일반": ["소비", "물가", "경기", "실업률"],
 }
 
-app = FastAPI(title="Trend API (Naver Datalab)", version="1.0.0")
-
 # ====== CORS ======
 app.add_middleware(
     CORSMiddleware,
@@ -37,9 +36,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ====== 유틸 ======
+# 사이즈 조절을 위한 함수
 def chunked(iterable, size):
-    """딕셔너리를 size 개씩 나눔"""
     it = iter(iterable.items())
     while True:
         batch = list(islice(it, size))
@@ -47,6 +45,7 @@ def chunked(iterable, size):
             break
         yield dict(batch)
 
+# 데이터랩에서 5개씩 끊어서 호출 후 병합
 def call_naver_datalab_groups(start_date: str, end_date: str, time_unit: str, groups_dict: dict):
     url = "https://openapi.naver.com/v1/datalab/search"
     headers = {
@@ -69,6 +68,7 @@ def call_naver_datalab_groups(start_date: str, end_date: str, time_unit: str, gr
         all_results.extend(j.get("results", []))
     return {"results": all_results}
 
+# 현재 기준 최근 30일 날짜 라벨과 카테고리별 값 배열 정렬 / 반환
 @app.get("/category-trends")
 def category_trends(days: int = 30, time_unit: str = "date"):
     end = date.today()
@@ -95,6 +95,7 @@ def category_trends(days: int = 30, time_unit: str = "date"):
 
     return {"source": "naver", "dates": labels, "categories": categories}
 
+# 샘플 데이터 확인
 @app.get("/sentiment/line")
 def sentiment_line():
     data = [
@@ -108,6 +109,7 @@ def sentiment_line():
                 "negative": [d["negative"] for d in data]
             }}
 
+# api의 유효성 체크
 @app.get("/health")
 def health():
     return {"ok": True, "service": "trends"}

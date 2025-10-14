@@ -1,4 +1,3 @@
-# youtube_api.py (패치 버전: quotaExceeded 시에도 페이지가 뜨도록 fallback 추가)
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from typing import Optional, Dict, Any, List
@@ -17,7 +16,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 🔐 환경변수 우선
+# youtube api key
 # _YT_FALLBACK = "AIzaSyDtsdmz204NoNAFBam4S3Fe_gNR4Sy_7Ko"
 # _YT_FALLBACK = "AIzaSyAvBT58ksxCS_E0nehgiy5fMJbtXnePghk"
 # _YT_FALLBACK = "AIzaSyBtxipDV9KVMm5j87yNiVMvriFSTZzJyeo"
@@ -29,12 +28,12 @@ Y_SEARCH = "https://www.googleapis.com/youtube/v3/search"
 Y_VIDEOS = "https://www.googleapis.com/youtube/v3/videos"
 TIMEOUT = 10
 
-
+# youtube key 확인
 def require_key():
     if not YOUTUBE_API_KEY:
         raise HTTPException(status_code=500, detail="Missing YOUTUBE_API_KEY")
 
-
+# 에러 로그 출력용
 def _extract_google_error_detail(resp: requests.Response) -> Dict[str, Any]:
     try:
         j = resp.json()
@@ -51,9 +50,8 @@ def _extract_google_error_detail(resp: requests.Response) -> Dict[str, Any]:
             detail["domain"] = errors[0].get("domain")
     return detail
 
-
+# api 호출 실패 시 단순 출력용 샘플 2개
 def _fallback_items(q: str) -> Dict[str, Any]:
-    """API 실패(특히 quotaExceeded) 시에도 페이지가 깨지지 않도록 반환할 안전한 더미 데이터."""
     demo = [
         {
             "videoId": "dQw4w9WgXcQ",
@@ -79,11 +77,11 @@ def _fallback_items(q: str) -> Dict[str, Any]:
         "items": demo,
         "nextPageToken": None,
         "prevPageToken": None,
-        "fallback": True,                # ← 프론트에서 “데모입니다” 같은 안내에 사용 가능
+        "fallback": True,
         "fallback_reason": "quotaExceeded or upstream error",
     }
 
-
+# 검색으로 얻은 비디오 아이디로 비디오 호출
 def fetch_video_stats(video_ids: List[str]) -> dict:
     if not video_ids:
         return {}
@@ -108,12 +106,14 @@ def fetch_video_stats(video_ids: List[str]) -> dict:
         }
     return stats
 
+# 엔드포인트
 
+# api 유효성 체크
 @app.get("/healthz")
 def healthz():
     return {"ok": True, "has_key": bool(YOUTUBE_API_KEY)}
 
-
+# api 호출
 @app.get("/youtube/search")
 def youtube_search(
     q: str = Query(..., min_length=1, description="검색어"),
@@ -123,10 +123,6 @@ def youtube_search(
     _raw: int = 0,
     allow_fallback: int = Query(1, description="API 실패 시 데모 데이터 반환(1=on,0=off)"),
 ) -> Dict[str, Any]:
-    """
-    YouTube Data API v3 proxy.
-    - API 실패해도 페이지가 떠야 하므로, 기본값(allow_fallback=1)에서는 데모 데이터를 반환.
-    """
     require_key()
 
     params = {
@@ -146,20 +142,16 @@ def youtube_search(
         r = requests.get(Y_SEARCH, params=params, timeout=TIMEOUT)
     except requests.RequestException as e:
         log.error("YouTube API network error: %s", e)
-        # 네트워크 장애일 때도 페이지가 떠야 한다면 fallback
         if allow_fallback:
             return _fallback_items(q)
         raise HTTPException(status_code=502, detail=f"YouTube upstream network error: {e}")
 
     if not r.ok:
-        # 4xx/5xx 원문 파싱
         detail = _extract_google_error_detail(r)
         reason = str(detail.get("reason"))
-        # 🔸 quotaExceeded 등일 때는 200 + fallback
         if allow_fallback and r.status_code == 403 and reason == "quotaExceeded":
             log.warning("quotaExceeded detected; serving fallback items.")
             return _fallback_items(q)
-        # 그 외에는 있는 그대로 던짐
         raise HTTPException(status_code=r.status_code, detail=detail)
 
     payload = r.json()
