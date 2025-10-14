@@ -15,7 +15,6 @@ public class TrendService {
     @Qualifier("trendClient")
     private final WebClient trendClient;  // baseUrl = http://localhost:8006
 
-    /** FastAPI(8006)에서 카테고리 트렌드 가져오기 */
     public Map<String, Object> getCategoryTrends(int days) {
         return trendClient.get()
                 .uri(uri -> uri.path("/category-trends")

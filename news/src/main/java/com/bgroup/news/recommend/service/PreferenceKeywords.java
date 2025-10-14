@@ -8,7 +8,6 @@ import java.util.*;
 @Service
 public class PreferenceKeywords {
 
-    /** 한글 정규 키: "부모/하위" */
     private static final Map<String, List<String>> GLOSS = Map.ofEntries(
             // 금융
             Map.entry("금융/금리",       List.of("금리","연준","기준금리","점도표")),
@@ -29,7 +28,6 @@ public class PreferenceKeywords {
             Map.entry("부동산/_기타",    List.of("부동산","아파트","전세","청약","집값"))
     );
 
-    /** 기존 영문/혼합 표기를 만나도 한글 정규 키로 수렴 (레거시 호환용) */
     private static final Map<String, String> ALIAS = Map.ofEntries(
             // parent
             Map.entry("finance", "금융"), Map.entry("financial", "금융"),
@@ -47,7 +45,6 @@ public class PreferenceKeywords {
             Map.entry("_misc","_기타"), Map.entry("misc","_기타")
     );
 
-    /** explicit*2 + implicit*1 → 상위 N 서브카테고리에서 대표 키워드 최대 M개 */
     public List<String> buildSeeds(MemberDoc me, int topSubcats, int maxKeywords) {
         Map<String,Integer> subScore = new HashMap<>();
 
@@ -90,7 +87,6 @@ public class PreferenceKeywords {
     private static String canon(String t){
         if (t == null) return "_기타";
         String s = t.trim();
-        // 영문 별칭 → 한글 정규
         s = ALIAS.getOrDefault(s, s);
         return s.isEmpty() ? "_기타" : s;
     }

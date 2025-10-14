@@ -33,11 +33,10 @@ public class NewsDoc {
     private String category;
 
     @Field("sentiment_score")
-    private Integer sentimentScore;   // 없으면 null
+    private Integer sentimentScore;
 
     private List<String> keywords;
 
-    // NOTE: 현재 DB가 문자열로 저장하고 있으므로 String 사용
     @Field("published_at")
     private String publishedAt;
 }
