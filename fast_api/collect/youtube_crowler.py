@@ -8,20 +8,22 @@ from pymongo import MongoClient
 import googleapiclient.errors
 from transformers import AutoTokenizer, AutoModelForSequenceClassification, pipeline
 import torch
+import os
+from dotenv import load_dotenv
+from difflib import SequenceMatcher
 
-# --------------------------
 # 1. API & DB 설정
-# --------------------------
-API_KEY = "AIzaSyAvBT58ksxCS_E0nehgiy5fMJbtXnePghk"  # 🔑 본인 키
-youtube = build("youtube", "v3", developerKey=API_KEY, static_discovery=False)
+load_dotenv()
 
-client = MongoClient("mongodb+srv://Dgict_TeamB:team1234@cluster0.5d0uual.mongodb.net/")
+API_KEY = os.getenv("YOUTUBE_API_KEY")
+MONGO_URI = os.getenv("MONGO_URI")
+
+youtube = build("youtube", "v3", developerKey=API_KEY, static_discovery=False)
+client = MongoClient(MONGO_URI)
 db = client["test123"]
 col = db["youtube_db2"]
 
-# --------------------------
 # 2. 한국어 감정 분석 모델 로드
-# --------------------------
 MODEL_NAME = "dlckdfuf141/korean-emotion-kluebert-v2"
 
 id2label = {
@@ -48,18 +50,14 @@ emotion_classifier = pipeline(
     model=model,
     tokenizer=tokenizer,
     top_k=None,
-    batch_size=32,  # 🔑 배치 단위로 추론
+    batch_size=32,
     device=0 if torch.cuda.is_available() else -1
 )
 
-# --------------------------
 # 3. 배치 감정 분석 함수
-# --------------------------
 def classify_emotions_batch(texts):
     """여러 댓글을 한 번에 감정 분류"""
-    preds = emotion_classifier(
-        texts, truncation=True, max_length=256
-    )
+    preds = emotion_classifier(texts, truncation=True, max_length=256)
     results = []
     for pred in preds:
         scores = {p["label"]: float(p["score"]) for p in pred}
@@ -67,9 +65,7 @@ def classify_emotions_batch(texts):
         results.append({"label": best, "scores": scores})
     return results
 
-# --------------------------
 # 4. 영상 정보
-# --------------------------
 def get_video_info(video_id: str, category: str):
     request = youtube.videos().list(part="snippet,statistics", id=video_id)
     response = request.execute()
@@ -90,9 +86,7 @@ def get_video_info(video_id: str, category: str):
         "thumbnail_url": snippet["thumbnails"]["medium"]["url"],
     }
 
-# --------------------------
 # 5. 댓글 수집 + 배치 감정 분석
-# --------------------------
 def get_video_comments(video_id: str, max_total: int = 1000):
     comments = []
     next_page_token = None
@@ -120,7 +114,6 @@ def get_video_comments(video_id: str, max_total: int = 1000):
                 if len(comments) + len(batch_texts) >= max_total:
                     break
 
-            # 🔑 배치로 감정분석
             if batch_texts:
                 emotions = classify_emotions_batch(batch_texts)
                 for snip, emo in zip(raw_items, emotions):
@@ -139,16 +132,12 @@ def get_video_comments(video_id: str, max_total: int = 1000):
 
     except googleapiclient.errors.HttpError as e:
         if "commentsDisabled" in str(e):
-            print(f"⚠️ 댓글 꺼짐 → 수집 안 함 (video_id={video_id})")
+            print(f"댓글 꺼짐 → 수집 안 함 (video_id={video_id})")
             return None
 
     return comments
 
-# --------------------------
-# 6. 메인 수집 (중복·무관 필터링 추가)
-# --------------------------
-from difflib import SequenceMatcher
-
+# 6. 메인 수집 (중복·무관 필터링 포함)
 def is_similar(a: str, b: str, threshold: float = 0.8) -> bool:
     """문자열 유사도 계산"""
     return SequenceMatcher(None, a, b).ratio() > threshold
@@ -156,7 +145,7 @@ def is_similar(a: str, b: str, threshold: float = 0.8) -> bool:
 def collect_videos_with_emotions(query: str, category: str, target_count: int = 10):
     saved_count = 0
     next_page_token = None
-    seen_titles = []  # 중복 제목 감시
+    seen_titles = []
 
     while saved_count < target_count:
         request = youtube.search().list(
@@ -175,9 +164,8 @@ def collect_videos_with_emotions(query: str, category: str, target_count: int = 
 
             video_id = item["id"]["videoId"]
 
-            # (1) DB 중복 확인
             if col.find_one({"video_id": video_id}):
-                print(f"⚠️ 중복 영상 → 스킵 ({video_id})")
+                print(f"중복 영상 → 스킵 ({video_id})")
                 continue
 
             info = get_video_info(video_id, category)
@@ -187,14 +175,12 @@ def collect_videos_with_emotions(query: str, category: str, target_count: int = 
             title = info["title"].strip()
             desc = item["snippet"].get("description", "")
 
-            # (3) 제목 유사도 검사
             if any(is_similar(title, t) for t in seen_titles):
-                print(f"⚠️ 유사 제목 → 스킵: {title}")
+                print(f"유사 제목 → 스킵: {title}")
                 continue
 
-            # (4) 댓글 수 기준
             if info["comment_count"] < 20:
-                print(f"❌ 댓글 {info['comment_count']}개 → 스킵: {title}")
+                print(f"댓글 {info['comment_count']}개 → 스킵: {title}")
                 continue
 
             comments = get_video_comments(video_id, max_total=1000)
@@ -205,20 +191,17 @@ def collect_videos_with_emotions(query: str, category: str, target_count: int = 
             col.insert_one(info)
             saved_count += 1
             seen_titles.append(title)
-            print(f"✅ 저장 완료: {title} ({len(comments)}개 댓글)")
+            print(f"저장 완료: {title} ({len(comments)}개 댓글)")
 
         next_page_token = response.get("nextPageToken")
         if not next_page_token:
-            print("⚠️ 더 이상 검색 결과 없음")
+            print("더 이상 검색 결과 없음")
             break
 
-    print(f"📊 최종 저장된 영상 수: {saved_count}")
+    print(f"최종 저장된 영상 수: {saved_count}")
 
-# --------------------------
 # 7. 실행
-# --------------------------
 if __name__ == "__main__":
     query = "산업 뉴스"
     category = "산업"
-    collect_videos_with_emotions(query, category, target_count=20)  # ✅ target_count 사용
-
+    collect_videos_with_emotions(query, category, target_count=20)
