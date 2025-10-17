@@ -28,14 +28,12 @@ public class YoutubeService {
 
     private final VideoRepository videoRepo;
 
-    // ✅ FastAPI와 연결할 WebClient (application.properties: fastapi.analysis)
     @Qualifier("analysisClient")
     private final WebClient analysisClient;
 
     private static final int LIST_SIZE = 50;
     private static final Duration TIMEOUT = Duration.ofSeconds(10);
 
-    /** 좌측 목록: 최신 50개 영상 */
     public List<VideoSummaryDto> listVideos() {
         var page = videoRepo.findAll(
                 org.springframework.data.domain.PageRequest.of(0, LIST_SIZE,
@@ -50,7 +48,6 @@ public class YoutubeService {
                 .collect(Collectors.toList());
     }
 
-    /** 상세 정보 */
     public VideoDetailDto getVideoDetail(String videoId) {
         var v = Optional.ofNullable(videoRepo.findByVideoId(videoId))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "video not found"));
@@ -66,10 +63,6 @@ public class YoutubeService {
                 .build();
     }
 
-    /**
-     * 분석 결과 (FastAPI 연동 버전)
-     * FastAPI의 /analysis/{video_id}?topn=100&limit=1000 호출
-     */
     public AnalysisResponseDto getAnalysis(String videoId) {
         try {
             log.info("[YoutubeService] FastAPI 요청 시작: videoId={}", videoId);
@@ -91,7 +84,6 @@ public class YoutubeService {
                 throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "FastAPI returned empty response");
             }
 
-            // FastAPI의 JSON을 DTO로 변환
             @SuppressWarnings("unchecked")
             Map<String, Integer> sentiment = (Map<String, Integer>) res.getOrDefault("sentiment", Map.of());
             @SuppressWarnings("unchecked")
@@ -130,7 +122,6 @@ public class YoutubeService {
         }
     }
 
-    /* ===== helpers ===== */
     private static String s(String x) { return x == null ? "" : x.trim(); }
     private static long nz(Long x) { return x == null ? 0L : x; }
 }

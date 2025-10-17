@@ -12,10 +12,8 @@ import reactor.core.publisher.Mono;
 @RequiredArgsConstructor
 public class YoutubeController {
 
-    // ✅ FastAPI 서버 포트 (8008)
     private final WebClient webClient = WebClient.create("http://localhost:8008");
 
-    /** 🎥 영상 목록 (FastAPI 프록시 + 정렬/카테고리 전달) */
     @GetMapping("/videos")
     public Mono<ResponseEntity<String>> listVideos(
             @RequestParam(required = false) String category,
@@ -32,7 +30,6 @@ public class YoutubeController {
                 .toEntity(String.class);
     }
 
-    /** 🎬 영상 상세 */
     @GetMapping("/videos/{videoId}")
     public Mono<ResponseEntity<String>> getVideoDetail(@PathVariable String videoId) {
         return webClient.get()
@@ -41,7 +38,6 @@ public class YoutubeController {
                 .toEntity(String.class);
     }
 
-    /** 📊 분석 결과 */
     @GetMapping("/analysis/{videoId}")
     public Mono<ResponseEntity<String>> getAnalysis(
             @PathVariable String videoId,

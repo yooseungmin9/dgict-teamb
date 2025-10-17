@@ -94,7 +94,7 @@ public class MemberController {
                 (keywords == null ? Collections.emptyList() : keywords)
         );
 
-        // ✅ 세션 최신화 (화면에서 즉시 최신값 사용)
+        // 세션 최신화 (화면에서 즉시 최신값 사용)
         MemberDoc refreshed = memberService.getOrThrow(me.getId());
         session.setAttribute("loginUser", refreshed);
 
@@ -116,7 +116,7 @@ public class MemberController {
 
         memberService.applyPreferenceSurvey(me.getId(), req);
 
-        // ✅ 세션 최신화
+        // 세션 최신화
         MemberDoc refreshed = memberService.getOrThrow(me.getId());
         session.setAttribute("loginUser", refreshed);
 

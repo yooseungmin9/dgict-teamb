@@ -26,7 +26,6 @@ public class AnalysisGateway {
 
     private final WebClient client;
 
-    // ✅ 명시적 생성자 + @Qualifier
     public AnalysisGateway(@Qualifier("analysisClient") WebClient client) {
         this.client = client;
     }
@@ -55,8 +54,6 @@ public class AnalysisGateway {
         );
         return body != null ? body : Collections.emptyMap();
     }
-
-    /* ------------------ 공통 GET 헬퍼 ------------------ */
 
     private <T> T get(String path, ParameterizedTypeReference<T> typeRef, Object... uriVars) {
         try {

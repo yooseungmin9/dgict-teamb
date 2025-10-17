@@ -473,6 +473,21 @@
   position:absolute; left:0; right:0; bottom:0; display:flex; justify-content:space-between; font-size:11px; color:#6b7280;
 }
 
+#panel-today-sentiment .emoa-marker {
+  transition: left 0.8s cubic-bezier(0.25, 0.8, 0.25, 1); /* 위치 이동 부드럽게 */
+}
+
+#panel-today-sentiment .emoa-bubble-merged {
+  transition: left 0.8s cubic-bezier(0.25, 0.8, 0.25, 1);
+  will-change: left;
+}
+
+#panel-today-sentiment .emoa-label {
+  transition: opacity 0.4s ease, transform 0.4s ease;
+}
+
+
+
 /* ====== 분석된 기사 개수 카드 가로 확장 ====== */
 #panel-news-count {
   grid-column: span 2 !important; /* 현재 열 기준으로 2칸 확장 */

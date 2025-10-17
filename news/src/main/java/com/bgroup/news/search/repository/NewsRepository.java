@@ -8,7 +8,6 @@ import org.springframework.data.mongodb.repository.Query;
 
 public interface NewsRepository extends MongoRepository<NewsDoc, String> {
 
-    // 제목/요약/본문/키워드(배열) 중 하나에 키워드 포함 (대소문자 무시)
     @Query("""
         { $or: [
             { 'title':   { $regex: ?0, $options: 'i' } },

@@ -22,7 +22,7 @@ public class AuthController {
         this.memberService = memberService;
     }
 
-    // ✅ 로그인 페이지 (GET)
+    // 로그인 페이지 (GET)
     @GetMapping("/login")
     public String loginPage(@RequestHeader(value = "Referer", required = false) String referer,
                             HttpSession session) {
@@ -33,7 +33,7 @@ public class AuthController {
         return "/member/login";
     }
 
-    // ✅ 로그인 요청 (POST)
+    // 로그인 요청 (POST)
     @PostMapping("/login")
     @ResponseBody
     public ResponseEntity<?> login(@RequestBody LoginRequest body, HttpSession session) {
@@ -52,7 +52,7 @@ public class AuthController {
                         .body(Map.of("error", "INVALID_CREDENTIALS")));
     }
 
-    // ✅ 웹 로그인 (폼 방식)
+    // 웹 로그인 (폼 방식)
     @PostMapping("/login/form")
     public String loginForm(@RequestParam String id,
                             @RequestParam String password,
@@ -75,7 +75,7 @@ public class AuthController {
                 });
     }
 
-    // ✅ 로그아웃
+    // 로그아웃
     @PostMapping("/logout")
     public String logout(@RequestHeader(value = "Referer", required = false) String referer,
                          HttpSession session) {

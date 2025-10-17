@@ -21,9 +21,8 @@ public class SearchService {
 
     private final BookRepository bookRepo;
     private final NewsRepository newsRepo;
-    private final WebClient youtubeClient; // @Bean("youtubeClient")
+    private final WebClient youtubeClient;
 
-    // ===== 기존 단건 메서드(초기 렌더용) =====
     public List<BookResponse> searchBooks(String q, int size) {
         if (q == null || q.isBlank()) return List.of();
         String safe = Pattern.quote(q.trim());
@@ -45,18 +44,15 @@ public class SearchService {
         YoutubeResponse r = searchYoutubePage(q, size, "");
         if (r == null || r.getItems() == null) return List.of();
 
-        // 1) 정렬
         List<YoutubeResponse.Item> items = new ArrayList<>(r.getItems());
         items.sort(Comparator.comparingLong((YoutubeResponse.Item v) -> -YoutubeViewCount(v)));
 
-        // 2) ✅ videoId 기준 중복 제거
         items = dedupeByVideoId(items);
 
         if (items.size() > size) items = items.subList(0, size);
         return items;
     }
 
-    // 아래 유틸 2개 추가
     private static List<YoutubeResponse.Item> dedupeByVideoId(List<YoutubeResponse.Item> in){
         if (in == null) return List.of();
         Map<String, YoutubeResponse.Item> map = new LinkedHashMap<>();
@@ -75,7 +71,6 @@ public class SearchService {
         catch (Exception e) { return 0L; }
     }
 
-    // ===== 페이지 API용 메서드 =====
     public Page<NewsDoc> searchNewsPage(String q, int page, int size) {
         if (q == null || q.isBlank()) return Page.empty();
         String safe = Pattern.quote(q.trim());
@@ -93,7 +88,6 @@ public class SearchService {
         return bookRepo.searchByTitleOrAuthor(safe, pg);
     }
 
-    // FastAPI 래핑: 페이지 토큰 기반
     public YoutubeResponse searchYoutubePage(String q, int size, String pageToken) {
         if (q == null || q.isBlank()) return new YoutubeResponse();
         try {
@@ -112,7 +106,6 @@ public class SearchService {
 
             if (res != null && res.getItems() != null) {
                 res.getItems().sort(Comparator.comparingLong((YoutubeResponse.Item v) -> -viewCount(v)));
-                // ✅ 페이지 내부 중복 제거
                 res.setItems(dedupeByVideoId(res.getItems()));
             }
             return res;

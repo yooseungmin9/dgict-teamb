@@ -17,7 +17,6 @@ public class NewsController {
         this.articleService = articleService;
     }
 
-    /** ✅ 목록 페이지 */
     @GetMapping({"", "/"})
     public String list(@RequestParam(defaultValue = "1") int page,
                        @RequestParam(defaultValue = "10") int size,
@@ -41,7 +40,6 @@ public class NewsController {
         return "pages/news";
     }
 
-    /** ✅ 상세 (모달 JSON 요청) */
     @GetMapping("/{id}")
     @ResponseBody
     public Article detail(@PathVariable String id) {

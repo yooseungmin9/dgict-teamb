@@ -32,4 +32,3 @@ public class GlobalController {
         }
     }
 }
-// 사용법: 템플릿에서 data-api-base="/api" 로 지정하면 CORS 불필요

@@ -21,19 +21,17 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class DashboardApiController {
 
-    private final TrendService trendService;                 // 8006 proxy
-    private final SentimentService sentimentService;         // 8007 proxy
-    private final KeywordRankingRepository keywordRepo;      // Mongo aggregation
+    private final TrendService trendService;
+    private final SentimentService sentimentService;
+    private final KeywordRankingRepository keywordRepo;
     private final EmoaService emoaService;
     private final NewsCountService newsCountService;
 
-    /** 핫토픽(데이터랩 그래프) — FastAPI(8006) 프록시 */
     @GetMapping("/trends/category-trends")
     public Map<String, Object> categoryTrends(@RequestParam(defaultValue = "30") int days) {
         return trendService.getCategoryTrends(days);
     }
 
-    /** 감성 라인/스택 — FastAPI(8007) 프록시 */
     @GetMapping("/sentiment/line")
     public ResponseEntity<?> sentimentLine(
             @RequestParam(defaultValue = "count") String mode,
@@ -46,17 +44,15 @@ public class DashboardApiController {
         }
     }
 
-    /** 키워드 랭킹 — Mongo 집계 */
     @GetMapping("/keywords/ranking")
     public List<KeywordRankingResponse> ranking(
-            @RequestParam String category,                 // '금융','부동산','산업','글로벌경제','일반'
+            @RequestParam String category,
             @RequestParam(defaultValue = "30") int days,
             @RequestParam(defaultValue = "50") int limit) {
         // 너희 컬렉션명으로 바꿔줘 (예: "news")
         return keywordRepo.topKeywords("shared_articles", category, days, limit);
     }
 
-    // /emoa/score?score_key=sentiment_score
     @GetMapping("/emoa/score")
     public Map<String,Object> score(@RequestParam(name="score_key", defaultValue="sentiment_score") String scoreKey){
         return emoaService.computeScore(scoreKey);

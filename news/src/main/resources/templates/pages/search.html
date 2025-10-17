@@ -44,7 +44,7 @@
     #search-page .more-btn{margin-top:10px;display:inline-block;padding:8px 14px;border:1px solid #e5e7eb;border-radius:8px;background:#fff;cursor:pointer}
     #search-page .more-btn:disabled{opacity:.6;cursor:not-allowed}
 
-    /* ===== Modal (레퍼런스 스타일 기반) ===== */
+    /* ===== Modal ===== */
     #news-modal{position:fixed;inset:0;z-index:6000;display:none}
     #news-modal.open{display:block}
     #news-modal .modal-backdrop{position:absolute;inset:0;background:rgba(17,24,39,.55);opacity:0;transition:opacity .18s}
@@ -182,7 +182,7 @@
 
 <div th:replace="~{fragments/footer :: siteFooter}"></div>
 
-<!-- ===== News Modal (레퍼런스 구조 적용) ===== -->
+<!-- ===== News Modal ===== -->
 <div id="news-modal" class="modal" aria-hidden="true">
   <div class="modal-backdrop"></div>
   <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="modal-title">
@@ -194,7 +194,7 @@
     <div class="modal-body">
       <img id="modal-image" class="modal-image" alt="article image" style="display:none;" />
       <div class="modal-content">
-        <p id="modal-summary" style="margin-bottom:12px"></p>
+        <!-- 요약 제거: 모달엔 본문만 표기 -->
         <p id="modal-content"></p>
       </div>
     </div>
@@ -337,12 +337,11 @@
       $videos.appendChild(frag);
     }
 
-    /* ===== 모달 (레퍼런스 UX) ===== */
+    /* ===== 모달 ===== */
     const modal=document.getElementById('news-modal');
     const $mTitle = document.getElementById('modal-title');
     const $mDate  = document.getElementById('modal-date');
     const $mImg   = document.getElementById('modal-image');
-    const $mSum   = document.getElementById('modal-summary');
     const $mCont  = document.getElementById('modal-content');
     const $mLink  = document.getElementById('modal-link');
     const $mPress = document.getElementById('modal-press');
@@ -363,7 +362,7 @@
       if(n?.image){ $mImg.src=n.image; $mImg.style.display='block'; $mImg.onerror=()=>{ $mImg.style.display='none'; }; }
       else { $mImg.removeAttribute('src'); $mImg.style.display='none'; }
 
-      $mSum.textContent  = n?.summary || '';
+      // 요약 미표시: 본문만 세팅
       $mCont.textContent = n?.content || '';
 
       if(n?.url){ $mLink.href=n.url; $mLink.style.display='inline-block'; }
