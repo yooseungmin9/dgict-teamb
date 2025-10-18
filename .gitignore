@@ -664,3 +664,8 @@ $RECYCLE.BIN/
 
 # End of https://www.toptal.com/developers/gitignore/api/windows,macos,pycharm,intellij,python,java,jetbrains,webstorm,react,jupyternotebooks
 run_many.py
+
+# Environment files (팀별/로컬 환경 분리용)
+.env
+.env.*
+!*.example

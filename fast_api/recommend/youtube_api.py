@@ -1,8 +1,15 @@
+# -*- coding: utf-8 -*-
+from __future__ import annotations
+
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from typing import Optional, Dict, Any, List
 from html import unescape
 import os, requests, logging
+from dotenv import load_dotenv
+
+# 0) .env 로드 (없으면 조용히 패스)
+load_dotenv()
 
 log = logging.getLogger("uvicorn.error")
 
@@ -10,30 +17,19 @@ app = FastAPI(title="YouTube Proxy API")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"],         # 기존 동작 유지 (필요하면 ENV로 빼도 OK)
     allow_credentials=False,
     allow_methods=["GET", "OPTIONS"],
     allow_headers=["*"],
 )
 
-# youtube api key
-# _YT_FALLBACK = "AIzaSyDtsdmz204NoNAFBam4S3Fe_gNR4Sy_7Ko"
-# _YT_FALLBACK = "AIzaSyAvBT58ksxCS_E0nehgiy5fMJbtXnePghk"
-# _YT_FALLBACK = "AIzaSyBtxipDV9KVMm5j87yNiVMvriFSTZzJyeo"
-_YT_FALLBACK = "AIzaSyB-_o4aPDlCDY_xwaTjbPKd-bkozHEOYO4"
-# _YT_FALLBACK = "AIzaSyDeKCDQL_eGrxCBMJvH4aCA_FOunlWPLVY"
-YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY", _YT_FALLBACK).strip()
-
+# 1) 환경변수
+YOUTUBE_API_KEY = (os.getenv("YOUTUBE_API_KEY") or "").strip()
 Y_SEARCH = "https://www.googleapis.com/youtube/v3/search"
 Y_VIDEOS = "https://www.googleapis.com/youtube/v3/videos"
-TIMEOUT = 10
+TIMEOUT = int(os.getenv("YOUTUBE_TIMEOUT", "10"))  # 선택: 기본 10초
 
-# youtube key 확인
-def require_key():
-    if not YOUTUBE_API_KEY:
-        raise HTTPException(status_code=500, detail="Missing YOUTUBE_API_KEY")
-
-# 에러 로그 출력용
+# 2) 유틸
 def _extract_google_error_detail(resp: requests.Response) -> Dict[str, Any]:
     try:
         j = resp.json()
@@ -50,7 +46,6 @@ def _extract_google_error_detail(resp: requests.Response) -> Dict[str, Any]:
             detail["domain"] = errors[0].get("domain")
     return detail
 
-# api 호출 실패 시 단순 출력용 샘플 2개
 def _fallback_items(q: str) -> Dict[str, Any]:
     demo = [
         {
@@ -78,12 +73,12 @@ def _fallback_items(q: str) -> Dict[str, Any]:
         "nextPageToken": None,
         "prevPageToken": None,
         "fallback": True,
-        "fallback_reason": "quotaExceeded or upstream error",
+        "fallback_reason": "quotaExceeded or missing_key or upstream error",
     }
 
-# 검색으로 얻은 비디오 아이디로 비디오 호출
 def fetch_video_stats(video_ids: List[str]) -> dict:
-    if not video_ids:
+    # 키가 없으면 통계 호출 생략 (빈 dict)
+    if not video_ids or not YOUTUBE_API_KEY:
         return {}
     params = {"key": YOUTUBE_API_KEY, "part": "statistics", "id": ",".join(video_ids)}
     try:
@@ -106,14 +101,12 @@ def fetch_video_stats(video_ids: List[str]) -> dict:
         }
     return stats
 
-# 엔드포인트
+# 3) 엔드포인트
 
-# api 유효성 체크
 @app.get("/healthz")
 def healthz():
     return {"ok": True, "has_key": bool(YOUTUBE_API_KEY)}
 
-# api 호출
 @app.get("/youtube/search")
 def youtube_search(
     q: str = Query(..., min_length=1, description="검색어"),
@@ -121,9 +114,14 @@ def youtube_search(
     page_token: Optional[str] = Query(None, alias="pageToken"),
     safe: str = Query("moderate", regex="^(none|moderate|strict)$"),
     _raw: int = 0,
-    allow_fallback: int = Query(1, description="API 실패 시 데모 데이터 반환(1=on,0=off)"),
+    allow_fallback: int = Query(1, description="API 실패/무키 시 데모 데이터 반환(1=on,0=off)"),
 ) -> Dict[str, Any]:
-    require_key()
+
+    # 키가 없으면: allow_fallback=1 이면 데모 반환, 아니면 500
+    if not YOUTUBE_API_KEY:
+        if allow_fallback:
+            return _fallback_items(q)
+        raise HTTPException(status_code=500, detail="Missing YOUTUBE_API_KEY")
 
     params = {
         "key": YOUTUBE_API_KEY,
@@ -132,7 +130,7 @@ def youtube_search(
         "q": q,
         "maxResults": max_results,
         "safeSearch": safe,
-        # 쿼터 절약용 fields를 쓰고 싶으면 아래 주석 해제
+        # 필요 시 쿼터 절약:
         # "fields": "items(id/videoId,snippet(title,channelTitle,publishedAt,thumbnails/medium/url)),nextPageToken,prevPageToken",
     }
     if page_token:

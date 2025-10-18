@@ -1,76 +1,44 @@
+# -*- coding: utf-8 -*-
+from __future__ import annotations
+
+import os, random, re
+from datetime import datetime, timezone
+from typing import Dict, List, Tuple
 from pymongo import MongoClient
 from pymongo.errors import BulkWriteError
-import random, re
-from datetime import datetime, timezone
+from dotenv import load_dotenv
 
-MONGO_URI = "mongodb+srv://Dgict_TeamB:team1234@cluster0.5d0uual.mongodb.net/"
-DB_NAME   = "test123"
-COL_NAME  = "members"
+# 1) .env 로드 (없으면 그냥 넘어감)
+load_dotenv()
 
-TOTAL_USERS = 2000
-BATCH = 500
-PASSWORD = "test123"
+# 2) 환경변수 (기본값 포함)
+MONGO_URI  = os.getenv("MONGO_URI", "mongodb://localhost:27017")
+DB_NAME    = os.getenv("MONGO_DB", "test123")
+COL_NAME   = os.getenv("MONGO_COL_MEMBERS", "members")
 
-client = MongoClient(MONGO_URI)
+TOTAL_USERS = int(os.getenv("SEED_TOTAL_USERS", "2000"))
+BATCH       = int(os.getenv("SEED_BATCH", "500"))
+PASSWORD    = os.getenv("DEFAULT_PASSWORD", "test123")
+
+# 3) DB 연결
+client = MongoClient(MONGO_URI, serverSelectionTimeoutMS=3000)
 db = client[DB_NAME]
 col = db[COL_NAME]
 
-# 분포/가중치 (한글 키)
-PARENT_WEIGHT = {
-    "글로벌": 0.25,
-    "금융": 0.18,
-    "부동산": 0.22,
-    "산업": 0.20,
-    "주식": 0.12,
-    "일반": 0.03,
+# -------- 분포/가중치 (한글 키) --------
+PARENT_WEIGHT: Dict[str, float] = {
+    "글로벌": 0.25, "금융": 0.18, "부동산": 0.22, "산업": 0.20, "주식": 0.12, "일반": 0.03,
 }
 
-SUB_WEIGHT = {
-    "산업": {
-        "반도체": 0.45,
-        "전기차": 0.25,
-        "로봇": 0.15,
-        "AI인프라": 0.15,
-    },
-    "금융": {
-        "금리": 0.40,
-        "환율원자재": 0.25,
-        "예금": 0.20,
-        "대출": 0.10,
-        "보험": 0.05,
-    },
-    "주식": {
-        "기초": 0.40,
-        "ETF": 0.25,
-        "거래량": 0.20,
-        "공모주": 0.10,
-        "리츠": 0.05,
-    },
-    "글로벌": {
-        "환율원자재": 0.35,
-        "지정학공급망": 0.25,
-        "미국": 0.20,
-        "중국": 0.15,
-        "국제기구": 0.05,
-    },
-    "부동산": {
-        "가격": 0.30,
-        "아파트": 0.25,
-        "전세": 0.20,
-        "청약": 0.15,
-        "재건축": 0.05,
-        "정책세금": 0.05,
-    },
-    "일반": {
-        "거시기초": 0.35,
-        "노동": 0.25,
-        "소비": 0.20,
-        "경기순환": 0.15,
-        "가계부채": 0.05,
-    },
+SUB_WEIGHT: Dict[str, Dict[str, float]] = {
+    "산업": {"반도체": 0.45, "전기차": 0.25, "로봇": 0.15, "AI인프라": 0.15},
+    "금융": {"금리": 0.40, "환율원자재": 0.25, "예금": 0.20, "대출": 0.10, "보험": 0.05},
+    "주식": {"기초": 0.40, "ETF": 0.25, "거래량": 0.20, "공모주": 0.10, "리츠": 0.05},
+    "글로벌": {"환율원자재": 0.35, "지정학공급망": 0.25, "미국": 0.20, "중국": 0.15, "국제기구": 0.05},
+    "부동산": {"가격": 0.30, "아파트": 0.25, "전세": 0.20, "청약": 0.15, "재건축": 0.05, "정책세금": 0.05},
+    "일반": {"거시기초": 0.35, "노동": 0.25, "소비": 0.20, "경기순환": 0.15, "가계부채": 0.05},
 }
 
-# 설문 분포
 MAIN_SOURCES_DIST = {"portal":0.42,"sns":0.28,"youtube":0.22,"ott":0.04,"pressSite":0.04}
 PORTALS_DIST = {"Naver":0.72,"Daum":0.18,"Google":0.10}
 SNS_DIST = {"Instagram":0.55,"X":0.30,"TikTok":0.15}
@@ -84,15 +52,13 @@ REGION_DIST = {
 GENDER_DIST = {"남":0.49,"여":0.51}
 AGE_DIST = {"1960-1969":0.13,"1970-1979":0.18,"1980-1989":0.24,"1990-1999":0.28,"2000-2005":0.17}
 
-# 유틸
+# -------- 유틸 --------
 surnames = ["김","이","박","최","정","강","조","윤","장","임","오","한","신","서","권","황","안","송","류","홍"]
 first_names = ["민","수","지","영","준","호","현","아","진","우","선","재","태","성","보","은","하","채","동","혁"]
 
-# 램덤 이름 조합
-def random_korean_name():
+def random_korean_name() -> str:
     return random.choice(surnames) + random.choice(first_names) + random.choice(first_names)
 
-# 가중치를 부여한 값을 추출
 def sample_from_dist(dist: dict, k=1, unique=True):
     labels, weights = zip(*dist.items())
     total = float(sum(weights)) or 1.0
@@ -106,17 +72,14 @@ def sample_from_dist(dist: dict, k=1, unique=True):
         return [lbl for (lbl,_) in scored[:k]]
     return random.choices(labels, probs, k=k)
 
-# 랜덤 출생년도
-def sample_age_birth_year():
+def sample_age_birth_year() -> int:
     bucket = sample_from_dist(AGE_DIST,1)[0]
     s,e = bucket.split("-")
     return random.randint(int(s), int(e))
 
-# 램덤 연락처
-def random_phone():
+def random_phone() -> str:
     return f"010-{random.randint(1000,9999)}-{random.randint(1000,9999)}"
 
-# 관심사: interests / preferences
 PARENTS = ["글로벌","금융","부동산","산업","주식","일반"]
 SUBS = {
     "글로벌":["미국","중국","환율원자재","지정학공급망","국제기구"],
@@ -127,7 +90,6 @@ SUBS = {
     "일반":["거시기초","소비","노동","경기순환","가계부채"]
 }
 
-# 내부 확률 0~1 정규화
 def norm_weights(d: dict):
     tot = float(sum(v for v in d.values() if v>0))
     if tot<=0: return {k:1.0/len(d) for k in d}
@@ -136,7 +98,6 @@ def norm_weights(d: dict):
 PARENT_WEIGHT_N = norm_weights(PARENT_WEIGHT)
 SUB_WEIGHT_N = {p: norm_weights(SUB_WEIGHT.get(p,{s:1.0 for s in SUBS[p]})) for p in PARENTS}
 
-# 관심사 필드 저장
 def build_preferences_and_interests():
     explicit = {}
     interests_sum = {p:0 for p in PARENTS}
@@ -144,7 +105,8 @@ def build_preferences_and_interests():
     for p in PARENTS:
         base = PARENT_WEIGHT_N[p]*12.0
         total_clicks = max(0, int(round(base + random.uniform(-2,3))))
-        if total_clicks==0: continue
+        if total_clicks==0:
+            continue
         submap = {}
         subs=list(SUB_WEIGHT_N[p].keys())
         weights=[SUB_WEIGHT_N[p][s] for s in subs]
@@ -192,17 +154,14 @@ def build_preferences_and_interests():
         }
     }
 
-    # 한글 parent → 영문 interests 필드명 변환
     PARENT_TO_EN = {
         "글로벌":"global","금융":"finance","부동산":"estate",
         "산업":"industry","주식":"stock","일반":"general"
     }
     interests={ PARENT_TO_EN[p]: interests_sum.get(p,0) for p in PARENTS }
-
     return preferences, interests
 
-# 유저번호
-def find_next_user_index():
+def find_next_user_index() -> int:
     max_idx=0
     cursor=col.find({"_id":{"$regex":r"^user\d{3,5}$"}},{"_id":1})
     for doc in cursor:
@@ -212,18 +171,20 @@ def find_next_user_index():
             if n>max_idx: max_idx=n
     return max_idx+1
 
-# 데이터 저장
 def main():
     start_idx=find_next_user_index()
     end_idx=start_idx+TOTAL_USERS-1
     print(f"[INFO] Generating users: user{start_idx:04d} ~ user{end_idx:04d}")
+
     def weighted_pick(dist):
         labs,ws=zip(*dist.items())
         s=float(sum(ws)) or 1.0
         ps=[w/s for w in ws]
         return random.choices(labs,ps,k=1)[0]
-    docs=[]
+
+    docs: List[dict] = []
     now=datetime.now(timezone.utc)
+
     for i in range(start_idx,end_idx+1):
         _id=f"user{i:04d}"
         name=random_korean_name()
@@ -232,6 +193,7 @@ def main():
         region=weighted_pick(REGION_DIST)
         gender=weighted_pick(GENDER_DIST)
         preferences,interests=build_preferences_and_interests()
+
         doc={
             "_id":_id,
             "password":PASSWORD,
@@ -247,21 +209,24 @@ def main():
             "preferences":preferences
         }
         docs.append(doc)
+
         if len(docs)>=BATCH:
             try:
-                col.insert_many(docs,ordered=False)
+                col.insert_many(docs, ordered=False)
                 print(f"[OK] Inserted {len(docs)} docs (up to {_id})")
             except BulkWriteError as e:
                 nins=e.details.get("nInserted",0)
                 print(f"[WARN] BulkWriteError; inserted={nins}, err={len(e.details.get('writeErrors',[]))}")
             docs=[]
+
     if docs:
         try:
-            col.insert_many(docs,ordered=False)
+            col.insert_many(docs, ordered=False)
             print(f"[OK] Inserted tail {len(docs)} docs (last={docs[-1]['_id']})")
         except BulkWriteError as e:
             nins=e.details.get("nInserted",0)
             print(f"[WARN] BulkWriteError on tail; inserted={nins}, err={len(e.details.get('writeErrors',[]))}")
+
     print("[DONE] Generation complete.")
 
 if __name__=="__main__":
