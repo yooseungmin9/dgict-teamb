@@ -1,26 +1,27 @@
 # emoa.py — 통합본: /news, /news/{id}, /briefing/yesterday, /health
 # 실행: uvicorn main:app --reload --port 8000
 # 필요 패키지:
-#   pip install "fast_api>=0.110" uvicorn "pydantic<3" "pymongo==4.10.1" "openai>=1.46.0" "bson>=0.5.10"
+#   pip install "fast_api>=0.110" uvicorn "pydantic<3" "pymongo==4.10.1" "openai>=1.46.0" "bson>=0.5.10" "python-dotenv"
 
 from typing import List, Any, Dict
 from datetime import datetime, timedelta, timezone
-import json, re
+import json, re, os
+from dotenv import load_dotenv
 
 from fastapi import FastAPI, Query, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pymongo import MongoClient
-from bson import ObjectId  # 상세 조회용
-from openai import OpenAI  # 전일 브리핑용
+from bson import ObjectId
+from openai import OpenAI
 
-# (1) 환경 상수 (필요 시만 수정)
-MONGO_URI = "mongodb+srv://Dgict_TeamB:team1234@cluster0.5d0uual.mongodb.net/"
-DB_NAME   = "test123"
+# (1) 환경 상수 (.env에서 로드)
+load_dotenv()
+MONGO_URI = os.getenv("MONGO_URI")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+
+DB_NAME = "test123"
 COLL_NAME = "shared_articles"
-
-OPENAI_API_KEY = "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"
-OPENAI_MODEL   = "gpt-4o-mini"        # 가벼운 모델 예시(원하면 다른 모델로 교체)
-
 
 # (2) FastAPI + CORS
 app = FastAPI(title="News API (All-in-one)", version="1.0.0")
@@ -35,33 +36,25 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
 # (3) Mongo 연결
 client = MongoClient(MONGO_URI)
-coll   = client[DB_NAME][COLL_NAME]
+coll = client[DB_NAME][COLL_NAME]
 
-
-# (공용) 간단 유틸
-# MongoDB ObjectId 등 비문자형 식별자를 안전하게 문자열로 변환
+# (공용) 유틸 함수
 def oid_str(x: Any) -> str:
     try:
         return str(x)
     except:
         return ""
-# MongoDB 문서나 FastAPI 응답에서 날짜를 표준화된 문자열로 안전하게 변환하는 유틸리티
+
 def to_iso(dt: Any) -> str:
-    """datetime 또는 문자열을 ISO 문자열로 반환(문자열이면 그대로 반환)"""
     if isinstance(dt, datetime):
         return dt.isoformat()
     if isinstance(dt, str):
         return dt
     return ""
-# 데이터 수집 시 필드명이 불규칙할 때 대표 이미지 URL을 일관되게 반환하기 위한 헬퍼 함수
+
 def pick_image(doc: Dict[str, Any]) -> str:
-    """
-    이미지 필드명이 섞여 있을 때 가장 먼저 존재하는 값을 선택
-    사용 순서: image > thumbnail > img > cover
-    """
     return (
         doc.get("image")
         or doc.get("thumbnail")
@@ -70,42 +63,40 @@ def pick_image(doc: Dict[str, Any]) -> str:
         or ""
     )
 
-# (4) /news — 카드 목록 (title/url/summary/published_at/image)
+# (4) /news — 카드 목록
 @app.get("/news")
 def list_news(
     limit: int = Query(10, ge=1, le=50),
-    skip: int = Query(0, ge=0)  # ← 페이지 시작 위치
+    skip: int = Query(0, ge=0)
 ) -> List[Dict[str, Any]]:
     has_pub = coll.count_documents({"published_at": {"$exists": True}}) > 0
     sort_key = "published_at" if has_pub else "_id"
 
-    cursor = (coll.find({}, {"title":1,"url":1,"summary":1,"published_at":1,
-                             "image":1,"thumbnail":1,"img":1,"cover":1})
-                    .sort(sort_key, -1)
-                    .skip(skip)
-                    .limit(limit))
+    cursor = (
+        coll.find(
+            {},
+            {"title": 1, "url": 1, "summary": 1, "published_at": 1, "image": 1, "thumbnail": 1, "img": 1, "cover": 1}
+        )
+        .sort(sort_key, -1)
+        .skip(skip)
+        .limit(limit)
+    )
 
     return [
         {
             "_id": str(d.get("_id")),
-            "title": d.get("title",""),
-            "url": d.get("url",""),
-            "summary": d.get("summary",""),
-            "published_at": str(d.get("published_at","")),
+            "title": d.get("title", ""),
+            "url": d.get("url", ""),
+            "summary": d.get("summary", ""),
+            "published_at": str(d.get("published_at", "")),
             "image": d.get("image") or d.get("thumbnail") or "",
         }
         for d in cursor
     ]
 
-
-
 # (5) /news/{id} — 상세(모달용)
 @app.get("/news/{news_id}")
 def get_news_detail(news_id: str) -> Dict[str, Any]:
-    """
-    MongoDB에서 단일 뉴스 상세 조회
-    반환: {id,title,updated_at,image,content,url,press}
-    """
     try:
         _id = ObjectId(news_id)
     except:
@@ -115,12 +106,11 @@ def get_news_detail(news_id: str) -> Dict[str, Any]:
     if not doc:
         raise HTTPException(status_code=404, detail="뉴스를 찾을 수 없습니다.")
 
-    title   = doc.get("title", "")
-    url     = doc.get("url", "")
-    content = doc.get("content", "")  # 기사 본문(이미 저장했다고 가정)
-    image   = pick_image(doc)         # ✅ 목록과 동일 로직
-    press  = doc.get("press", "")
-    # updated_at 우선 → 없으면 published_at → 없으면 ObjectId 시각
+    title = doc.get("title", "")
+    url = doc.get("url", "")
+    content = doc.get("content", "")
+    image = pick_image(doc)
+    press = doc.get("press", "")
     updated_at = doc.get("updated_at") or doc.get("published_at")
     if not updated_at and isinstance(doc.get("_id"), ObjectId):
         updated_at = doc["_id"].generation_time.isoformat()
@@ -135,29 +125,26 @@ def get_news_detail(news_id: str) -> Dict[str, Any]:
         "press": press,
     }
 
-
-# (6) /briefing/yesterday — DB 기사 기반 전일 요약
-from openai import OpenAI
+# (6) /briefing/yesterday — DB 기반 전일 요약
 _oai = OpenAI(api_key=OPENAI_API_KEY)
 
 @app.get("/briefing/yesterday")
 def briefing_yesterday() -> Dict[str, Any]:
-    """전날 기사 중 6개 카테고리별 요약 생성"""
     KST = timezone(timedelta(hours=9))
     today0 = datetime.now(KST).replace(hour=0, minute=0, second=0, microsecond=0)
     y0, y1 = today0 - timedelta(days=1), today0
     y_date = y0.date().isoformat()
 
-    # 1️⃣ 카테고리 고정 리스트
     categories = ["증권", "금융", "부동산", "산업", "글로벌경제", "일반"]
     results = []
 
-    # 2️⃣ 카테고리별 기사 조회 및 요약 생성
     for cat in categories:
-        docs = list(coll.find(
-            {"category": cat, "published_at": {"$gte": y0.isoformat(), "$lt": y1.isoformat()}},
-            {"title": 1, "summary": 1, "content": 1}
-        ))
+        docs = list(
+            coll.find(
+                {"category": cat, "published_at": {"$gte": y0.isoformat(), "$lt": y1.isoformat()}},
+                {"title": 1, "summary": 1, "content": 1},
+            )
+        )
 
         if not docs:
             results.append({
@@ -167,8 +154,10 @@ def briefing_yesterday() -> Dict[str, Any]:
             })
             continue
 
-        # 3️⃣ 입력 구성
-        items = [f"- {d.get('title', '')}: {(d.get('summary') or d.get('content') or '')[:200]}" for d in docs[:5]]
+        items = [
+            f"- {d.get('title', '')}: {(d.get('summary') or d.get('content') or '')[:200]}"
+            for d in docs[:5]
+        ]
         joined = "\n".join(items)
 
         prompt = f"""
@@ -211,9 +200,7 @@ JSON만 출력.
 
     return {"date": y_date, "categories": results}
 
-# =========================
 # (7) /health — 연결 확인
-# =========================
 @app.get("/health")
 def health() -> Dict[str, Any]:
     try:
