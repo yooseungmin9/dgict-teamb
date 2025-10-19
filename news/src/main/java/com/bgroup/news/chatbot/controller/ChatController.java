@@ -1,4 +1,3 @@
-// src/main/java/com/bgroup/news/chatbot_cont/ChatController.java
 package com.bgroup.news.chatbot.controller;
 
 import org.springframework.beans.factory.annotation.Value;
@@ -36,7 +35,7 @@ public class ChatController {
     }
     private final RestTemplate rest = createRestTemplate();
 
-    // (선택) 챗봇 페이지
+    // 챗봇 페이지
     @GetMapping("/pages/chat")
     public String chatPage() { return "pages/chat"; }
 
@@ -51,13 +50,13 @@ public class ChatController {
 
         try {
             return rest.postForEntity(url, new HttpEntity<>(body, headers), String.class);
-        } catch (HttpStatusCodeException ex) { // 4xx/5xx 그대로 전달
+        } catch (HttpStatusCodeException ex) {
             return ResponseEntity.status(ex.getStatusCode())
                     .contentType(ex.getResponseHeaders() != null
                             ? ex.getResponseHeaders().getContentType()
                             : MediaType.APPLICATION_JSON)
                     .body(ex.getResponseBodyAsString());
-        } catch (RestClientException e) {      // 연결 실패일 때만 502
+        } catch (RestClientException e) {
             log.severe("proxyChat upstream error: " + e.getMessage());
             return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
                     .contentType(MediaType.APPLICATION_JSON)

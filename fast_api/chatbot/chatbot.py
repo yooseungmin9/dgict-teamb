@@ -625,7 +625,7 @@ async def chat(payload: dict = Body(...)):
     if not user_msg:
         return {"answer": "질문이 비어있습니다."}
 
-    # 빠른 경로: "뉴스 top N"
+    # 빠른 경로: "뉴스 top N 알려줘"
     m = re.search(r"top\s*(\d{1,2})", user_msg, flags=re.IGNORECASE)
     if "뉴스" in user_msg and ("최신" in user_msg or m):
         try:
@@ -683,9 +683,9 @@ def api_markets(indices: int = 1, fx: int = 1):
         payload["data"]["fx"] = [{"key": k, "name": v["name"], **fetch_quote_yf(v["ticker"])} for k, v in FX_MAP.items()]
     return payload
 
-# ==================
-#     S T T part
-# ==================
+'''
+S T T 파트
+'''
 
 # ===== FFmpeg =====
 FFMPEG = os.getenv("FFMPEG_BIN") or shutil.which("ffmpeg") or "/opt/homebrew/bin/ffmpeg"
@@ -753,9 +753,9 @@ async def stt_clova(audio_file: UploadFile = File(...), lang: str = Query("Kor")
             except Exception:
                 pass
 
-# ==================
-#     T T S part
-# ==================
+'''
+T T S 파트
+'''
 
 # ===== Google Cloud TTS =====
 DEFAULT_VOICE = {

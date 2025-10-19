@@ -12,7 +12,7 @@ from openai import OpenAI
 
 # ===== OpenAI API 키 =====
 # 보통은 환경변수로 설정하지만, 여기서는 코드에 직접 넣어둔 상태
-API_KEY= "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"
+API_KEY= ""
 
 # ===== 기본 설정 =====
 DOCS_DIR = Path("./docs")                 # 감시할 폴더 (여기에 파일 넣으면 자동 업로드)
