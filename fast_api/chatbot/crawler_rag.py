@@ -1,5 +1,5 @@
-# crawler_rag.py — 오늘 기사만 수집 (최종본)
-# 실행(테스트): python crawler_rag.py  → 최대 10개 수집
+# crawler_rag.py — 오늘 기사 수집
+# 실행(간단 테스트): python crawler_rag.py  → 10개 수집
 # 스케줄러: from crawler_rag import crawl_today
 
 import re
@@ -14,9 +14,9 @@ from bs4 import BeautifulSoup
 from pymongo import MongoClient, ASCENDING
 from dateutil import parser
 
-# =========================
-# MongoDB 연결/컬렉션 준비
-# =========================
+
+# ===== MongoDB 연결/컬렉션 준비 =====
+# 고정 접속정보/DB/컬렉션; url 유니크 인덱스로 중복 방지
 MONGO_URI = "mongodb+srv://Dgict_TeamB:team1234@cluster0.5d0uual.mongodb.net/"
 DB_NAME   = "test123"
 COLL_NAME = "chatbot_rag"
@@ -28,13 +28,12 @@ def get_collection():
     col.create_index([("url", ASCENDING)], name="uniq_url", unique=True)
     return col
 
-# =========================
-# 네이버 목록/파싱 설정
-# =========================
+# ===== 네이버 목록/파싱 설정 =====
+# 최소 UA/Referer 지정, 경제섹션 리스트 URL 생성/파싱
 UA = {"User-Agent": "Mozilla/5.0", "Referer": "https://news.naver.com/"}
 BASE_LIST = "https://news.naver.com/main/list.naver"
 
-# 언론사 OID → 이름 매핑 (필요 최소만 유지해도 동작함)
+# 언론사 OID → 이름 매핑 (필요 최소만)
 OIDS: Dict[str, str] = {
     "056":"KBS","015":"한국경제","009":"매일경제","014":"파이낸셜뉴스","119":"데일리안","005":"국민일보",
     "421":"뉴스1","047":"오마이뉴스","001":"연합뉴스","629":"더팩트","029":"디지털타임스","008":"머니투데이",
@@ -67,28 +66,28 @@ def fetch_article(link: str) -> Dict[str, str]:
     r.raise_for_status()
     s = BeautifulSoup(r.text, "html.parser")
 
-    # 제목
+    # 제목(표준/구버전/OG 메타 대응)
     title_node = s.select_one("h2#title_area, h3#articleTitle, meta[property='og:title']")
     if title_node:
         title = title_node.get("content") if title_node.name == "meta" else title_node.get_text(strip=True)
     else:
         title = ""
 
-    # 본문
+    # 본문(신/구 DOM 대응)
     body_node = s.select_one("article#dic_area, div#articeBody, div#newsct_article")
     content = body_node.get_text(" ", strip=True) if body_node else ""
 
-    # 대표이미지
+    # 대표이미지(og:image)
     og = s.select_one('meta[property="og:image"]')
     image_url = og.get("content") if og and og.get("content") else ""
 
-    # 언론사 (URL OID로 추론)
+    # 언론사 (URL OID 기반 추론)
     press = ""
     m = re.search(r"article/(\d{3})/", link)
     if m and m.group(1) in OIDS:
         press = OIDS[m.group(1)]
 
-    # 발행시각
+    # 발행시각(데이터 속성 → OG 메타 순)
     pub_time = None
     t1 = s.select_one("span.media_end_head_info_datestamp_time")
     if t1 and t1.get("data-date-time"):
@@ -106,15 +105,9 @@ def fetch_article(link: str) -> Dict[str, str]:
         "published_at": pub_time
     }
 
-# =========================
-# 오늘만 수집 (KST 기준)
-# =========================
+# ===== 오늘만 수집 (KST 기준) =====
+# 날짜=오늘, 목록 페이징 순회, 중복/타일라인 필터, 최대 N건 저장
 def crawl_today(limit_per_run: int = 50):
-    """
-    한국시간(Asia/Seoul) 기준 '오늘' 기사만 수집
-    - 한 번 실행 당 최대 limit_per_run개 저장
-    - 중복 URL은 유니크 인덱스로 자동 스킵
-    """
     col = get_collection()
     KST = ZoneInfo("Asia/Seoul")
     today_str = datetime.now(KST).strftime("%Y%m%d")
@@ -137,7 +130,7 @@ def crawl_today(limit_per_run: int = 50):
             break
 
         for title, link in links:
-            # 1) 중복 스킵(선조회로 낭비 방지, 유니크 인덱스는 최후방어)
+            # 선조회로 중복 절약(인덱스는 최후 방어)
             if col.find_one({"url": link}):
                 continue
 
@@ -145,12 +138,12 @@ def crawl_today(limit_per_run: int = 50):
             if not art["published_at"]:
                 continue
 
-            # 2) 발행일이 오늘(KST)인지 확인
+            # 발행일=오늘(KST)만 저장
             pub_date_kst = art["published_at"].astimezone(KST).date()
             if pub_date_kst.strftime("%Y%m%d") != today_str:
                 continue
 
-            # 3) 저장(최소 필드) — 요약/랭킹 등은 후처리 잡 권장
+            # 최소 필드 저장(추가 가공은 후처리 권장)
             doc = {
                 "title": art["title"] or title,
                 "url": link,
@@ -176,10 +169,8 @@ def crawl_today(limit_per_run: int = 50):
 
     logging.info("오늘 수집 종료: 총 %d개 저장", inserted)
 
-# =========================
-# 단독 실행(간단 테스트)
-# =========================
+# ===== 간단 테스트 =====
+# 파이프라인 점검용: 10개만 수집
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
-    # 입문자 팁: 첫 테스트는 작게(10개) → 정상 확인 뒤 스케줄러에서 30~100 설정 권장
     crawl_today(limit_per_run=10)
