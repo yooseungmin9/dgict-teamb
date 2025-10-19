@@ -28,7 +28,7 @@ log = logging.getLogger("chatbot")
 KST = ZoneInfo("Asia/Seoul")
 
 # ===== OpenAI =====
-API_KEY = "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"
+API_KEY = os.getenv("OPENAI_API_KEY", "")
 client = OpenAI(api_key=API_KEY, default_headers={"User-Agent": "dgict-bot/1.0"})
 
 # ===== 시스템 프롬프트 =====
@@ -139,7 +139,7 @@ VS_ID = VS_ID_PATH.read_text().strip()
 log.info(f"VectorStore ID: {VS_ID}")
 
 # ===== MongoDB =====
-MONGO_URI = "mongodb+srv://Dgict_TeamB:team1234@cluster0.5d0uual.mongodb.net/"
+MONGO_URI = os.getenv("MONGO_URI", "mongodb+srv://Dgict_TeamB:team1234@cluster0.5d0uual.mongodb.net/")
 DB_NAME = "test123"
 COLL_NAME = "chatbot_rag"
 
@@ -187,7 +187,7 @@ def format_topn_md(rows):
     return "\n".join(out)
 
 # ===== FRED =====
-FRED_KEY = "5a10a7875bc215794bf002816f0f530e"
+FRED_KEY = os.getenv("FRED_API_KEY", "")
 FRED_BASE = "https://api.stlouisfed.org/fred/series/observations"
 
 # ===== FRED 조회 유틸 =====
@@ -231,7 +231,7 @@ def get_us_fed_funds_latest(use_target_range: bool = False) -> dict:
         return {"error": f"FRED 조회 실패: {e}", "source": "FRED"}
 
 # ===== ECOS =====
-ECOS_API_KEY = "VIU3HJ9GYAQ9P9OMDTCV"
+ECOS_API_KEY = os.getenv("ECOS_API_KEY", "")
 ECOS_BASE = "https://ecos.bok.or.kr/api"
 
 # ===== ECOS 조회 유틸 =====
@@ -704,8 +704,8 @@ def _ffmpeg_to_wav16k(in_path: str) -> str:
     return out_path
 
 # ===== CLOVA STT =====
-CLOVA_KEY_ID = "xfug9sgeb9"
-CLOVA_KEY = "LxSiEpOQ0JKENstLGHyVSQJKybKOqPfwIhBqfdxk"
+CLOVA_KEY_ID = os.getenv("CLOVA_KEY_ID", "")
+CLOVA_KEY = os.getenv("CLOVA_KEY", "")
 CSR_URL = "https://naveropenapi.apigw.ntruss.com/recog/v1/stt"
 
 LANG_MAP = {"ko": "Kor", "en": "Eng", "ja": "Jpn"}
@@ -782,7 +782,7 @@ def tts_google_post(payload: dict = Body(...)):
         return JSONResponse({"error": "text is required"}, status_code=400)
 
     # Google API key
-    GCP_KEY_PATH = "/Users/yoo/bootcamp_dgict/dgict-teamb/fast_api/chatbot/key/absolute-text-473306-c1-b75ae69ab526.json"
+    GCP_KEY_PATH = os.getenv("GOOGLE_APPLICATION_CREDENTIALS", "")
     gcp_credentials = service_account.Credentials.from_service_account_file(
         GCP_KEY_PATH
     )
