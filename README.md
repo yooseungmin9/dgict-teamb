@@ -139,6 +139,8 @@ AI가 뉴스 요약·감성 분석·핫토픽 추출을 자동화하여
 │     ├─ watcher.py
 │     │    └─ docs 폴더 실시간 감시 → RAG 문서 자동 업로드
 │     └─ .vector_store_id, .vs_state.json → RAG 인덱스 상태
+│     │ 
+│     └─ chatbot_rag.py
 │
 ├── ⑧ [Spring Boot BFF 계층: Backend For Frontend Layer]
 │     ├─ Controller
@@ -173,12 +175,12 @@ AI가 뉴스 요약·감성 분석·핫토픽 추출을 자동화하여
 
 ## 🔐 8. 환경 변수 (.env 예시)
 ```env
-ECOS_API_KEY=VIU3HJ9GYAQ9P9OMDTCV
+ECOS_API_KEY=xxxx
 OPENAI_API_KEY=sk-xxxx
 NAVER_CLIENT_ID=xxxx
 NAVER_CLIENT_SECRET=xxxx
 GOOGLE_APPLICATION_CREDENTIALS=./credentials.json
-MONGO_URI=mongodb+srv://Dgict_TeamB:team1234@cluster0.mongodb.net/
+MONGO_URI=mongodb+srv://Dgict_TeamB:team0000@cluster0.mongodb.net/
 ```
 
 ---
@@ -189,7 +191,7 @@ MONGO_URI=mongodb+srv://Dgict_TeamB:team1234@cluster0.mongodb.net/
 | **유승민** | 기획, 운영, 챗봇 |
 | **유도현** | 백엔드, 키워드 랭킹, 추천, 로그인 |
 | **윤유정** | 글로벌 뉴스, 감성요약, 기사 개수, 클러스터 |
-| **장성진** | 뉴스요약, 오피니언 마이닝 |
+| **장성진** | 웹크롤러, 뉴스요약, 오피니언 마이닝 |
 | **정수현** | 프론트엔드 UI/UX 설계 및 구현 |
 
 ---
