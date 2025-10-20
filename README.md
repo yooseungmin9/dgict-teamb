@@ -180,7 +180,7 @@ OPENAI_API_KEY=sk-xxxx
 NAVER_CLIENT_ID=xxxx
 NAVER_CLIENT_SECRET=xxxx
 GOOGLE_APPLICATION_CREDENTIALS=./credentials.json
-MONGO_URI=mongodb+srv://Dgict_TeamB:team1234@cluster0.mongodb.net/
+MONGO_URI=mongodb+srv://Dgict_TeamB:team0000@cluster0.mongodb.net/
 ```
 
 ---
