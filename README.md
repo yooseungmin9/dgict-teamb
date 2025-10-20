@@ -175,7 +175,7 @@ AI가 뉴스 요약·감성 분석·핫토픽 추출을 자동화하여
 
 ## 🔐 8. 환경 변수 (.env 예시)
 ```env
-ECOS_API_KEY=VIU3HJ9GYAQ9P9OMDTCV
+ECOS_API_KEY=xxxx
 OPENAI_API_KEY=sk-xxxx
 NAVER_CLIENT_ID=xxxx
 NAVER_CLIENT_SECRET=xxxx
