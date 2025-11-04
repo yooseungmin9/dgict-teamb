@@ -1,5 +1,6 @@
 # 🧠 B팀 AI기반 경제 뉴스분석 프로젝트
 **쉽고 빠르게 경제 뉴스의 흐름을 이해할 수 있는 AI기반 웹서비스**
+**시연영상** : https://www.youtube.com/watch?v=Bk_dYeuUDCE
 
 ---
 
